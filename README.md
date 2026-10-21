@@ -35,7 +35,7 @@ Create an application password in Pi-hole and enter it in Home Assistant. It is 
 
 ## Query history and limits
 
-The integration calls Home Assistant's documented `logbook.log` action. The original Pi-hole timestamp is included in each message; the Activity row itself is timestamped when Home Assistant records it, typically within one polling interval. Recorder retention and filters determine how long the entries remain. A high DNS query rate can produce substantial Recorder and Logbook data.
+The integration calls Home Assistant's documented `logbook.log` action and tags each entry with the `pihole_queries` domain. Entries appear in Activity/Logbook, not on the integration's configuration page. The original Pi-hole timestamp is included in each message; the Activity row itself is timestamped when Home Assistant records it, typically within one polling interval. If Activity uses an include filter, include the `pihole_queries` domain. Recorder retention and filters determine how long the entries remain. A high DNS query rate can produce substantial Recorder and Logbook data.
 
 The first setup stores a baseline ID and does not backfill older Pi-hole queries. The integration reads the in-memory query history exposed by Pi-hole. Queries no longer available there cannot be recovered after a long outage or an FTL history reset. Pagination fetches backlogs in 1,000-row pages. A very large backlog can extend a polling cycle. If Home Assistant stops after writing a Logbook entry but before persisting its cursor, the last entry may be replayed on restart because Recorder and integration storage do not share an atomic transaction.
 

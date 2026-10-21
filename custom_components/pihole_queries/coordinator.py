@@ -175,7 +175,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[int]):
                     {
                         "name": name,
                         "message": f"Fecha/hora de Pi-hole: {query_time} · {message}",
-                        "domain": "logbook",
+                        # Use the integration domain so Activity filters can
+                        # include these entries explicitly and HA can show the
+                        # integration's branding instead of the generic icon.
+                        "domain": DOMAIN,
                     },
                     blocking=True,
                 )
