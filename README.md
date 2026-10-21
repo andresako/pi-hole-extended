@@ -30,6 +30,7 @@ The config flow requests:
 
 - Hostname or IP address and web/API port.
 - Whether to use HTTPS.
+- Whether to verify the HTTPS certificate. Keep this enabled for trusted certificates; disable it only for a self-signed certificate.
 - A Pi-hole application password.
 - Poll interval from 5 to 3600 seconds (default: 15 seconds).
 
@@ -47,7 +48,7 @@ The API schema is versioned with Pi-hole and is also served by each instance at 
 
 ## Development and publication
 
-The repository includes HACS validation and Hassfest workflows. Version `0.3.0` is a test release that organizes client data as devices with five simple sensors. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
+The repository includes HACS validation and Hassfest workflows. Version `0.3.1` is a test release that adds an HTTPS certificate verification option for self-signed Pi-hole certificates. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Spanish installation and lifecycle instructions are in [README.es.md](README.es.md).
 

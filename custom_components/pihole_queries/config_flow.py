@@ -12,6 +12,7 @@ from homeassistant.helpers import selector
 
 from .api import (
     PiHoleAuthenticationError,
+    PiHoleCertificateError,
     PiHoleClient,
     PiHoleConnectionError,
 )
@@ -21,6 +22,7 @@ from .const import (
     CONF_PORT,
     CONF_SCAN_INTERVAL,
     CONF_USE_HTTPS,
+    CONF_VERIFY_SSL,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -44,6 +46,7 @@ def _schema(defaults: dict[str, Any] | None = None, *, include_connection: bool 
                 vol.Coerce(int), vol.Range(min=1, max=65535)
             ),
             vol.Required(CONF_USE_HTTPS, default=defaults.get(CONF_USE_HTTPS, False)): bool,
+            vol.Required(CONF_VERIFY_SSL, default=defaults.get(CONF_VERIFY_SSL, True)): bool,
             vol.Required(CONF_PASSWORD): selector.TextSelector(
                 selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
             ),
@@ -80,6 +83,8 @@ class PiHoleQueriesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     await _validate_connection(self.hass, data)
                 except PiHoleAuthenticationError:
                     errors["base"] = "invalid_auth"
+                except PiHoleCertificateError:
+                    errors["base"] = "ssl_certificate"
                 except PiHoleConnectionError:
                     errors["base"] = "cannot_connect"
                 else:
@@ -107,6 +112,8 @@ class PiHoleQueriesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await _validate_connection(self.hass, data)
             except PiHoleAuthenticationError:
                 errors["base"] = "invalid_auth"
+            except PiHoleCertificateError:
+                errors["base"] = "ssl_certificate"
             except PiHoleConnectionError:
                 errors["base"] = "cannot_connect"
             else:

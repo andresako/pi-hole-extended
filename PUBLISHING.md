@@ -2,8 +2,8 @@
 
 The public repository is
 [`andresako/pi-hole-extended`](https://github.com/andresako/pi-hole-extended).
-Release `0.3.0` is available as a test build through the custom HACS repository.
-It groups each client's counters and latest query details as entities on a client device.
+Release `0.3.1` is available as a test build through the custom HACS repository.
+It adds an explicit HTTPS certificate verification option for Pi-hole instances that use self-signed certificates.
 
 The request to include the repository in the HACS default catalog,
 [`hacs/default#12355`](https://github.com/hacs/default/pull/12355), was closed

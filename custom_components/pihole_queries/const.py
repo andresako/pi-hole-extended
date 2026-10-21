@@ -9,6 +9,7 @@ CONF_HOST = "host"
 CONF_PORT = "port"
 CONF_PASSWORD = "password"
 CONF_USE_HTTPS = "use_https"
+CONF_VERIFY_SSL = "verify_ssl"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 DEFAULT_PORT = 80

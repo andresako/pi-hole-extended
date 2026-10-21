@@ -3,11 +3,12 @@
     "step": {
       "user": {
         "title": "Conectar con Pi-hole v6",
-        "description": "Introduce la dirección de Pi-hole y una contraseña de aplicación creada en su interfaz.",
+        "description": "Introduce la dirección de Pi-hole y una contraseña de aplicación. Si usas un certificado autofirmado, desactiva la verificación HTTPS.",
         "data": {
           "host": "Host o dirección IP",
           "port": "Puerto web/API",
           "use_https": "Usar HTTPS",
+          "verify_ssl": "Verificar el certificado HTTPS",
           "password": "Contraseña de aplicación",
           "scan_interval": "Frecuencia de consulta (segundos)"
         }
@@ -21,6 +22,7 @@
     "error": {
       "invalid_host": "Introduce un host válido.",
       "cannot_connect": "No se pudo conectar a la API v6 de Pi-hole. Revisa host, puerto, protocolo y que /api/docs esté disponible.",
+      "ssl_certificate": "Home Assistant no confía en el certificado HTTPS de Pi-hole. Si es autofirmado, desactiva la verificación del certificado.",
       "invalid_auth": "Pi-hole rechazó la contraseña de aplicación."
     },
     "abort": {"reauth_successful": "Credenciales actualizadas."}

@@ -8,7 +8,14 @@ from urllib.parse import urlsplit
 
 import aiohttp
 
-from .const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USE_HTTPS, REQUEST_TIMEOUT
+from .const import (
+    CONF_HOST,
+    CONF_PASSWORD,
+    CONF_PORT,
+    CONF_USE_HTTPS,
+    CONF_VERIFY_SSL,
+    REQUEST_TIMEOUT,
+)
 
 
 class PiHoleApiError(Exception):
@@ -21,6 +28,10 @@ class PiHoleAuthenticationError(PiHoleApiError):
 
 class PiHoleConnectionError(PiHoleApiError):
     """The Pi-hole could not be reached or returned an invalid response."""
+
+
+class PiHoleCertificateError(PiHoleConnectionError):
+    """The HTTPS certificate could not be verified."""
 
 
 class PiHoleClient:
@@ -36,6 +47,7 @@ class PiHoleClient:
             host = f"[{host}]"
         self._base_url = f"{'https' if data[CONF_USE_HTTPS] else 'http'}://{host}:{data[CONF_PORT]}"
         self._password = str(data[CONF_PASSWORD])
+        self._verify_ssl = bool(data.get(CONF_VERIFY_SSL, True))
         self._session = session
         self._sid: str | None = None
         self._lock = asyncio.Lock()
@@ -46,6 +58,7 @@ class PiHoleClient:
             async with self._session.post(
                 f"{self._base_url}/api/auth",
                 json={"password": self._password},
+                ssl=self._verify_ssl,
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
             ) as response:
                 if response.status == 401:
@@ -54,6 +67,8 @@ class PiHoleClient:
                 payload = await response.json(content_type=None)
         except PiHoleAuthenticationError:
             raise
+        except aiohttp.ClientConnectorCertificateError as err:
+            raise PiHoleCertificateError from err
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
             raise PiHoleConnectionError from err
 
@@ -75,6 +90,7 @@ class PiHoleClient:
                     f"{self._base_url}/api/queries",
                     params=params,
                     headers={"X-FTL-SID": self._sid or ""},
+                    ssl=self._verify_ssl,
                     timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
                 ) as response:
                     if response.status == 401:
@@ -86,6 +102,8 @@ class PiHoleClient:
                     payload = await response.json(content_type=None)
             except PiHoleAuthenticationError:
                 raise
+            except aiohttp.ClientConnectorCertificateError as err:
+                raise PiHoleCertificateError from err
             except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
                 raise PiHoleConnectionError from err
             if not isinstance(payload, dict) or not isinstance(payload.get("queries"), list):
@@ -102,6 +120,7 @@ class PiHoleClient:
             async with self._session.delete(
                 f"{self._base_url}/api/auth",
                 headers={"X-FTL-SID": sid},
+                ssl=self._verify_ssl,
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
             ):
                 pass

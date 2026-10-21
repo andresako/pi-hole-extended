@@ -27,6 +27,7 @@ El repositorio está en [andresako/pi-hole-extended](https://github.com/andresak
 - **Host**: nombre o IP de Pi-hole, sin ruta. Por ejemplo, `pi.hole` o `192.168.1.2`.
 - **Puerto**: puerto donde escucha la interfaz/API web de Pi-hole (normalmente 80 o 443).
 - **HTTPS**: actívalo si Pi-hole sirve la API por HTTPS.
+- **Verificar el certificado HTTPS**: déjalo activado si el certificado es de confianza. Desactívalo solo si Pi-hole usa un certificado autofirmado; la conexión seguirá cifrada, pero Home Assistant no validará la identidad del servidor.
 - **Contraseña de aplicación**: crea una en la interfaz de Pi-hole y úsala aquí. No uses ni compartas una contraseña dentro de este proyecto. Se guarda en el campo privado de datos de la entrada de configuración de Home Assistant y no se escribe en los registros de la integración.
 - **Frecuencia**: entre 5 y 3600 segundos; el valor inicial es 15. Se puede cambiar luego en **Opciones** de la integración.
 
