@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -40,28 +39,27 @@ SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     SensorEntityDescription(
-        key="query_rate",
-        name="Consultas por segundo",
+        key="queries_last_minute",
+        name="Consultas (último minuto)",
         icon="mdi:speedometer",
-        native_unit_of_measurement="consultas/s",
+        native_unit_of_measurement="consultas/min",
         state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=2,
+        suggested_display_precision=0,
     ),
     SensorEntityDescription(
-        key="allowed_rate",
-        name="Permitidas por segundo",
+        key="allowed_last_minute",
+        name="Permitidas (último minuto)",
         icon="mdi:check-circle-outline",
-        native_unit_of_measurement="consultas/s",
+        native_unit_of_measurement="consultas/min",
         state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=2,
+        suggested_display_precision=0,
     ),
     SensorEntityDescription(
-        key="blocked_rate",
-        name="Bloqueadas por segundo",
+        key="blocked_last_minute",
+        name="Bloqueadas (último minuto)",
         icon="mdi:cancel",
-        native_unit_of_measurement="consultas/s",
+        native_unit_of_measurement="consultas/min",
         state_class=SensorStateClass.MEASUREMENT,
-        suggested_display_precision=2,
     ),
 )
 
@@ -69,10 +67,10 @@ _COUNT_KEYS = {
     "queries": "query_count",
     "allowed": "allowed_count",
     "blocked": "blocked_count",
+    "queries_last_minute": "queries_last_minute",
+    "allowed_last_minute": "allowed_last_minute",
+    "blocked_last_minute": "blocked_last_minute",
 }
-
-_RATE_KEYS = {"query_rate", "allowed_rate", "blocked_rate"}
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -115,20 +113,9 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
         super().__init__(coordinator)
         self._client_key = client_key
         self._entry = entry
-        client_data = coordinator.client_data.get(client_key, {})
-        client_ip = str(client_data.get("client_ip") or "")
-        client_id = (
-            client_ip
-            if client_ip and client_ip != "Desconocida"
-            else str(client_data.get("client_name") or client_key)
-        )
-        # Keep the client device name human-friendly, while making the sensor ID
-        # clearly filterable by integration in Recorder.
-        self._attr_has_entity_name = False
-        self.entity_description = replace(
-            description,
-            name=f"PHE {client_id} {description.name}",
-        )
+        # The device carries the client name; the entity label only describes
+        # the metric, independently of its technical registry ID.
+        self.entity_description = description
         # Keep the original counter unique_id so updating does not create a duplicate entity.
         suffix = "" if description.key == "queries" else f"_{description.key}"
         self._attr_unique_id = f"{entry.unique_id or entry.entry_id}_{client_key}{suffix}"
@@ -154,7 +141,7 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
 
     @property
     def native_value(self) -> int | float:
-        """Return this entity's accumulated count or latest query rate."""
+        """Return this entity's accumulated count or rolling one-minute count."""
         data = self._client_data
         metric = self.entity_description.key
         if metric in _COUNT_KEYS:
@@ -162,11 +149,6 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
                 return int(data.get(_COUNT_KEYS[metric], 0))
             except (TypeError, ValueError):
                 return 0
-        if metric in _RATE_KEYS:
-            try:
-                return float(data.get(metric, 0.0))
-            except (TypeError, ValueError):
-                return 0.0
         return 0
 
     @property

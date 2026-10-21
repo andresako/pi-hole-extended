@@ -6,7 +6,7 @@ Integración personalizada e independiente de la integración oficial de Pi-hole
 
 Cada entrada incluye la hora de la consulta, nombre e IP del cliente (si Pi-hole los conoce), dominio, decisión permitida/bloqueada y estado original de Pi-hole. Añade tipo DNS, tipo de respuesta, CNAME bloqueado, servidor ascendente y texto EDE cuando la respuesta de la API incluye esos campos. Las categorías y clientes configurados en Pi-hole se conservan tal como los presente la API; la integración no cambia su configuración.
 
-Cada cliente aparece como un dispositivo con seis entidades: los contadores acumulados **Consultas DNS**, **Permitidas** y **Bloqueadas**, y las tasas **Consultas por segundo**, **Permitidas por segundo** y **Bloqueadas por segundo**. Los contadores reflejan las consultas observadas desde que se añadió la integración. Las tasas se calculan entre sondeos correctos; arrancan en cero después del inicio y se actualizan en el siguiente sondeo. Si no hay consultas nuevas, muestran cero. La entidad **Consultas DNS** conserva además nombre/IP, la última consulta y hasta diez consultas recientes en sus atributos. Las consultas individuales aparecen en **Ajustes → Sistema → Registros → Actividad** (Logbook). Si Actividad usa un filtro de dominios incluidos, añade `pihole_queries`.
+Cada cliente aparece como un dispositivo con seis entidades: los contadores acumulados **Consultas DNS**, **Permitidas** y **Bloqueadas**, y los contadores móviles **Consultas (último minuto)**, **Permitidas (último minuto)** y **Bloqueadas (último minuto)**. Los contadores acumulados reflejan las consultas observadas desde que se añadió la integración. Los contadores del último minuto muestran cuántas consultas se han visto en una ventana móvil de 60 segundos; bajan hasta cero cuando el cliente deja de consultar. Se actualizan con cada sondeo, así que el intervalo elegido determina la frecuencia de actualización y el retraso. La entidad **Consultas DNS** conserva nombre/IP y hasta diez consultas recientes en sus atributos. Las consultas individuales aparecen en **Ajustes → Sistema → Registros → Actividad** (Logbook). Si Actividad usa un filtro de dominios incluidos, añade `pihole_queries`.
 
 Los IDs de sus sensores empiezan por `sensor.phe_`; por ejemplo, `sensor.phe_192_168_68_94_consultas_dns`. Ese prefijo permite localizarlos y filtrarlos en Recorder mediante `entity_globs`. Si ya usas un bloque `recorder.include`, puedes añadir:
 
@@ -17,7 +17,7 @@ recorder:
       - sensor.phe_*
 ```
 
-Ten en cuenta que `recorder.include` hace que Recorder guarde solo las entidades incluidas. La versión 0.5.1 migra los IDs generados por defecto y conserva los IDs que ya se hubieran cambiado manualmente. Si una automatización o un panel usaba el ID anterior, actualiza esa referencia después de la migración.
+Ten en cuenta que `recorder.include` hace que Recorder guarde solo las entidades incluidas. La versión 0.6.0 normaliza los IDs de las entidades bajo el prefijo `phe_` y retira las antiguas entidades de tasas por segundo. Si habías personalizado un ID, la migración lo puede cambiar al formato normalizado. La migración no borra el historial ya guardado en Recorder. Los nombres que se muestran son descriptivos y no repiten el ID técnico. Si una automatización o un panel usaba el ID anterior, actualiza esa referencia después de la migración.
 
 ## Requisito de persistencia
 
@@ -82,4 +82,4 @@ custom_components/pihole_queries/
   strings.json
 ```
 
-La versión 0.5.2 distingue los errores de API y Logbook en los registros para facilitar el diagnóstico. La versión 0.5.1 antepone `phe` a los IDs de sensores para facilitar los filtros de Recorder. La versión 0.4.1 permite configurar un sondeo de 1 segundo; la 0.4.0 añadió las tasas de consultas por segundo por cliente y eliminó las entidades de último dominio y último resultado.
+La versión 0.6.0 añade sensores de consultas del último minuto, nombres sencillos para las entidades, normalización de IDs y una corrección de paginación del cursor. La versión 0.5.2 distingue los errores de API y Logbook en los registros para facilitar el diagnóstico. La versión 0.5.1 antepone `phe` a los IDs de sensores para facilitar los filtros de Recorder. La versión 0.4.1 permite configurar un sondeo de 1 segundo; esa opción controla la frecuencia de consulta a la API, no la ventana de los sensores. La versión 0.4.0 añadió tasas por cliente que se reemplazan en la versión 0.6.0 por contadores móviles del último minuto.

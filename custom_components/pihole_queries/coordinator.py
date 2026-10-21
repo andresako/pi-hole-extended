@@ -134,8 +134,6 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.cursor: int | None = None
         self.client_data: dict[str, dict[str, Any]] = {}
         self._bootstrapped = False
-        self._last_rate_sample_at: float | None = None
-        self._last_rate_counts: dict[str, tuple[int, int, int]] = {}
         super().__init__(
             hass,
             _LOGGER,
@@ -183,7 +181,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 ]
                 self.cursor = max(ids, default=0)
                 self._bootstrapped = True
-                self._update_query_rates(time.monotonic())
+                self._update_minute_query_counts(time.time())
                 await self._save_cursor()
                 _LOGGER.info("Pi-hole query tracking initialized at query ID %s", self.cursor)
                 return deepcopy(self.client_data)
@@ -205,13 +203,17 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 ]
                 if not rows or (self.cursor is not None and ids and min(ids) <= self.cursor):
                     break
-                next_cursor = pages[-1].get("cursor")
-                if next_cursor is None:
+                if not ids:
+                    raise UpdateFailed(
+                        "La API de /api/queries devolvió resultados sin identificadores"
+                    )
+                # The Pi-hole v6 instance returns `cursor` as the newest ID in
+                # the current page; passing that value back repeats the page.
+                # Its cursor parameter is inclusive, so request the page before
+                # the oldest ID we just received.
+                next_cursor = min(ids) - 1
+                if next_cursor < 0:
                     break
-                try:
-                    next_cursor = int(next_cursor)
-                except (TypeError, ValueError) as err:
-                    raise UpdateFailed("La API de Pi-hole devolvió un cursor no válido") from err
                 if next_cursor in seen_cursors:
                     raise UpdateFailed("La paginación de /api/queries no avanzó")
                 seen_cursors.add(next_cursor)
@@ -234,7 +236,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if (query_id := _query_id(row)) is not None
             ]
             if not identified:
-                self._update_query_rates(time.monotonic())
+                self._update_minute_query_counts(time.time())
                 await self._save_cursor()
                 return deepcopy(self.client_data)
 
@@ -249,9 +251,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     summary["last_query_id"] = 0
                     summary.pop("last_query", None)
                     summary["recent_queries"] = []
+                    summary["recent_activity"] = []
                 self._seed_clients(pages[0].get("queries", []))
                 self.cursor = newest_id
-                self._update_query_rates(time.monotonic())
+                self._update_minute_query_counts(time.time())
                 await self._save_cursor()
                 return deepcopy(self.client_data)
 
@@ -275,7 +278,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 raise
 
             self.cursor = max(self.cursor or 0, newest_id)
-            self._update_query_rates(time.monotonic())
+            self._update_minute_query_counts(time.time())
             await self._save_cursor()
             return deepcopy(self.client_data)
         except PiHoleAuthenticationError as err:
@@ -284,6 +287,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             ) from err
         except PiHoleConnectionError as err:
             raise UpdateFailed(f"No se pudo consultar la API de Pi-hole: {err}") from err
+        except UpdateFailed:
+            raise
         except HomeAssistantError as err:
             raise UpdateFailed(
                 f"No se pudo registrar una consulta en el Logbook de Home Assistant: {err}"
@@ -299,35 +304,34 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         for query_id, row in sorted(identified, key=lambda pair: pair[0]):
             self._update_client(row, query_id, count_as_new=False)
 
-    def _update_query_rates(self, sampled_at: float) -> None:
-        """Calculate per-client query rates since the previous successful poll."""
-        elapsed = (
-            sampled_at - self._last_rate_sample_at
-            if self._last_rate_sample_at is not None
-            else 0.0
-        )
-        current_counts: dict[str, tuple[int, int, int]] = {}
-        for client_key, summary in self.client_data.items():
-            counts = (
-                int(summary.get("query_count", 0)),
-                int(summary.get("allowed_count", 0)),
-                int(summary.get("blocked_count", 0)),
-            )
-            current_counts[client_key] = counts
-            previous = self._last_rate_counts.get(client_key, counts)
-            rates = (
-                tuple(
-                    max(0, current - old) / elapsed
-                    for current, old in zip(counts, previous, strict=True)
-                )
-                if elapsed > 0
-                else (0.0, 0.0, 0.0)
-            )
-            summary["query_rate"] = rates[0]
-            summary["allowed_rate"] = rates[1]
-            summary["blocked_rate"] = rates[2]
-        self._last_rate_counts = current_counts
-        self._last_rate_sample_at = sampled_at
+    def _update_minute_query_counts(self, sampled_at: float) -> None:
+        """Count queries per client in the rolling 60-second window."""
+        window_start = sampled_at - 60
+        for summary in self.client_data.values():
+            recent = summary.get("recent_activity", [])
+            if not isinstance(recent, list):
+                recent = []
+            activity: list[dict[str, Any]] = []
+            allowed = 0
+            blocked = 0
+            for item in recent:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    timestamp = float(item["timestamp"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if window_start <= timestamp <= sampled_at:
+                    is_blocked = bool(item.get("blocked"))
+                    activity.append({"timestamp": timestamp, "blocked": is_blocked})
+                    if is_blocked:
+                        blocked += 1
+                    else:
+                        allowed += 1
+            summary["recent_activity"] = activity
+            summary["queries_last_minute"] = len(activity)
+            summary["allowed_last_minute"] = allowed
+            summary["blocked_last_minute"] = blocked
 
     def _update_client(
         self,
@@ -346,8 +350,12 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 "query_count": 0,
                 "allowed_count": 0,
                 "blocked_count": 0,
+                "queries_last_minute": 0,
+                "allowed_last_minute": 0,
+                "blocked_last_minute": 0,
                 "last_query_id": 0,
                 "recent_queries": [],
+                "recent_activity": [],
             },
         )
         summary["client_name"] = client_name
@@ -373,8 +381,18 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
         if count_as_new:
             summary["query_count"] = int(summary.get("query_count", 0)) + 1
-            count_key = "blocked_count" if _blocked(query.get("status")) else "allowed_count"
+            is_blocked = _blocked(query.get("status"))
+            count_key = "blocked_count" if is_blocked else "allowed_count"
             summary[count_key] = int(summary.get(count_key, 0)) + 1
+            try:
+                timestamp = float(query["time"])
+            except (KeyError, TypeError, ValueError):
+                timestamp = time.time()
+            activity = summary.setdefault("recent_activity", [])
+            if not isinstance(activity, list):
+                activity = []
+            activity.append({"timestamp": timestamp, "blocked": is_blocked})
+            summary["recent_activity"] = activity
 
     async def _log_query(self, row: dict[str, Any]) -> None:
         """Write one new query to Home Assistant Activity."""
