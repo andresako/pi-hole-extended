@@ -5,8 +5,8 @@
   "config_flow": true,
   "dependencies": ["logbook", "recorder"],
   "documentation": "https://github.com/Andresako/pi-hole-extended#readme",
-  "issue_tracker": "https://github.com/Andresako/pi-hole-extended/issues",
   "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Andresako/pi-hole-extended/issues",
   "requirements": [],
   "version": "0.1.0"
 }
