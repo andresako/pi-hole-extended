@@ -29,6 +29,14 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Remove obsolete sensors and assign concise, integration-prefixed IDs."""
     registry = er.async_get(hass)
+    metric_names = {
+        "consultas_dns": "Consultas DNS",
+        "permitidas": "Permitidas",
+        "bloqueadas": "Bloqueadas",
+        "consultas_por_segundo": "Consultas por segundo",
+        "permitidas_por_segundo": "Permitidas por segundo",
+        "bloqueadas_por_segundo": "Bloqueadas por segundo",
+    }
     if entry.version < 2:
         for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
             if entity.unique_id.endswith(("_last_domain", "_last_result")):
@@ -37,18 +45,10 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if entry.version < 3:
         device_registry = dr.async_get(hass)
-        metric_names = {
-            "consultas_dns": "Consultas DNS",
-            "permitidas": "Permitidas",
-            "bloqueadas": "Bloqueadas",
-            "consultas_por_segundo": "Consultas por segundo",
-            "permitidas_por_segundo": "Permitidas por segundo",
-            "bloqueadas_por_segundo": "Bloqueadas por segundo",
-        }
         for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
             if entity.domain != "sensor" or not entity.device_id:
                 continue
-            if entity.entity_id.startswith("sensor.pi_hole_extended_"):
+            if entity.entity_id.startswith("sensor.phe_"):
                 continue
             device = device_registry.async_get(entity.device_id)
             if device is None or device.name_by_user:
@@ -77,16 +77,62 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 client_name, client_ip = match.groups()
                 if client_ip != "Desconocida":
                     client_name = client_ip
-            new_object_id = slugify(f"Pi-hole Extended {client_name} {metric}")
-            new_entity_id = f"sensor.{new_object_id}"
-            collision = 2
-            while registry.async_get(new_entity_id) is not None:
-                new_entity_id = f"sensor.{new_object_id}_{collision}"
-                collision += 1
+            new_object_id = slugify(f"PHE {client_name} {metric}")
+            new_entity_id = _available_entity_id(registry, f"sensor.{new_object_id}")
             registry.async_update_entity(entity.entity_id, new_entity_id=new_entity_id)
 
         hass.config_entries.async_update_entry(entry, version=3)
-    return entry.version == 3
+
+    if entry.version < 4:
+        device_registry = dr.async_get(hass)
+        for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+            prefix = "sensor.pi_hole_extended_"
+            if not entity.entity_id.startswith(prefix) or not entity.device_id:
+                continue
+            device = device_registry.async_get(entity.device_id)
+            if device is None or device.name_by_user:
+                continue
+            metric = next(
+                (
+                    name
+                    for suffix, name in metric_names.items()
+                    if entity.entity_id.endswith(f"_{suffix}")
+                ),
+                None,
+            )
+            if metric is None:
+                continue
+            client_id = _client_id_from_device_name(device.name)
+            old_default = f"sensor.{slugify(f'Pi-hole Extended {client_id} {metric}')}"
+            if entity.entity_id != old_default:
+                continue
+            new_entity_id = f"sensor.phe_{entity.entity_id.removeprefix(prefix)}"
+            new_entity_id = _available_entity_id(registry, new_entity_id)
+            registry.async_update_entity(entity.entity_id, new_entity_id=new_entity_id)
+
+        hass.config_entries.async_update_entry(entry, version=4)
+    return entry.version == 4
+
+
+def _client_id_from_device_name(device_name: str) -> str:
+    """Use the client IP in entity IDs when it is part of the device name."""
+    match = re.fullmatch(r"(.+) \(([^()]*)\)", device_name)
+    if match:
+        client_name, client_ip = match.groups()
+        if client_ip != "Desconocida":
+            return client_ip
+        return client_name
+    return device_name
+
+
+def _available_entity_id(registry: er.EntityRegistry, entity_id: str) -> str:
+    """Return an unused entity ID, adding a numeric suffix if necessary."""
+    base_entity_id = entity_id
+    collision = 2
+    while registry.async_get(entity_id) is not None:
+        entity_id = f"{base_entity_id}_{collision}"
+        collision += 1
+    return entity_id
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

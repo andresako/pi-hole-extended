@@ -127,7 +127,7 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
         self._attr_has_entity_name = False
         self.entity_description = replace(
             description,
-            name=f"Pi-hole Extended {client_id} {description.name}",
+            name=f"PHE {client_id} {description.name}",
         )
         # Keep the original counter unique_id so updating does not create a duplicate entity.
         suffix = "" if description.key == "queries" else f"_{description.key}"
