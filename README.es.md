@@ -8,6 +8,17 @@ Cada entrada incluye la hora de la consulta, nombre e IP del cliente (si Pi-hole
 
 Cada cliente aparece como un dispositivo con seis entidades: los contadores acumulados **Consultas DNS**, **Permitidas** y **Bloqueadas**, y las tasas **Consultas por segundo**, **Permitidas por segundo** y **Bloqueadas por segundo**. Los contadores reflejan las consultas observadas desde que se añadió la integración. Las tasas se calculan entre sondeos correctos; arrancan en cero después del inicio y se actualizan en el siguiente sondeo. Si no hay consultas nuevas, muestran cero. La entidad **Consultas DNS** conserva además nombre/IP, la última consulta y hasta diez consultas recientes en sus atributos. Las consultas individuales aparecen en **Ajustes → Sistema → Registros → Actividad** (Logbook). Si Actividad usa un filtro de dominios incluidos, añade `pihole_queries`.
 
+Los IDs de sus sensores empiezan por `sensor.pi_hole_extended_`; por ejemplo, `sensor.pi_hole_extended_192_168_68_94_consultas_dns`. Ese prefijo permite localizarlos y filtrarlos en Recorder mediante `entity_globs`. Si ya usas un bloque `recorder.include`, puedes añadir:
+
+```yaml
+recorder:
+  include:
+    entity_globs:
+      - sensor.pi_hole_extended_*
+```
+
+Ten en cuenta que `recorder.include` hace que Recorder guarde solo las entidades incluidas. La versión 0.5.0 migra los IDs generados por defecto y conserva los IDs que ya se hubieran cambiado manualmente. Si una automatización o un panel usaba el ID anterior, actualiza esa referencia después de la migración.
+
 ## Requisito de persistencia
 
 La integración llama a la acción pública `logbook.log` para crear cada entrada personalizada y las etiqueta con el dominio `pihole_queries`. El mensaje contiene la fecha/hora original reportada por Pi-hole; la hora de la fila en Logbook/Recorder es la hora en que Home Assistant la registra, normalmente hasta un intervalo de sondeo después. Recorder guarda el evento y su historial alimenta Logbook/Actividad. La retención sigue la configuración de Recorder (por defecto, purga automática; normalmente 10 días). Un filtro de Actividad con dominios incluidos debe incluir `pihole_queries`; sin filtros de inclusión, normalmente se muestran automáticamente. Si Recorder excluye el evento `logbook_entry`, no habrá historial persistente.
@@ -71,4 +82,4 @@ custom_components/pihole_queries/
   strings.json
 ```
 
-La versión 0.4.1 permite configurar un sondeo de 1 segundo. La versión 0.4.0 añadió las tasas de consultas por segundo por cliente y eliminó las entidades de último dominio y último resultado.
+La versión 0.5.0 antepone `pi_hole_extended` a los IDs de sensores para facilitar los filtros de Recorder. La versión 0.4.1 permite configurar un sondeo de 1 segundo; la 0.4.0 añadió las tasas de consultas por segundo por cliente y eliminó las entidades de último dominio y último resultado.

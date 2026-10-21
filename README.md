@@ -44,13 +44,24 @@ The integration calls Home Assistant's documented `logbook.log` action and tags 
 
 Each discovered Pi-hole client gets a device with six sensors: cumulative total, allowed, and blocked counts, plus total, allowed, and blocked queries per second. Counts include queries observed since the integration was first set up. Rates are calculated between successful polling cycles; after startup they begin at zero and update on the next poll. When no new queries arrive, the corresponding rate is zero. The total sensor keeps client name/IP, the latest query, and up to ten recent queries in its attributes. Existing client devices remain available if a client is removed from Pi-hole; a new client appears after its first query is detected. The initial snapshot discovers clients but does not count or log its existing queries.
 
+Sensor entity IDs start with `sensor.pi_hole_extended_`, for example `sensor.pi_hole_extended_192_168_68_94_consultas_dns`. This prefix makes them easy to find and filter in Recorder with `entity_globs`. If you already use a `recorder.include` block, you can add:
+
+```yaml
+recorder:
+  include:
+    entity_globs:
+      - sensor.pi_hole_extended_*
+```
+
+Keep in mind that `recorder.include` makes Recorder save only included entities. Version 0.5.0 migrates default-generated IDs and preserves IDs that were already customized. Update any dashboard or automation references that used an old ID after the migration.
+
 The first setup stores a baseline ID and does not backfill older Pi-hole queries. The integration reads the in-memory query history exposed by Pi-hole. Queries no longer available there cannot be recovered after a long outage or an FTL history reset. Pagination fetches backlogs in 1,000-row pages. A very large backlog can extend a polling cycle. If Home Assistant stops after writing a Logbook entry but before persisting its cursor, the last entry may be replayed on restart because Recorder and integration storage do not share an atomic transaction.
 
 The API schema is versioned with Pi-hole and is also served by each instance at `http(s)://<host>:<port>/api/docs`. See the [official API overview](https://docs.pi-hole.net/api/), [authentication documentation](https://docs.pi-hole.net/api/auth/), and [FTL query endpoint schema](https://github.com/pi-hole/FTL/blob/master/src/api/docs/content/specs/queries.yaml).
 
 ## Development and publication
 
-The repository includes HACS validation and Hassfest workflows. Version `0.4.1` allows a 1-second polling interval; `0.4.0` added per-client query-rate sensors and removed the last-domain and last-result sensors. The repository also includes the API session cleanup fix from `0.3.2`. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
+The repository includes HACS validation and Hassfest workflows. Version `0.5.0` prefixes sensor IDs with `pi_hole_extended` for easier Recorder filtering. Version `0.4.1` allows a 1-second polling interval; `0.4.0` added per-client query-rate sensors and removed the last-domain and last-result sensors. The repository also includes the API session cleanup fix from `0.3.2`. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Spanish installation and lifecycle instructions are in [README.es.md](README.es.md).
 

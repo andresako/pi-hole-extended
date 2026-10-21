@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import re
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
+from homeassistant.util import slugify
 
 from .api import PiHoleClient
 from .const import DOMAIN, PLATFORMS, STORAGE_KEY_PREFIX, STORAGE_VERSION
@@ -23,15 +27,66 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Remove the two no-longer-useful client sensors from the entity registry."""
-    if entry.version == 1:
-        registry = er.async_get(hass)
+    """Remove obsolete sensors and assign concise, integration-prefixed IDs."""
+    registry = er.async_get(hass)
+    if entry.version < 2:
         for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
             if entity.unique_id.endswith(("_last_domain", "_last_result")):
                 registry.async_remove(entity.entity_id)
         hass.config_entries.async_update_entry(entry, version=2)
-        return True
-    return entry.version == 2
+
+    if entry.version < 3:
+        device_registry = dr.async_get(hass)
+        metric_names = {
+            "consultas_dns": "Consultas DNS",
+            "permitidas": "Permitidas",
+            "bloqueadas": "Bloqueadas",
+            "consultas_por_segundo": "Consultas por segundo",
+            "permitidas_por_segundo": "Permitidas por segundo",
+            "bloqueadas_por_segundo": "Bloqueadas por segundo",
+        }
+        for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+            if entity.domain != "sensor" or not entity.device_id:
+                continue
+            if entity.entity_id.startswith("sensor.pi_hole_extended_"):
+                continue
+            device = device_registry.async_get(entity.device_id)
+            if device is None or device.name_by_user:
+                continue
+            metric = next(
+                (
+                    name
+                    for suffix, name in metric_names.items()
+                    if entity.entity_id.endswith(f"_{suffix}")
+                ),
+                None,
+            )
+            if metric is None:
+                continue
+
+            # Only migrate Home Assistant's default IDs. Leave any user-customized
+            # entity ID untouched.
+            old_default_name = slugify(f"{device.name} {metric}")
+            old_default = f"sensor.{old_default_name}"
+            if entity.entity_id != old_default:
+                continue
+
+            client_name = device.name
+            match = re.fullmatch(r"(.+) \(([^()]*)\)", client_name)
+            if match:
+                client_name, client_ip = match.groups()
+                if client_ip != "Desconocida":
+                    client_name = client_ip
+            new_object_id = slugify(f"Pi-hole Extended {client_name} {metric}")
+            new_entity_id = f"sensor.{new_object_id}"
+            collision = 2
+            while registry.async_get(new_entity_id) is not None:
+                new_entity_id = f"sensor.{new_object_id}_{collision}"
+                collision += 1
+            registry.async_update_entity(entity.entity_id, new_entity_id=new_entity_id)
+
+        hass.config_entries.async_update_entry(entry, version=3)
+    return entry.version == 3
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

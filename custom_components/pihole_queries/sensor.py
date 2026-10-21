@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -112,9 +113,22 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
         description: SensorEntityDescription,
     ) -> None:
         super().__init__(coordinator)
-        self.entity_description = description
         self._client_key = client_key
         self._entry = entry
+        client_data = coordinator.client_data.get(client_key, {})
+        client_ip = str(client_data.get("client_ip") or "")
+        client_id = (
+            client_ip
+            if client_ip and client_ip != "Desconocida"
+            else str(client_data.get("client_name") or client_key)
+        )
+        # Keep the client device name human-friendly, while making the sensor ID
+        # clearly filterable by integration in Recorder.
+        self._attr_has_entity_name = False
+        self.entity_description = replace(
+            description,
+            name=f"Pi-hole Extended {client_id} {description.name}",
+        )
         # Keep the original counter unique_id so updating does not create a duplicate entity.
         suffix = "" if description.key == "queries" else f"_{description.key}"
         self._attr_unique_id = f"{entry.unique_id or entry.entry_id}_{client_key}{suffix}"
