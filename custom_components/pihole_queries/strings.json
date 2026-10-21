@@ -1,0 +1,37 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Conectar con Pi-hole v6",
+        "description": "Introduce la dirección de Pi-hole y una contraseña de aplicación creada en su interfaz.",
+        "data": {
+          "host": "Host o dirección IP",
+          "port": "Puerto web/API",
+          "use_https": "Usar HTTPS",
+          "password": "Contraseña de aplicación",
+          "scan_interval": "Frecuencia de consulta (segundos)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Actualizar credenciales de Pi-hole",
+        "description": "Pi-hole ha rechazado la credencial guardada. Introduce una contraseña de aplicación nueva para {host}.",
+        "data": {"password": "Contraseña de aplicación"}
+      }
+    },
+    "error": {
+      "invalid_host": "Introduce un host válido.",
+      "cannot_connect": "No se pudo conectar a la API v6 de Pi-hole. Revisa host, puerto, protocolo y que /api/docs esté disponible.",
+      "invalid_auth": "Pi-hole rechazó la contraseña de aplicación."
+    },
+    "abort": {"reauth_successful": "Credenciales actualizadas."}
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Frecuencia de consulta",
+        "description": "Entre 5 y 3600 segundos. Las consultas aparecen en el Logbook en el siguiente ciclo de sondeo.",
+        "data": {"scan_interval": "Frecuencia de consulta (segundos)"}
+      }
+    }
+  }
+}

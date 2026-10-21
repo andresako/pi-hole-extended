@@ -1,0 +1,37 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Pi-hole v6",
+        "description": "Enter the Pi-hole address and an application password created in its web interface.",
+        "data": {
+          "host": "Host or IP address",
+          "port": "Web/API port",
+          "use_https": "Use HTTPS",
+          "password": "Application password",
+          "scan_interval": "Polling interval (seconds)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Update Pi-hole credentials",
+        "description": "Pi-hole rejected the stored credential. Enter a new application password for {host}.",
+        "data": {"password": "Application password"}
+      }
+    },
+    "error": {
+      "invalid_host": "Enter a valid host.",
+      "cannot_connect": "Could not connect to the Pi-hole v6 API. Check the host, port, protocol, and that /api/docs is available.",
+      "invalid_auth": "Pi-hole rejected the application password."
+    },
+    "abort": {"reauth_successful": "Credentials updated."}
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Polling interval",
+        "description": "Choose 5 to 3600 seconds. New queries appear in the Logbook on the next polling cycle.",
+        "data": {"scan_interval": "Polling interval (seconds)"}
+      }
+    }
+  }
+}
