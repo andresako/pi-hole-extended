@@ -31,7 +31,7 @@
     "step": {
       "init": {
         "title": "Frecuencia de consulta",
-        "description": "Entre 5 y 3600 segundos. Las consultas aparecen en el Logbook en el siguiente ciclo de sondeo.",
+        "description": "Entre 1 y 3600 segundos. A 1 s, la integración consulta la API hasta una vez por segundo; el uso de CPU y red puede aumentar.",
         "data": {"scan_interval": "Frecuencia de consulta (segundos)"}
       }
     }

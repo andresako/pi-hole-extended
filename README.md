@@ -32,9 +32,11 @@ The config flow requests:
 - Whether to use HTTPS.
 - Whether to verify the HTTPS certificate. Keep this enabled for trusted certificates; disable it only for a self-signed certificate.
 - A Pi-hole application password.
-- Poll interval from 5 to 3600 seconds (default: 15 seconds).
+- Poll interval from 1 to 3600 seconds (default: 15 seconds).
 
 Create an application password in Pi-hole and enter it in Home Assistant. It is stored in the config entry and is not part of source files, examples, or integration logs. Pi-hole v6 uses a temporary SID; the integration obtains one through `POST /api/auth` and renews it after an expired-session response.
+
+At a 1-second interval, normal operation makes about 60 authenticated `GET /api/queries` requests per minute, reusing one SID; it does not log in for each poll. Catching up after a backlog can require additional paginated requests. Pi-hole documents login-attempt throttling for `POST /api/auth`, but does not publish a numeric limit for normal authenticated query reads. No supported request threshold is documented, so 1 second is an optional high-frequency setting, not a guaranteed safe maximum. Start at 5 seconds if Pi-hole is a low-power device and watch its load. Separately, Pi-hole FTL versions before 6.7 have an upstream web/API denial-of-service issue involving uncontrolled request floods; update FTL to 6.7 or later before exposing its web/API service to untrusted networks.
 
 ## Query history and limits
 
@@ -48,7 +50,7 @@ The API schema is versioned with Pi-hole and is also served by each instance at 
 
 ## Development and publication
 
-The repository includes HACS validation and Hassfest workflows. Version `0.4.0` adds per-client query-rate sensors and removes the last-domain and last-result sensors; it also includes the API session cleanup fix from 0.3.2. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
+The repository includes HACS validation and Hassfest workflows. Version `0.4.1` allows a 1-second polling interval; `0.4.0` added per-client query-rate sensors and removed the last-domain and last-result sensors. The repository also includes the API session cleanup fix from `0.3.2`. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Spanish installation and lifecycle instructions are in [README.es.md](README.es.md).
 

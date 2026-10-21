@@ -29,9 +29,11 @@ El repositorio está en [andresako/pi-hole-extended](https://github.com/andresak
 - **HTTPS**: actívalo si Pi-hole sirve la API por HTTPS.
 - **Verificar el certificado HTTPS**: déjalo activado si el certificado es de confianza. Desactívalo solo si Pi-hole usa un certificado autofirmado; la conexión seguirá cifrada, pero Home Assistant no validará la identidad del servidor.
 - **Contraseña de aplicación**: crea una en la interfaz de Pi-hole y úsala aquí. No uses ni compartas una contraseña dentro de este proyecto. Se guarda en el campo privado de datos de la entrada de configuración de Home Assistant y no se escribe en los registros de la integración.
-- **Frecuencia**: entre 5 y 3600 segundos; el valor inicial es 15. Se puede cambiar luego en **Opciones** de la integración.
+- **Frecuencia**: entre 1 y 3600 segundos; el valor inicial sigue siendo 15. Se puede cambiar luego en **Opciones** de la integración.
 
 Pi-hole v6 autentica con `POST /api/auth` y una sesión temporal SID. La integración la solicita de nuevo tras un `401`, sin imprimir contraseñas ni SID en los logs. Usa el puerto/protocolo adecuado y, si se usa TLS, un certificado que Home Assistant confíe. Consulta la [documentación oficial de autenticación de Pi-hole](https://docs.pi-hole.net/api/auth/) y la [documentación de la API](https://docs.pi-hole.net/api/).
+
+A 1 segundo, en condiciones normales habrá unas 60 lecturas autenticadas de `GET /api/queries` por minuto; se reutiliza un único SID y no se inicia sesión en cada sondeo. Ponerse al día después de una acumulación puede requerir llamadas paginadas adicionales. Pi-hole documenta la limitación de intentos de inicio de sesión de `POST /api/auth`, pero no publica un límite numérico para las lecturas autenticadas normales. Por eso, 1 segundo es una opción de alta frecuencia, no un máximo garantizado como seguro. Si Pi-hole es un dispositivo de baja potencia, empieza con 5 segundos y vigila su carga. Por separado, FTL anterior a 6.7 tiene un problema upstream del servidor web/API ante ráfagas descontroladas; actualiza FTL a 6.7 o posterior antes de exponer la API a redes no confiables.
 
 **Si Pi-hole muestra “API seats exceeded”**: detén los reintentos de configuración y deshabilita o descarga temporalmente esta integración. Al cerrarse correctamente, envía `DELETE /api/auth` para liberar su SID; las sesiones huérfanas caducan según el tiempo de sesión configurado en Pi-hole. La versión 0.3.2 garantiza también el cierre del SID cuando falla la carga inicial. No aumentes `webserver.api.max_sessions` como arreglo: eso solo eleva el límite y puede ocultar sesiones que no se están cerrando. Otras aplicaciones también pueden ocupar sesiones.
 
@@ -45,7 +47,7 @@ Las entradas suelen aparecer dentro de un intervalo de sondeo más el tiempo de 
 
 Cada llamada pide 1000 filas; si hay una acumulación, se recorre por páginas usando el `cursor` oficial y el ID de consulta hasta alcanzar el cursor previamente guardado. Pi-hole limita cada respuesta a un máximo de 10 000 registros; la paginación evita depender de un único lote. Una acumulación extraordinariamente grande puede alargar un ciclo y aumentar memoria/llamadas a la API. Si el historial en memoria de Pi-hole se vacía antes de que Home Assistant vuelva a sondear, las consultas que Pi-hole ya no exponga no se pueden recuperar desde esta integración. Tampoco se importan consultas anteriores a la primera instalación. El cursor se basa en IDs de la base de Pi-hole: si esa base se recrea y los IDs retroceden, se establece un cursor nuevo y no se intenta reconciliar historiales incompatibles. Los contadores comienzan en cero tras crear la integración; la instantánea inicial encuentra clientes y muestra su última consulta sin contarla. Los dispositivos de clientes retirados se conservan para mantener su historial de Recorder.
 
-El registro por consulta aumenta el volumen de Recorder y de Logbook, especialmente en redes con muchas peticiones DNS. Usa un intervalo razonable y revisa la retención de Recorder y el almacenamiento disponible. El intervalo mínimo es 5 s; intervalos más breves no son aceptados.
+El registro por consulta aumenta el volumen de Recorder y de Logbook, especialmente en redes con muchas peticiones DNS. Usa un intervalo razonable y revisa la retención de Recorder y el almacenamiento disponible. El intervalo mínimo configurable es 1 s. A ese ritmo se generan hasta 86 400 solicitudes API al día por instancia; si no necesitas una actualización casi instantánea, usa 5 s o más para reducir las lecturas y la carga de Recorder.
 
 Si Home Assistant se detiene exactamente entre emitir una entrada y guardar el cursor, podría repetirse esa última entrada después del reinicio; Home Assistant no ofrece una transacción atómica entre evento de Logbook y almacenamiento del cursor de una integración.
 
@@ -69,4 +71,4 @@ custom_components/pihole_queries/
   strings.json
 ```
 
-La versión 0.4.0 añade tasas de consultas por segundo por cliente y elimina las entidades de último dominio y último resultado.
+La versión 0.4.1 permite configurar un sondeo de 1 segundo. La versión 0.4.0 añadió las tasas de consultas por segundo por cliente y eliminó las entidades de último dominio y último resultado.

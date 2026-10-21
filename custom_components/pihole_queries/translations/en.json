@@ -31,7 +31,7 @@
     "step": {
       "init": {
         "title": "Polling interval",
-        "description": "Choose 5 to 3600 seconds. New queries appear in the Logbook on the next polling cycle.",
+        "description": "Choose 1 to 3600 seconds. At 1 s, the integration polls the API up to once per second; CPU and network use may increase.",
         "data": {"scan_interval": "Polling interval (seconds)"}
       }
     }
