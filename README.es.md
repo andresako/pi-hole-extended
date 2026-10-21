@@ -20,7 +20,7 @@ No se duplica toda la consulta DNS en almacenamiento propio: Home Assistant Reco
 2. Reinicia Home Assistant.
 3. Ve a **Ajustes → Dispositivos y servicios → Añadir integración**, busca **Pi-hole DNS Queries** y completa el formulario.
 
-Cuando el proyecto tenga un repositorio público en GitHub, podrás añadirlo en **HACS → Integraciones → ⋮ → Repositorios personalizados**, eligiendo la categoría **Integración**, e instalarlo desde HACS. La inclusión en el catálogo predeterminado de HACS requiere una revisión aparte. Esta carpeta aún no está conectada a una cuenta ni a un repositorio público; mientras tanto, la instalación disponible es manual. El plan está en [PUBLISHING.md](PUBLISHING.md). Después de actualizar los archivos, reinicia Home Assistant.
+El repositorio público es [andresako/pi-hole-extended](https://github.com/andresako/pi-hole-extended). Para instalarlo ahora desde HACS, abre **HACS → Integraciones → ⋮ → Repositorios personalizados**, añade `andresako/pi-hole-extended`, elige la categoría **Integración**, instálalo y reinicia Home Assistant. La solicitud para incluirlo en el catálogo predeterminado de HACS se revisa por separado y todavía no está aprobada. Para instalación manual, copia la carpeta indicada arriba y reinicia Home Assistant. Después de actualizar los archivos, reinicia Home Assistant.
 
 ## Configuración
 

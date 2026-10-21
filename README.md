@@ -16,7 +16,7 @@ Documentation: [English](README.md) · [Español](README.es.md)
 
 ### HACS
 
-This project is being prepared for public HACS distribution. Once published, add its GitHub repository in **HACS → Integrations → ⋮ → Custom repositories** with category **Integration**, install **Pi-hole DNS Queries**, and restart Home Assistant. Inclusion in the HACS default list requires a separate review and can take months.
+The public repository is [andresako/pi-hole-extended](https://github.com/andresako/pi-hole-extended). To install it now through HACS, open **HACS → Integrations → ⋮ → Custom repositories**, add `andresako/pi-hole-extended` with category **Integration**, install **Pi-hole DNS Queries**, and restart Home Assistant. A request for inclusion in HACS's default catalog is under review and has not yet been approved.
 
 ### Manual
 
@@ -43,7 +43,7 @@ The API schema is versioned with Pi-hole and is also served by each instance at 
 
 ## Development and publication
 
-The repository includes HACS validation and Hassfest workflows. For HACS default-list submission, the maintainer must set the repository description and topics, pass both workflows, publish a GitHub release, and open an editable PR to `hacs/default`. HACS default inclusion is a separate review; the repository can first be installed as a custom repository.
+The repository includes HACS validation and Hassfest workflows. The `0.1.0` release passed both checks, and a request for default-list inclusion is open at [hacs/default#12355](https://github.com/hacs/default/pull/12355). HACS default inclusion is a separate review; while it is pending, install this repository as a custom repository.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Spanish installation and lifecycle instructions are in [README.es.md](README.es.md).
 
