@@ -26,12 +26,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     client = PiHoleClient(async_get_clientsession(hass), {**entry.data, **entry.options})
     store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY_PREFIX}_{entry.entry_id}")
     coordinator = PiHoleQueryCoordinator(hass, entry, client, store)
-    await coordinator.async_load_cursor()
-    await coordinator.async_config_entry_first_refresh()
-    hass.data[DOMAIN][entry.entry_id] = {"client": client, "coordinator": coordinator}
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
-    return True
+    try:
+        await coordinator.async_load_cursor()
+        await coordinator.async_config_entry_first_refresh()
+        hass.data[DOMAIN][entry.entry_id] = {"client": client, "coordinator": coordinator}
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+        return True
+    except BaseException:
+        # A failed first refresh or platform setup must not strand a Pi-hole SID.
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        try:
+            await coordinator.async_shutdown()
+        finally:
+            await client.async_close()
+        raise
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -44,6 +53,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
     runtime = hass.data[DOMAIN].pop(entry.entry_id)
-    await runtime["coordinator"].async_shutdown()
-    await runtime["client"].async_close()
+    try:
+        await runtime["coordinator"].async_shutdown()
+    finally:
+        await runtime["client"].async_close()
     return True
