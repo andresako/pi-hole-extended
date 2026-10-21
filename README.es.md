@@ -1,12 +1,12 @@
 # Pi-hole Extended para Home Assistant
 
-Integración personalizada e independiente de la integración oficial de Pi-hole. Consulta la API REST de Pi-hole v6, registra en Actividad cada consulta nueva detectada y crea un sensor por cliente encontrado en el historial de Pi-hole.
+Integración personalizada e independiente de la integración oficial de Pi-hole. Consulta la API REST de Pi-hole v6, registra en Actividad cada consulta nueva detectada y crea un dispositivo por cliente.
 
 ## Qué registra
 
 Cada entrada incluye la hora de la consulta, nombre e IP del cliente (si Pi-hole los conoce), dominio, decisión permitida/bloqueada y estado original de Pi-hole. Añade tipo DNS, tipo de respuesta, CNAME bloqueado, servidor ascendente y texto EDE cuando la respuesta de la API incluye esos campos. Las categorías y clientes configurados en Pi-hole se conservan tal como los presente la API; la integración no cambia su configuración.
 
-Las consultas individuales aparecen en **Ajustes → Sistema → Registros → Actividad** (Logbook), no dentro de la pantalla de configuración de la integración. Además, se crea un sensor por cliente: su estado cuenta las consultas observadas desde que se añadió el sensor y sus atributos muestran nombre/IP, totales permitidos y bloqueados, última consulta y hasta diez consultas recientes. Si Actividad usa un filtro de dominios incluidos, añade `pihole_queries`.
+Cada cliente aparece como un dispositivo con cinco entidades: **Consultas DNS**, **Permitidas**, **Bloqueadas**, **Último dominio** y **Último resultado**. Los tres contadores reflejan las consultas observadas desde que se añadió la integración. La entidad **Consultas DNS** conserva además nombre/IP, la última consulta y hasta diez consultas recientes en sus atributos. Las consultas individuales aparecen en **Ajustes → Sistema → Registros → Actividad** (Logbook). Si Actividad usa un filtro de dominios incluidos, añade `pihole_queries`.
 
 ## Requisito de persistencia
 
@@ -40,7 +40,7 @@ Home Assistant documenta las [entradas personalizadas de Activity/Logbook](https
 
 Las entradas suelen aparecer dentro de un intervalo de sondeo más el tiempo de respuesta de red. Por ejemplo, con 15 segundos de intervalo, una consulta puede tardar aproximadamente hasta 15 segundos en aparecer. Pi-hole alimenta la API desde su historial de consultas en memoria, así que no se espera el retardo de escritura periódica de su base de datos en disco.
 
-Cada llamada pide 1000 filas; si hay una acumulación, se recorre por páginas usando el `cursor` oficial y el ID de consulta hasta alcanzar el cursor previamente guardado. Pi-hole limita cada respuesta a un máximo de 10 000 registros; la paginación evita depender de un único lote. Una acumulación extraordinariamente grande puede alargar un ciclo y aumentar memoria/llamadas a la API. Si el historial en memoria de Pi-hole se vacía antes de que Home Assistant vuelva a sondear, las consultas que Pi-hole ya no exponga no se pueden recuperar desde esta integración. Tampoco se importan consultas anteriores a la primera instalación. El cursor se basa en IDs de la base de Pi-hole: si esa base se recrea y los IDs retroceden, se establece un cursor nuevo y no se intenta reconciliar historiales incompatibles. El sensor cuenta solo consultas detectadas desde que se introdujo; la instantánea inicial encuentra clientes y muestra su última consulta sin contarla. Los sensores de clientes retirados se conservan para mantener su historial de Recorder.
+Cada llamada pide 1000 filas; si hay una acumulación, se recorre por páginas usando el `cursor` oficial y el ID de consulta hasta alcanzar el cursor previamente guardado. Pi-hole limita cada respuesta a un máximo de 10 000 registros; la paginación evita depender de un único lote. Una acumulación extraordinariamente grande puede alargar un ciclo y aumentar memoria/llamadas a la API. Si el historial en memoria de Pi-hole se vacía antes de que Home Assistant vuelva a sondear, las consultas que Pi-hole ya no exponga no se pueden recuperar desde esta integración. Tampoco se importan consultas anteriores a la primera instalación. El cursor se basa en IDs de la base de Pi-hole: si esa base se recrea y los IDs retroceden, se establece un cursor nuevo y no se intenta reconciliar historiales incompatibles. Los contadores comienzan en cero tras crear la integración; la instantánea inicial encuentra clientes y muestra su última consulta sin contarla. Los dispositivos de clientes retirados se conservan para mantener su historial de Recorder.
 
 El registro por consulta aumenta el volumen de Recorder y de Logbook, especialmente en redes con muchas peticiones DNS. Usa un intervalo razonable y revisa la retención de Recorder y el almacenamiento disponible. El intervalo mínimo es 5 s; intervalos más breves no son aceptados.
 
@@ -61,7 +61,7 @@ custom_components/pihole_queries/
   config_flow.py    # configuración y opciones desde la interfaz
   const.py
   coordinator.py    # sondeo, cursor, resumen por cliente y eventos Activity
-  sensor.py         # contador y detalles recientes por cliente DNS
+  sensor.py         # dispositivo y entidades sencillas por cliente DNS
   manifest.json
   strings.json
 ```

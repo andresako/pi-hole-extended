@@ -1,6 +1,6 @@
 # Pi-hole Extended for Home Assistant
 
-A standalone custom integration for Pi-hole v6. It polls Pi-hole's official `GET /api/queries` endpoint, records newly observed DNS queries in Home Assistant Activity, and creates a sensor for each client found in Pi-hole's query history.
+A standalone custom integration for Pi-hole v6. It polls Pi-hole's official `GET /api/queries` endpoint, records newly observed DNS queries in Home Assistant Activity, and creates one device per client.
 
 Documentation: [English](README.md) · [Español](README.es.md)
 
@@ -9,7 +9,8 @@ Documentation: [English](README.md) · [Español](README.es.md)
 - Configure host, port, HTTPS, Pi-hole application password, and polling interval in Home Assistant.
 - Record the query time, client name/IP, domain, result/status, query type, reply, and other fields when Pi-hole provides them.
 - Resume using Pi-hole's query IDs and API cursor, avoiding normal duplicate entries across polling cycles and Home Assistant restarts.
-- Create a per-client sensor with observed query totals and the latest ten query details in its attributes.
+- Create a per-client device with five simple sensors: total, allowed, blocked, last domain, and last result.
+- Keep the latest query and up to ten recent query details in the total sensor's attributes.
 - Keep DNS history in Home Assistant Recorder and view it in Activity/Logbook.
 - Operate independently of Home Assistant's built-in Pi-hole integration.
 
@@ -38,7 +39,7 @@ Create an application password in Pi-hole and enter it in Home Assistant. It is 
 
 The integration calls Home Assistant's documented `logbook.log` action and tags each entry with the `pihole_queries` domain. Entries appear in Activity/Logbook, not on the integration's configuration page. The original Pi-hole timestamp is included in each message; the Activity row itself is timestamped when Home Assistant records it, typically within one polling interval. If Activity uses an include filter, include the `pihole_queries` domain. Recorder retention and filters determine how long the entries remain. A high DNS query rate can produce substantial Recorder and Logbook data.
 
-Each discovered Pi-hole client gets a sensor whose state is the number of queries observed since that sensor was added. Attributes include client name/IP, allowed and blocked totals, the latest query, and up to ten recent queries. Existing client sensors remain available if a client is removed from Pi-hole; a new client appears after its first query is detected. The initial snapshot discovers clients but does not count or log its existing queries.
+Each discovered Pi-hole client gets a device with five sensors: total, allowed, blocked, last domain, and last result. Counts include queries observed since the integration was first set up. The total sensor keeps client name/IP, the latest query, and up to ten recent queries in its attributes. Existing client devices remain available if a client is removed from Pi-hole; a new client appears after its first query is detected. The initial snapshot discovers clients but does not count or log its existing queries.
 
 The first setup stores a baseline ID and does not backfill older Pi-hole queries. The integration reads the in-memory query history exposed by Pi-hole. Queries no longer available there cannot be recovered after a long outage or an FTL history reset. Pagination fetches backlogs in 1,000-row pages. A very large backlog can extend a polling cycle. If Home Assistant stops after writing a Logbook entry but before persisting its cursor, the last entry may be replayed on restart because Recorder and integration storage do not share an atomic transaction.
 
@@ -46,7 +47,7 @@ The API schema is versioned with Pi-hole and is also served by each instance at 
 
 ## Development and publication
 
-The repository includes HACS validation and Hassfest workflows. Version `0.2.1` is a test release that fixes the integration icon artwork. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
+The repository includes HACS validation and Hassfest workflows. Version `0.3.0` is a test release that organizes client data as devices with five simple sensors. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Spanish installation and lifecycle instructions are in [README.es.md](README.es.md).
 
