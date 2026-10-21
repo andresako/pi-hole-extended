@@ -61,7 +61,7 @@ The API schema is versioned with Pi-hole and is also served by each instance at 
 
 ## Development and publication
 
-The repository includes HACS validation and Hassfest workflows. Version `0.5.1` prefixes sensor IDs with `phe` for easier Recorder filtering. Version `0.4.1` allows a 1-second polling interval; `0.4.0` added per-client query-rate sensors and removed the last-domain and last-result sensors. The repository also includes the API session cleanup fix from `0.3.2`. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
+The repository includes HACS validation and Hassfest workflows. Version `0.5.2` distinguishes API and Logbook errors in the logs for easier troubleshooting. Version `0.5.1` prefixes sensor IDs with `phe` for easier Recorder filtering. Version `0.4.1` allows a 1-second polling interval; `0.4.0` added per-client query-rate sensors and removed the last-domain and last-result sensors. The repository also includes the API session cleanup fix from `0.3.2`. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Spanish installation and lifecycle instructions are in [README.es.md](README.es.md).
 

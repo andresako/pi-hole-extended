@@ -282,8 +282,12 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             raise ConfigEntryAuthFailed(
                 "Contraseña de aplicación de Pi-hole no válida o sesión expirada"
             ) from err
-        except (PiHoleConnectionError, HomeAssistantError) as err:
-            raise UpdateFailed("No se pudo consultar la API de Pi-hole") from err
+        except PiHoleConnectionError as err:
+            raise UpdateFailed(f"No se pudo consultar la API de Pi-hole: {err}") from err
+        except HomeAssistantError as err:
+            raise UpdateFailed(
+                f"No se pudo registrar una consulta en el Logbook de Home Assistant: {err}"
+            ) from err
 
     def _seed_clients(self, rows: Any) -> None:
         """Initialize client summaries from a query page without counting it."""

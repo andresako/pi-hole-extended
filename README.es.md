@@ -82,4 +82,4 @@ custom_components/pihole_queries/
   strings.json
 ```
 
-La versión 0.5.1 antepone `phe` a los IDs de sensores para facilitar los filtros de Recorder. La versión 0.4.1 permite configurar un sondeo de 1 segundo; la 0.4.0 añadió las tasas de consultas por segundo por cliente y eliminó las entidades de último dominio y último resultado.
+La versión 0.5.2 distingue los errores de API y Logbook en los registros para facilitar el diagnóstico. La versión 0.5.1 antepone `phe` a los IDs de sensores para facilitar los filtros de Recorder. La versión 0.4.1 permite configurar un sondeo de 1 segundo; la 0.4.0 añadió las tasas de consultas por segundo por cliente y eliminó las entidades de último dominio y último resultado.

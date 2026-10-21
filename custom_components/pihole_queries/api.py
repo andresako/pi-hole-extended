@@ -63,14 +63,27 @@ class PiHoleClient:
             ) as response:
                 if response.status == 401:
                     raise PiHoleAuthenticationError
-                response.raise_for_status()
+                if response.status >= 400:
+                    raise PiHoleConnectionError(
+                        f"/api/auth respondió HTTP {response.status}"
+                    )
                 payload = await response.json(content_type=None)
         except PiHoleAuthenticationError:
             raise
+        except PiHoleConnectionError:
+            raise
         except aiohttp.ClientConnectorCertificateError as err:
-            raise PiHoleCertificateError from err
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
-            raise PiHoleConnectionError from err
+            raise PiHoleCertificateError(
+                "No se pudo verificar el certificado HTTPS de Pi-hole"
+            ) from err
+        except asyncio.TimeoutError as err:
+            raise PiHoleConnectionError("tiempo de espera agotado al llamar a /api/auth") from err
+        except aiohttp.ClientError as err:
+            raise PiHoleConnectionError(
+                f"fallo de red al llamar a /api/auth ({type(err).__name__})"
+            ) from err
+        except ValueError as err:
+            raise PiHoleConnectionError("Pi-hole devolvió JSON no válido en /api/auth") from err
 
         session = payload.get("session", {}) if isinstance(payload, dict) else {}
         if not session.get("valid") or not session.get("sid"):
@@ -98,14 +111,31 @@ class PiHoleClient:
                         if attempt == 0:
                             continue
                         raise PiHoleAuthenticationError
-                    response.raise_for_status()
+                    if response.status >= 400:
+                        raise PiHoleConnectionError(
+                            f"/api/queries respondió HTTP {response.status}"
+                        )
                     payload = await response.json(content_type=None)
             except PiHoleAuthenticationError:
                 raise
+            except PiHoleConnectionError:
+                raise
             except aiohttp.ClientConnectorCertificateError as err:
-                raise PiHoleCertificateError from err
-            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
-                raise PiHoleConnectionError from err
+                raise PiHoleCertificateError(
+                    "No se pudo verificar el certificado HTTPS de Pi-hole"
+                ) from err
+            except asyncio.TimeoutError as err:
+                raise PiHoleConnectionError(
+                    "tiempo de espera agotado al llamar a /api/queries"
+                ) from err
+            except aiohttp.ClientError as err:
+                raise PiHoleConnectionError(
+                    f"fallo de red al llamar a /api/queries ({type(err).__name__})"
+                ) from err
+            except ValueError as err:
+                raise PiHoleConnectionError(
+                    "Pi-hole devolvió JSON no válido en /api/queries"
+                ) from err
             if not isinstance(payload, dict) or not isinstance(payload.get("queries"), list):
                 raise PiHoleConnectionError("Respuesta de /api/queries no válida")
             return payload
