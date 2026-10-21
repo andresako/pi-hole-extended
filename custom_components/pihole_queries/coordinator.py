@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -133,6 +134,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.cursor: int | None = None
         self.client_data: dict[str, dict[str, Any]] = {}
         self._bootstrapped = False
+        self._last_rate_sample_at: float | None = None
+        self._last_rate_counts: dict[str, tuple[int, int, int]] = {}
         super().__init__(
             hass,
             _LOGGER,
@@ -180,6 +183,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 ]
                 self.cursor = max(ids, default=0)
                 self._bootstrapped = True
+                self._update_query_rates(time.monotonic())
                 await self._save_cursor()
                 _LOGGER.info("Pi-hole query tracking initialized at query ID %s", self.cursor)
                 return deepcopy(self.client_data)
@@ -230,6 +234,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if (query_id := _query_id(row)) is not None
             ]
             if not identified:
+                self._update_query_rates(time.monotonic())
                 await self._save_cursor()
                 return deepcopy(self.client_data)
 
@@ -246,6 +251,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     summary["recent_queries"] = []
                 self._seed_clients(pages[0].get("queries", []))
                 self.cursor = newest_id
+                self._update_query_rates(time.monotonic())
                 await self._save_cursor()
                 return deepcopy(self.client_data)
 
@@ -269,6 +275,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 raise
 
             self.cursor = max(self.cursor or 0, newest_id)
+            self._update_query_rates(time.monotonic())
             await self._save_cursor()
             return deepcopy(self.client_data)
         except PiHoleAuthenticationError as err:
@@ -287,6 +294,36 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         ]
         for query_id, row in sorted(identified, key=lambda pair: pair[0]):
             self._update_client(row, query_id, count_as_new=False)
+
+    def _update_query_rates(self, sampled_at: float) -> None:
+        """Calculate per-client query rates since the previous successful poll."""
+        elapsed = (
+            sampled_at - self._last_rate_sample_at
+            if self._last_rate_sample_at is not None
+            else 0.0
+        )
+        current_counts: dict[str, tuple[int, int, int]] = {}
+        for client_key, summary in self.client_data.items():
+            counts = (
+                int(summary.get("query_count", 0)),
+                int(summary.get("allowed_count", 0)),
+                int(summary.get("blocked_count", 0)),
+            )
+            current_counts[client_key] = counts
+            previous = self._last_rate_counts.get(client_key, counts)
+            rates = (
+                tuple(
+                    max(0, current - old) / elapsed
+                    for current, old in zip(counts, previous, strict=True)
+                )
+                if elapsed > 0
+                else (0.0, 0.0, 0.0)
+            )
+            summary["query_rate"] = rates[0]
+            summary["allowed_rate"] = rates[1]
+            summary["blocked_rate"] = rates[2]
+        self._last_rate_counts = current_counts
+        self._last_rate_sample_at = sampled_at
 
     def _update_client(
         self,

@@ -39,14 +39,28 @@ SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     SensorEntityDescription(
-        key="last_domain",
-        name="Último dominio",
-        icon="mdi:form-textbox",
+        key="query_rate",
+        name="Consultas por segundo",
+        icon="mdi:speedometer",
+        native_unit_of_measurement="consultas/s",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
     ),
     SensorEntityDescription(
-        key="last_result",
-        name="Último resultado",
-        icon="mdi:shield-check-outline",
+        key="allowed_rate",
+        name="Permitidas por segundo",
+        icon="mdi:check-circle-outline",
+        native_unit_of_measurement="consultas/s",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+    ),
+    SensorEntityDescription(
+        key="blocked_rate",
+        name="Bloqueadas por segundo",
+        icon="mdi:cancel",
+        native_unit_of_measurement="consultas/s",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
     ),
 )
 
@@ -55,6 +69,8 @@ _COUNT_KEYS = {
     "allowed": "allowed_count",
     "blocked": "blocked_count",
 }
+
+_RATE_KEYS = {"query_rate", "allowed_rate", "blocked_rate"}
 
 
 async def async_setup_entry(
@@ -123,8 +139,8 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
         )
 
     @property
-    def native_value(self) -> int | str | None:
-        """Return this entity's counter or most recent query detail."""
+    def native_value(self) -> int | float:
+        """Return this entity's accumulated count or latest query rate."""
         data = self._client_data
         metric = self.entity_description.key
         if metric in _COUNT_KEYS:
@@ -132,17 +148,12 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
                 return int(data.get(_COUNT_KEYS[metric], 0))
             except (TypeError, ValueError):
                 return 0
-
-        last_query = data.get("last_query")
-        if not isinstance(last_query, dict):
-            return None
-        if metric == "last_domain":
-            value = last_query.get("domain")
-            return str(value) if value else None
-        if metric == "last_result":
-            value = last_query.get("result")
-            return str(value).capitalize() if value else None
-        return None
+        if metric in _RATE_KEYS:
+            try:
+                return float(data.get(metric, 0.0))
+            except (TypeError, ValueError):
+                return 0.0
+        return 0
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:

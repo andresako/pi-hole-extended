@@ -6,7 +6,7 @@ Integración personalizada e independiente de la integración oficial de Pi-hole
 
 Cada entrada incluye la hora de la consulta, nombre e IP del cliente (si Pi-hole los conoce), dominio, decisión permitida/bloqueada y estado original de Pi-hole. Añade tipo DNS, tipo de respuesta, CNAME bloqueado, servidor ascendente y texto EDE cuando la respuesta de la API incluye esos campos. Las categorías y clientes configurados en Pi-hole se conservan tal como los presente la API; la integración no cambia su configuración.
 
-Cada cliente aparece como un dispositivo con cinco entidades: **Consultas DNS**, **Permitidas**, **Bloqueadas**, **Último dominio** y **Último resultado**. Los tres contadores reflejan las consultas observadas desde que se añadió la integración. La entidad **Consultas DNS** conserva además nombre/IP, la última consulta y hasta diez consultas recientes en sus atributos. Las consultas individuales aparecen en **Ajustes → Sistema → Registros → Actividad** (Logbook). Si Actividad usa un filtro de dominios incluidos, añade `pihole_queries`.
+Cada cliente aparece como un dispositivo con seis entidades: los contadores acumulados **Consultas DNS**, **Permitidas** y **Bloqueadas**, y las tasas **Consultas por segundo**, **Permitidas por segundo** y **Bloqueadas por segundo**. Los contadores reflejan las consultas observadas desde que se añadió la integración. Las tasas se calculan entre sondeos correctos; arrancan en cero después del inicio y se actualizan en el siguiente sondeo. Si no hay consultas nuevas, muestran cero. La entidad **Consultas DNS** conserva además nombre/IP, la última consulta y hasta diez consultas recientes en sus atributos. Las consultas individuales aparecen en **Ajustes → Sistema → Registros → Actividad** (Logbook). Si Actividad usa un filtro de dominios incluidos, añade `pihole_queries`.
 
 ## Requisito de persistencia
 
@@ -68,3 +68,5 @@ custom_components/pihole_queries/
   manifest.json
   strings.json
 ```
+
+La versión 0.4.0 añade tasas de consultas por segundo por cliente y elimina las entidades de último dominio y último resultado.

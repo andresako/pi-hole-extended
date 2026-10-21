@@ -68,7 +68,7 @@ async def _validate_connection(hass: HomeAssistant, data: dict[str, Any]) -> Non
 class PiHoleQueriesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Configure a Pi-hole v6 instance from Home Assistant's UI."""
 
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> dict[str, Any]:
         """Configure host, API credentials, and polling interval."""

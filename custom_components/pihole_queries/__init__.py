@@ -5,6 +5,7 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
@@ -19,6 +20,18 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration domain."""
     hass.data.setdefault(DOMAIN, {})
     return True
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Remove the two no-longer-useful client sensors from the entity registry."""
+    if entry.version == 1:
+        registry = er.async_get(hass)
+        for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+            if entity.unique_id.endswith(("_last_domain", "_last_result")):
+                registry.async_remove(entity.entity_id)
+        hass.config_entries.async_update_entry(entry, version=2)
+        return True
+    return entry.version == 2
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
