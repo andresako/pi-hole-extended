@@ -9,7 +9,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
 from .api import PiHoleClient
-from .const import DOMAIN, STORAGE_KEY_PREFIX, STORAGE_VERSION
+from .const import DOMAIN, PLATFORMS, STORAGE_KEY_PREFIX, STORAGE_VERSION
 from .coordinator import PiHoleQueryCoordinator
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -29,6 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_load_cursor()
     await coordinator.async_config_entry_first_refresh()
     hass.data[DOMAIN][entry.entry_id] = {"client": client, "coordinator": coordinator}
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
 
@@ -40,6 +41,8 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Stop polling and close the Pi-hole session when unloading."""
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        return False
     runtime = hass.data[DOMAIN].pop(entry.entry_id)
     await runtime["coordinator"].async_shutdown()
     await runtime["client"].async_close()

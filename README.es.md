@@ -1,12 +1,12 @@
-# Pi-hole DNS Queries para Home Assistant
+# Pi-hole Extended para Home Assistant
 
-Integración personalizada e independiente de la integración oficial de Pi-hole. Consulta la API REST de Pi-hole v6 y crea una entrada del Logbook/Actividad por cada consulta nueva detectada.
+Integración personalizada e independiente de la integración oficial de Pi-hole. Consulta la API REST de Pi-hole v6, registra en Actividad cada consulta nueva detectada y crea un sensor por cliente encontrado en el historial de Pi-hole.
 
 ## Qué registra
 
 Cada entrada incluye la hora de la consulta, nombre e IP del cliente (si Pi-hole los conoce), dominio, decisión permitida/bloqueada y estado original de Pi-hole. Añade tipo DNS, tipo de respuesta, CNAME bloqueado, servidor ascendente y texto EDE cuando la respuesta de la API incluye esos campos. Las categorías y clientes configurados en Pi-hole se conservan tal como los presente la API; la integración no cambia su configuración.
 
-Las consultas aparecen en **Ajustes → Sistema → Registros → Actividad** (Logbook), no dentro de la pantalla de configuración de la integración. Esta integración no crea sensores por consulta: Activity/Logbook es el registro individual soportado por Home Assistant y evita que una entidad cambie miles de veces. Si Actividad usa un filtro de dominios incluidos, añade `pihole_queries`.
+Las consultas individuales aparecen en **Ajustes → Sistema → Registros → Actividad** (Logbook), no dentro de la pantalla de configuración de la integración. Además, se crea un sensor por cliente: su estado cuenta las consultas observadas desde que se añadió el sensor y sus atributos muestran nombre/IP, totales permitidos y bloqueados, última consulta y hasta diez consultas recientes. Si Actividad usa un filtro de dominios incluidos, añade `pihole_queries`.
 
 ## Requisito de persistencia
 
@@ -18,9 +18,9 @@ No se duplica toda la consulta DNS en almacenamiento propio: Home Assistant Reco
 
 1. Copia la carpeta `custom_components/pihole_queries` a `custom_components/pihole_queries` dentro del directorio de configuración de Home Assistant.
 2. Reinicia Home Assistant.
-3. Ve a **Ajustes → Dispositivos y servicios → Añadir integración**, busca **Pi-hole DNS Queries** y completa el formulario.
+3. Ve a **Ajustes → Dispositivos y servicios → Añadir integración**, busca **Pi-hole Extended** y completa el formulario.
 
-El repositorio público es [andresako/pi-hole-extended](https://github.com/andresako/pi-hole-extended). Para instalarlo ahora desde HACS, abre **HACS → Integraciones → ⋮ → Repositorios personalizados**, añade `andresako/pi-hole-extended`, elige la categoría **Integración**, instálalo y reinicia Home Assistant. La solicitud para incluirlo en el catálogo predeterminado de HACS se revisa por separado y todavía no está aprobada. Para instalación manual, copia la carpeta indicada arriba y reinicia Home Assistant. Después de actualizar los archivos, reinicia Home Assistant.
+El repositorio está en [andresako/pi-hole-extended](https://github.com/andresako/pi-hole-extended). Puede añadirse como repositorio personalizado desde **HACS → Integraciones → ⋮ → Repositorios personalizados**, categoría **Integración**. La inclusión en el catálogo predeterminado de HACS queda pausada hasta verificar la integración; la solicitud anterior está cerrada. Para instalación manual, copia la carpeta indicada arriba y reinicia Home Assistant. Después de actualizar los archivos, reinicia Home Assistant.
 
 ## Configuración
 
@@ -40,7 +40,7 @@ Home Assistant documenta las [entradas personalizadas de Activity/Logbook](https
 
 Las entradas suelen aparecer dentro de un intervalo de sondeo más el tiempo de respuesta de red. Por ejemplo, con 15 segundos de intervalo, una consulta puede tardar aproximadamente hasta 15 segundos en aparecer. Pi-hole alimenta la API desde su historial de consultas en memoria, así que no se espera el retardo de escritura periódica de su base de datos en disco.
 
-Cada llamada pide 1000 filas; si hay una acumulación, se recorre por páginas usando el `cursor` oficial y el ID de consulta hasta alcanzar el cursor previamente guardado. Pi-hole limita cada respuesta a un máximo de 10 000 registros; la paginación evita depender de un único lote. Una acumulación extraordinariamente grande puede alargar un ciclo y aumentar memoria/llamadas a la API. Si el historial en memoria de Pi-hole se vacía antes de que Home Assistant vuelva a sondear, las consultas que Pi-hole ya no exponga no se pueden recuperar desde esta integración. Tampoco se importan consultas anteriores a la primera instalación. El cursor se basa en IDs de la base de Pi-hole: si esa base se recrea y los IDs retroceden, se establece un cursor nuevo y no se intenta reconciliar historiales incompatibles.
+Cada llamada pide 1000 filas; si hay una acumulación, se recorre por páginas usando el `cursor` oficial y el ID de consulta hasta alcanzar el cursor previamente guardado. Pi-hole limita cada respuesta a un máximo de 10 000 registros; la paginación evita depender de un único lote. Una acumulación extraordinariamente grande puede alargar un ciclo y aumentar memoria/llamadas a la API. Si el historial en memoria de Pi-hole se vacía antes de que Home Assistant vuelva a sondear, las consultas que Pi-hole ya no exponga no se pueden recuperar desde esta integración. Tampoco se importan consultas anteriores a la primera instalación. El cursor se basa en IDs de la base de Pi-hole: si esa base se recrea y los IDs retroceden, se establece un cursor nuevo y no se intenta reconciliar historiales incompatibles. El sensor cuenta solo consultas detectadas desde que se introdujo; la instantánea inicial encuentra clientes y muestra su última consulta sin contarla. Los sensores de clientes retirados se conservan para mantener su historial de Recorder.
 
 El registro por consulta aumenta el volumen de Recorder y de Logbook, especialmente en redes con muchas peticiones DNS. Usa un intervalo razonable y revisa la retención de Recorder y el almacenamiento disponible. El intervalo mínimo es 5 s; intervalos más breves no son aceptados.
 
@@ -60,7 +60,8 @@ custom_components/pihole_queries/
   api.py            # autenticación SID y GET /api/queries
   config_flow.py    # configuración y opciones desde la interfaz
   const.py
-  coordinator.py    # sondeo, cursor y eventos Logbook
+  coordinator.py    # sondeo, cursor, resumen por cliente y eventos Activity
+  sensor.py         # contador y detalles recientes por cliente DNS
   manifest.json
   strings.json
 ```

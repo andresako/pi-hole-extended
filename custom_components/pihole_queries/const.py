@@ -2,6 +2,8 @@
 
 from datetime import timedelta
 
+from homeassistant.const import Platform
+
 DOMAIN = "pihole_queries"
 CONF_HOST = "host"
 CONF_PORT = "port"
@@ -16,9 +18,10 @@ MAX_SCAN_INTERVAL = 3600
 REQUEST_TIMEOUT = 15
 QUERY_BATCH_SIZE = 1000
 
-PLATFORMS: list[str] = []
+PLATFORMS: list[Platform] = [Platform.SENSOR]
 UPDATE_INTERVAL = timedelta(seconds=DEFAULT_SCAN_INTERVAL)
 
 STORAGE_VERSION = 1
 STORAGE_KEY_PREFIX = f"{DOMAIN}_cursor"
+CLIENT_QUERY_HISTORY = 10
 

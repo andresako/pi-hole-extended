@@ -1,6 +1,6 @@
 {
   "domain": "pihole_queries",
-  "name": "Pi-hole DNS Queries",
+  "name": "Pi-hole Extended",
   "codeowners": ["@andresako"],
   "config_flow": true,
   "dependencies": ["logbook", "recorder"],
@@ -8,5 +8,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/Andresako/pi-hole-extended/issues",
   "requirements": [],
-  "version": "0.1.1"
+  "version": "0.2.0"
 }
