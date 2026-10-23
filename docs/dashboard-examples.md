@@ -44,7 +44,7 @@ Each entry has its own diagnostic entities and client entities. Choose all rows 
 
 ## Tested scope and limits
 
-This native-card example is based on a dashboard tested on Home Assistant Core 2025.1.0. It uses the built-in `entities`, `history-graph`, and `markdown` cards. The YAML was imported with manual entity mapping and observed at 390×844 and 1440×900 CSS pixels, with all four views and keyboard navigation. The dashboard was also checked with long names, zero, unavailable, and diagnostic states. Those observations do not establish behavior on other Home Assistant releases or screen sizes.
+This native-card example is based on a dashboard tested on Home Assistant Core 2025.1.0. It uses the built-in `entities`, `history-graph`, and `markdown` cards. The YAML was imported with manual entity mapping and observed at 390×844 and 1440×900 CSS pixels, with all four views and keyboard navigation. A separate prototype was checked with long names, zero, unavailable, and diagnostic states. Those observations do not establish behavior on other Home Assistant releases or screen sizes.
 
 Per-period query volumes based on Pi-hole's original event timestamps are unavailable. No view in this example plots that metric. Recorder history remains subject to Home Assistant retention and exclusions; the integration does not verify event persistence.
 
@@ -96,6 +96,6 @@ Cada entrada tiene sus propias entidades de diagnóstico y de cliente. Elige tod
 
 ## Alcance y límites probados
 
-Este ejemplo de tarjetas nativas se basa en un panel probado con Home Assistant Core 2025.1.0. Usa las tarjetas integradas `entities`, `history-graph` y `markdown`. El YAML se importó con asignación manual de entidades y se observó a 390×844 y 1440×900 píxeles CSS, con las cuatro vistas y navegación por teclado. El panel también se comprobó con nombres largos y estados cero, no disponible y diagnóstico. Esto no demuestra el comportamiento en otras versiones de Home Assistant ni otros tamaños de pantalla.
+Este ejemplo de tarjetas nativas se basa en un panel probado con Home Assistant Core 2025.1.0. Usa las tarjetas integradas `entities`, `history-graph` y `markdown`. El YAML se importó con asignación manual de entidades y se observó a 390×844 y 1440×900 píxeles CSS, con las cuatro vistas y navegación por teclado. Por separado, un prototipo se comprobó con nombres largos y estados cero, no disponible y diagnóstico. Esto no demuestra el comportamiento en otras versiones de Home Assistant ni otros tamaños de pantalla.
 
 Los volúmenes por periodo basados en la hora original de las consultas de Pi-hole no están disponibles. Este ejemplo no representa esa métrica. El historial de Recorder depende de la retención y exclusiones de Home Assistant; la integración no comprueba la persistencia de los eventos.
