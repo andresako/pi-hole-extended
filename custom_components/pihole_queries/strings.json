@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Conectar con Pi-hole v6",
-        "description": "Introduce la dirección de Pi-hole y una contraseña de aplicación. Si usas un certificado autofirmado, desactiva la verificación HTTPS.",
+        "description": "Introduce un host sin protocolo ni ruta, el puerto web/API y una contraseña de aplicación. HTTPS usa exactamente el puerto indicado; no se cambia automáticamente. Si usas un certificado autofirmado, desactiva la verificación HTTPS.",
         "data": {
           "host": "Host o dirección IP",
           "port": "Puerto web/API",
@@ -11,29 +11,136 @@
           "verify_ssl": "Verificar el certificado HTTPS",
           "password": "Contraseña de aplicación",
           "scan_interval": "Frecuencia de consulta (segundos)"
+        },
+        "data_description": {
+          "host": "Solo nombre de host o dirección IP; no pegues una URL ni incluyas puerto o ruta.",
+          "port": "Puerto web/API usado literalmente (por ejemplo, 80 para HTTP o 443 para HTTPS).",
+          "password": "Crea una contraseña de aplicación desde Pi-hole."
+        }
+      },
+      "reconfigure": {
+        "title": "Cambiar conexión de Pi-hole",
+        "description": "Valida la conexión antes de guardarla. Confirma si sigue siendo el mismo servidor o si es un Pi-hole de reemplazo. Puerto y protocolo se usan tal como se indican; la contraseña vacía conserva la guardada.",
+        "data": {
+          "host": "Host o dirección IP, sin URL ni ruta",
+          "port": "Puerto web/API explícito",
+          "use_https": "Usar HTTPS",
+          "verify_ssl": "Verificar el certificado HTTPS",
+          "password": "Nueva contraseña de aplicación (opcional)",
+          "source_action": "Identidad del servidor"
         }
       },
       "reauth_confirm": {
         "title": "Actualizar credenciales de Pi-hole",
         "description": "Pi-hole ha rechazado la credencial guardada. Introduce una contraseña de aplicación nueva para {host}.",
-        "data": {"password": "Contraseña de aplicación"}
+        "data": {
+          "password": "Contraseña de aplicación"
+        }
       }
     },
     "error": {
-      "invalid_host": "Introduce un host válido.",
+      "invalid_host": "Introduce solo un nombre DNS o una dirección IP, sin protocolo, puerto, ruta ni credenciales.",
+      "already_configured": "Otra entrada de Pi-hole ya usa ese host, protocolo y puerto.",
       "cannot_connect": "No se pudo conectar a la API v6 de Pi-hole. Revisa host, puerto, protocolo y que /api/docs esté disponible.",
       "ssl_certificate": "Home Assistant no confía en el certificado HTTPS de Pi-hole. Si es autofirmado, desactiva la verificación del certificado.",
       "invalid_auth": "Pi-hole rechazó la contraseña de aplicación."
     },
-    "abort": {"reauth_successful": "Credenciales actualizadas."}
+    "abort": {
+      "reauth_successful": "Credenciales actualizadas.",
+      "reconfigure_successful": "Conexión actualizada.",
+      "reconfigure_entry_not_found": "No se encontró la entrada de Pi-hole que se iba a cambiar.",
+      "reconfigure_entry_changed": "La entrada cambió mientras se validaba la conexión. Inicia de nuevo la reconfiguración."
+    }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Frecuencia de consulta",
-        "description": "Entre 1 y 3600 segundos. A 1 s, la integración consulta la API hasta una vez por segundo; el uso de CPU y red puede aumentar.",
-        "data": {"scan_interval": "Frecuencia de consulta (segundos)"}
+        "title": "Frecuencia y conservación de consultas",
+        "description": "Elige cómo conservar los detalles. El modo agregado elimina los detalles del Store de la integración, incluida su copia heredada, pero no borra el historial previo de Recorder o Activity.",
+        "data": {
+          "scan_interval": "Frecuencia de consulta (segundos)",
+          "retention_mode": "Conservación de consultas",
+          "activity_mode": "Eventos de Activity"
+        },
+        "data_description": {
+          "retention_mode": "Detalle conserva filas recientes de consultas. Agregado mantiene solo identidad del cliente y totales numéricos.",
+          "activity_mode": "Elige todos los eventos, solo bloqueados o ninguno. La conservación agregada siempre desactiva las entradas de Activity."
+        }
       }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "communication_status": {
+        "name": "Estado de comunicación",
+        "state": {
+          "connected": "Conectado",
+          "error": "Error de comunicación",
+          "stale": "Lectura obsoleta",
+          "unknown": "Desconocido"
+        }
+      },
+      "last_successful_read": {
+        "name": "Última lectura correcta"
+      },
+      "last_query_observed": {
+        "name": "Última consulta observada"
+      },
+      "coverage": {
+        "name": "Cobertura de ingesta",
+        "state": {
+          "unknown": "Desconocida",
+          "complete": "Completa desde el cursor base",
+          "partial": "Parcial"
+        }
+      },
+      "queries": {
+        "name": "Consultas DNS"
+      },
+      "legacy_allowed": {
+        "name": "Permitidas (histórico legado)"
+      },
+      "legacy_blocked": {
+        "name": "Bloqueadas (histórico legado)"
+      },
+      "allowed_v1": {
+        "name": "Permitidas (v1)"
+      },
+      "blocked_v1": {
+        "name": "Bloqueadas (v1)"
+      },
+      "provisional_v1": {
+        "name": "Provisionales (v1)"
+      }
+    }
+  },
+  "selector": {
+    "retention_mode": {
+      "options": {
+        "detail": "Historial detallado de consultas",
+        "aggregate": "Solo totales agregados"
+      }
+    },
+    "activity_mode": {
+      "options": {
+        "all": "Todos los eventos",
+        "blocked": "Solo eventos bloqueados",
+        "none": "Sin eventos de Activity"
+      }
+    },
+    "source_action": {
+      "options": {
+        "same_source": "Es el mismo Pi-hole; conservar cursor e identidad",
+        "new_source": "Es un Pi-hole de reemplazo; iniciar una generación nueva"
+      }
+    }
+  },
+  "device": {
+    "client_device": {
+      "name": "{client_name}"
+    },
+    "pihole_instance": {
+      "name": "{entry_title} · Diagnóstico"
     }
   }
 }

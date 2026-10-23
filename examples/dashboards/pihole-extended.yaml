@@ -1,0 +1,134 @@
+title: Pi-hole Extended
+views:
+  - title: Resumen
+    path: resumen
+    icon: mdi:view-dashboard
+    cards:
+      - type: markdown
+        content: |
+          ## Pi-hole Extended
+
+          Muestra una instancia por vista. Las consultas son acumuladas desde la configuración;
+          el gráfico usa la hora de registro de HA, no la hora original de Pi-hole.
+      - type: entities
+        title: Consultas acumuladas
+        entities:
+          # Reemplaza cada ID con el ID actual de la entidad en Ajustes → Entidades.
+          - entity: sensor.replace_with_client_1_queries
+            name: Cliente 1
+          - entity: sensor.replace_with_client_2_queries
+            name: Cliente 2
+          - entity: sensor.replace_with_client_3_queries
+            name: Cliente 3
+      - type: markdown
+        content: |
+          ### Actividad observada por HA · último minuto
+
+          Cuenta móvil de consultas observadas por la integración. No es el volumen histórico
+          por hora original de Pi-hole. Se actualiza con cada sondeo; si el intervalo de
+          sondeo supera un minuto, el valor puede quedar desfasado hasta el siguiente.
+
+          {% set count = state_attr('sensor.replace_with_client_1_queries', 'queries_observed_last_minute') %}
+          - Cliente 1: {{ count if count is not none else 'No disponible' }}
+          {% set count = state_attr('sensor.replace_with_client_2_queries', 'queries_observed_last_minute') %}
+          - Cliente 2: {{ count if count is not none else 'No disponible' }}
+          {% set count = state_attr('sensor.replace_with_client_3_queries', 'queries_observed_last_minute') %}
+          - Cliente 3: {{ count if count is not none else 'No disponible' }}
+      - type: entities
+        title: Bloqueadas v1 · acumulado
+        entities:
+          # Comparación estática de hasta cinco clientes de la misma instancia.
+          - entity: sensor.replace_with_client_1_blocked_v1
+            name: Cliente 1
+          - entity: sensor.replace_with_client_2_blocked_v1
+            name: Cliente 2
+          - entity: sensor.replace_with_client_3_blocked_v1
+            name: Cliente 3
+      - type: history-graph
+        title: Consultas acumuladas · 24 h
+        hours_to_show: 24
+        refresh_interval: 60
+        entities:
+          - entity: sensor.replace_with_client_1_queries
+            name: Cliente 1
+          - entity: sensor.replace_with_client_2_queries
+            name: Cliente 2
+          - entity: sensor.replace_with_client_3_queries
+            name: Cliente 3
+  - title: Clientes
+    path: clientes
+    icon: mdi:devices
+    cards:
+      - type: markdown
+        content: >
+          Sustituye las entidades de ejemplo por las de tus clientes. Añade o quita filas
+          manualmente para conservar acceso a clientes inactivos y desconocidos.
+      - type: entities
+        title: Clientes · consultas acumuladas
+        entities:
+          - entity: sensor.replace_with_client_1_queries
+            name: Cliente 1 · consultas observadas
+          - entity: sensor.replace_with_client_2_queries
+            name: Cliente 2 · consultas observadas
+          - entity: sensor.replace_with_client_3_queries
+            name: Cliente 3 · consultas observadas
+          - entity: sensor.replace_with_client_4_queries
+            name: Cliente 4 · consultas observadas
+          - entity: sensor.replace_with_unknown_client_queries
+            name: Desconocido · DNS
+  - title: Detalle
+    path: detalle
+    icon: mdi:magnify
+    cards:
+      - type: markdown
+        content: >
+          Selecciona una entidad para abrir el cuadro estándar de Home Assistant y consultar
+          el historial disponible y sus atributos. Esta vista no ofrece una tabla DNS completa,
+          una búsqueda interactiva ni filtros coordinados.
+      - type: entities
+        title: Cliente · contadores observados
+        entities:
+          - entity: sensor.replace_with_client_1_queries
+            name: Cliente 1 · consultas observadas
+          - entity: sensor.replace_with_client_1_allowed_v1
+            name: Cliente 1 · permitidas (v1)
+          - entity: sensor.replace_with_client_1_blocked_v1
+            name: Cliente 1 · bloqueadas (v1)
+          - entity: sensor.replace_with_client_1_provisional_v1
+            name: Cliente 1 · provisionales (v1)
+          - entity: sensor.replace_with_client_2_queries
+            name: Cliente 2 · consultas observadas
+          - entity: sensor.replace_with_client_2_allowed_v1
+            name: Cliente 2 · permitidas (v1)
+          - entity: sensor.replace_with_client_2_blocked_v1
+            name: Cliente 2 · bloqueadas (v1)
+          - entity: sensor.replace_with_client_2_provisional_v1
+            name: Cliente 2 · provisionales (v1)
+  - title: Diagnóstico
+    path: diagnostico
+    icon: mdi:heart-pulse
+    cards:
+      - type: markdown
+        content: >
+          Sustituye estas entidades por las cuatro de diagnóstico de una entrada. Estado de
+          comunicación, frescura, cobertura y persistencia son señales distintas. Una lectura
+          correcta no confirma que Recorder haya guardado cada evento.
+      - type: entities
+        title: Estado de la integración
+        entities:
+          - entity: sensor.replace_with_entry_communication_status
+            name: Estado de comunicación
+          - entity: sensor.replace_with_entry_last_successful_read
+            name: Última lectura correcta
+          - entity: sensor.replace_with_entry_last_query_observed
+            name: Última consulta observada
+          - entity: sensor.replace_with_entry_ingestion_coverage
+            name: Cobertura de ingesta
+      - type: history-graph
+        title: Estado y cobertura · últimas 24 h
+        hours_to_show: 24
+        entities:
+          - entity: sensor.replace_with_entry_communication_status
+            name: Estado
+          - entity: sensor.replace_with_entry_ingestion_coverage
+            name: Cobertura
