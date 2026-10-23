@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from custom_components.pihole_queries import async_setup_entry
 from custom_components.pihole_queries.const import (
@@ -27,8 +27,14 @@ async def test_new_registry_entity_is_normalized_on_the_event_loop(
 
     hass = HomeAssistant(str(tmp_path))
     hass.data[DOMAIN] = {}
+    if hasattr(dr, "async_setup"):
+        dr.async_setup(hass)
+        await dr.async_load(hass)
+    else:
+        dr.async_get(hass)
     hass.config_entries = SimpleNamespace(
-        async_forward_entry_setups=AsyncMock(return_value=None)
+        async_forward_entry_setups=AsyncMock(return_value=None),
+        async_get_entry=lambda entry_id: entry if entry_id == entry.entry_id else None,
     )
 
     class Client:

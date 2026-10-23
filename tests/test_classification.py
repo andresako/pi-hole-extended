@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from homeassistant.components.sensor import SensorEntityDescription, SensorStateClass
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityPlatformState
 
 from custom_components.pihole_queries import classification, coordinator as coordinator_module
 from custom_components.pihole_queries.classification import classify_status
@@ -201,7 +202,7 @@ async def test_overlapping_api_pages_count_and_log_each_id_once(frozen_time) -> 
     }
     assert [item["id"] for item in summary["recent_queries"]] == [101, 102]
     assert summary["recent_queries"][0]["status"] == "UNKNOWN"
-    assert len(summary["recent_activity"]) == 2
+    assert len(coordinator.client_data["192.0.2.10"]["recent_activity"]) == 2
     assert summary["queries_observed_last_minute"] == 2
     assert len(coordinator.hass.services.calls) == 2
 
@@ -380,7 +381,9 @@ async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path)
             platform_translations={},
                 default_language_platform_translations={},
         )
+        entity.platform_data = entity.platform
         await entity.async_internal_added_to_hass()
+        entity._platform_state = EntityPlatformState.ADDED
         entity.async_write_ha_state()
 
     assert total.unique_id == "entry_192.0.2.10"

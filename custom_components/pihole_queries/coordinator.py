@@ -622,6 +622,24 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         """Fetch data and update summaries from the Pi-hole API."""
         return await self._async_update_data_snapshot()
 
+    def _data_snapshot(self) -> dict[str, dict[str, Any]]:
+        """Copy observer data without duplicating the private ingestion journal."""
+        snapshot: dict[str, dict[str, Any]] = {}
+        for key, summary in self.client_data.items():
+            if not isinstance(summary, dict):
+                continue
+            # Exact per-query observation timestamps remain in client_data and
+            # Store for rolling-window calculations. They are not exposed by
+            # any entity; copying their potentially large journal into HA's
+            # coordinator snapshot would retain a second copy of every row.
+            visible_summary = {
+                field: value
+                for field, value in summary.items()
+                if field != "recent_activity"
+            }
+            snapshot[key] = deepcopy(visible_summary)
+        return snapshot
+
     async def _async_get_queries(self, *, length: int, cursor: int | None = None) -> dict[str, Any]:
         """Read Pi-hole queries and record API success independently of later work."""
         try:
@@ -678,7 +696,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             if self.awaiting_generation:
                 # Keep checking API health, but attach a new source generation
                 # before these IDs can enter cumulative series.
-                return deepcopy(self.client_data)
+                return self._data_snapshot()
 
             if not self._bootstrapped:
                 # Seed client entities from the current page, without logging or
@@ -694,7 +712,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                         "invalid_legacy_store",
                     }:
                         self.coverage_reason = "baseline_unverified"
-                    return deepcopy(self.client_data)
+                    return self._data_snapshot()
                 self.cursor = max((query_id for query_id, _ in ids), default=0)
                 self._bootstrapped = True
                 self.recovery_cursor = None
@@ -722,7 +740,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     awaiting_generation=original_awaiting_generation
                 )
                 _LOGGER.info("Pi-hole query tracking initialized at query ID %s", self.cursor)
-                return deepcopy(self.client_data)
+                return self._data_snapshot()
 
             # Pi-hole returns newest records first. Follow cursors until the
             # previously stored high-water mark is reached.
@@ -750,7 +768,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                         original_coverage_reason, original_last_query_time,
                         original_bootstrapped, original_recovery_cursor
                     )
-                    return deepcopy(self.client_data)
+                    return self._data_snapshot()
                 self.recovery_cursor = None
 
             seen_cursors: set[int] = set()
@@ -827,7 +845,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     original_coverage_reason, original_last_query_time, original_bootstrapped,
                     original_recovery_cursor
                 )
-                return deepcopy(self.client_data)
+                return self._data_snapshot()
 
             newest_id = max(query_id for query_id, _ in identified)
             if self.cursor is not None and newest_id < self.cursor:
@@ -849,7 +867,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     original_recovery_cursor,
                     awaiting_generation=original_awaiting_generation
                 )
-                return deepcopy(self.client_data)
+                return self._data_snapshot()
 
             if not self.client_data:
                 # Discover clients on upgrade from older releases without
@@ -903,7 +921,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     original_coverage_reason, original_last_query_time,
                     original_bootstrapped, original_recovery_cursor
                 )
-                return deepcopy(self.client_data)
+                return self._data_snapshot()
 
             new_rows = sorted(
                 (
@@ -955,7 +973,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 original_coverage_reason, original_last_query_time, original_bootstrapped,
                 original_recovery_cursor
             )
-            return deepcopy(self.client_data)
+            return self._data_snapshot()
         except PiHoleAuthenticationError as err:
             raise ConfigEntryAuthFailed(
                 "Contraseña de aplicación de Pi-hole no válida o sesión expirada"
@@ -1075,7 +1093,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self.coverage = "partial"
             self.coverage_reason = "invalid_query_ids"
             await commit()
-            return deepcopy(self.client_data)
+            return self._data_snapshot()
         latest_identified = [
             (query_id, row)
             for row in latest_rows
@@ -1085,7 +1103,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self.coverage = "partial"
             self.coverage_reason = "invalid_query_ids"
             await commit()
-            return deepcopy(self.client_data)
+            return self._data_snapshot()
         if not latest_identified:
             if not self._bootstrapped:
                 self.coverage = "unknown"
@@ -1097,7 +1115,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 self.coverage = "unknown"
                 self.coverage_reason = "empty_history"
             await commit()
-            return deepcopy(self.client_data)
+            return self._data_snapshot()
 
         latest_id, latest_row = latest_identified[0]
         if not self._bootstrapped:
@@ -1111,11 +1129,11 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self.coverage = "complete"
             self.coverage_reason = None
             await commit()
-            return deepcopy(self.client_data)
+            return self._data_snapshot()
 
         if self.awaiting_generation:
             await commit()
-            return deepcopy(self.client_data)
+            return self._data_snapshot()
 
         if original_cursor is not None and latest_id < original_cursor:
             _LOGGER.warning("El identificador de consultas de Pi-hole se reinició; se establece un cursor nuevo")
@@ -1128,12 +1146,12 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             pending_cursor = None
             pending_time = None
             await commit(awaiting_generation=original_awaiting_generation)
-            return deepcopy(self.client_data)
+            return self._data_snapshot()
 
         if latest_id <= (original_cursor or 0) and not pending:
             self.recovery_cursor = None
             await commit()
-            return deepcopy(self.client_data)
+            return self._data_snapshot()
 
         earliest = _timestamp_number(latest.get("earliest_timestamp"))
         truncated = (
@@ -1244,7 +1262,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 self.coverage = "unknown"
                 self.coverage_reason = "cursor_not_reached"
             await commit()
-            return deepcopy(self.client_data)
+            return self._data_snapshot()
 
         # A proven boundary (or confirmed retention truncation) allows these
         # anonymous numeric deltas to become visible cumulative counts.
@@ -1309,7 +1327,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self.coverage = "complete"
             self.coverage_reason = None
         await commit()
-        return deepcopy(self.client_data)
+        return self._data_snapshot()
 
     def _seed_clients(self, rows: Any) -> None:
         """Initialize client summaries from a query page without counting it."""
@@ -1488,9 +1506,36 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 recent = []
             recent = [item for item in recent if isinstance(item, dict)]
             summary["recent_queries"] = recent
-            if not any(item.get("id") == query_id for item in recent if isinstance(item, dict)):
-                recent.append(_query_summary(query, query_id))
-            recent.sort(key=lambda item: _query_id({"id": item.get("id")}) or 0)
+
+            # New rows arrive in increasing, unique ID order. Preserve the
+            # legacy sort for imported/malformed histories, while avoiding a
+            # full sort for the normal append-only Store history.
+            ordered_integer_history = all(
+                type(item.get("id")) is int and item["id"] >= 0
+                for item in recent
+            ) and all(
+                recent[index - 1]["id"] <= recent[index]["id"]
+                for index in range(1, len(recent))
+            )
+            append_history = ordered_integer_history and (
+                not recent or recent[-1]["id"] < query_id
+            )
+            history_is_full_and_newer = (
+                ordered_integer_history
+                and len(recent) >= CLIENT_QUERY_HISTORY
+                and recent[0]["id"] > query_id
+            )
+            already_present = (
+                False
+                if append_history or history_is_full_and_newer
+                else any(item.get("id") == query_id for item in recent)
+            )
+            query_details: dict[str, Any] | None = None
+            if not already_present and not history_is_full_and_newer:
+                query_details = _query_summary(query, query_id)
+                recent.append(query_details)
+            if not append_history and not history_is_full_and_newer:
+                recent.sort(key=lambda item: _query_id({"id": item.get("id")}) or 0)
             del recent[:-CLIENT_QUERY_HISTORY]
 
             try:
@@ -1499,7 +1544,11 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 last_query_id = 0
             if query_id > last_query_id or "last_query" not in summary:
                 summary["last_query_id"] = query_id
-                summary["last_query"] = _query_summary(query, query_id)
+                if query_details is None:
+                    query_details = _query_summary(query, query_id)
+                # Keep the outer dictionaries independent, as they were when
+                # built by separate calls, while reusing the expensive fields.
+                summary["last_query"] = query_details.copy()
 
         if count_as_new:
             summary["query_count"] = int(summary.get("query_count", 0)) + 1
