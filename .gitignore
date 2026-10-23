@@ -3,7 +3,3 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
-
-# Local product plans and reviews; not part of the published integration.
-/local-planning/
-/.agents/notes.md

@@ -446,7 +446,7 @@ class _IdentityStore:
                     or not isinstance(count, int)
                     or count < 0
                 ):
-                    # P03 requires a numeric total. Keep this client visible, but
+                    # Keep this client visible, but
                     # never claim its imported coverage is complete.
                     summary["query_count"] = 0
                     malformed = True

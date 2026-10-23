@@ -17,5 +17,4 @@ The test configuration disables sockets except for loopback. Tests use a local
 HTTP server and synthetic `example.test` query records; no Pi-hole, Home
 Assistant installation, private DNS data, or credentials are needed.
 
-The local Home Assistant runtime recipe for future visual work belongs to the
-P09 work package; backend tests do not claim to validate the frontend.
+Backend tests do not validate the Home Assistant frontend.

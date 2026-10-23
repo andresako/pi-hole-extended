@@ -2,7 +2,7 @@
 
 A standalone custom integration for Pi-hole v6. It polls Pi-hole's official `GET /api/queries` endpoint, records newly observed DNS queries in Home Assistant Activity, and creates one device per client.
 
-The minimum Home Assistant version is **2025.1.0** (`hacs.json`). The query API contract has been compared with Pi-hole FTL **6.1.0–6.8.x**; the exact API schema is versioned and each server exposes its own documentation at `/api/docs`. P10's native dashboard was exercised on Home Assistant Core 2025.1.0. These checks do not establish behavior on later Home Assistant versions or FTL releases outside that range.
+The minimum Home Assistant version is **2025.1.0** (`hacs.json`). The query API contract has been compared with Pi-hole FTL **6.1.0–6.8.x**; the exact API schema is versioned and each server exposes its own documentation at `/api/docs`. The native dashboard was exercised on Home Assistant Core 2025.1.0. These checks do not establish behavior on later Home Assistant versions or FTL releases outside that range.
 
 Documentation: [English](../README.md) · [Español](../README.es.md)
 

@@ -2,7 +2,7 @@
 
 Integración personalizada e independiente de la integración oficial de Pi-hole. Consulta la API REST de Pi-hole v6, registra en Actividad cada consulta nueva detectada y crea un dispositivo por cliente.
 
-La versión mínima de Home Assistant es **2025.1.0** (`hacs.json`). El contrato de la API de consultas se ha comparado con Pi-hole FTL **6.1.0–6.8.x**; el esquema exacto varía por versión y cada servidor publica su documentación en `/api/docs`. El panel nativo de P10 se probó con Home Assistant Core 2025.1.0. Estas comprobaciones no demuestran el comportamiento en versiones posteriores de Home Assistant ni en FTL fuera de ese intervalo.
+La versión mínima de Home Assistant es **2025.1.0** (`hacs.json`). El contrato de la API de consultas se ha comparado con Pi-hole FTL **6.1.0–6.8.x**; el esquema exacto varía por versión y cada servidor publica su documentación en `/api/docs`. El panel nativo se probó con Home Assistant Core 2025.1.0. Estas comprobaciones no demuestran el comportamiento en versiones posteriores de Home Assistant ni en FTL fuera de ese intervalo.
 
 ## Qué registra
 

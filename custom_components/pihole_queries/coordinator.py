@@ -676,8 +676,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     "No se pueden actualizar los contadores porque los datos locales no son válidos"
                 )
             if self.awaiting_generation:
-                # Keep checking API health, but P04 must attach a new source
-                # generation before these IDs can enter cumulative series.
+                # Keep checking API health, but attach a new source generation
+                # before these IDs can enter cumulative series.
                 return deepcopy(self.client_data)
 
             if not self._bootstrapped:
@@ -831,7 +831,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
             newest_id = max(query_id for query_id, _ in identified)
             if self.cursor is not None and newest_id < self.cursor:
-                # P04 must attach a new source generation before ingestion can
+                # Attach a new source generation before ingestion can
                 # resume; otherwise cumulative series would combine databases.
                 _LOGGER.warning(
                     "El identificador de consultas de Pi-hole se reinició; se establece un cursor nuevo"

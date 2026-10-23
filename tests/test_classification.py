@@ -416,7 +416,7 @@ async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path)
     await hass.async_stop()
 
 
-def test_sensor_cardinality_stays_within_all_p01_profiles() -> None:
+def test_sensor_cardinality_stays_within_all_supported_profiles() -> None:
     profiles = ((5, 30), (25, 150), (100, 600))
     assert len(SENSOR_DESCRIPTIONS) == 6
     for clients, entity_budget in profiles:

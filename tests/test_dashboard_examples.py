@@ -108,8 +108,8 @@ def test_unknown_client_label_is_compact_for_narrow_screens() -> None:
 def test_guide_distinguishes_zero_percentage_from_unknown() -> None:
     guide = GUIDE_PATH.read_text(encoding="utf-8")
 
-    assert "The final P10 YAML was separately imported" in guide
-    assert "El YAML final de P10 se importó por separado" in guide
+    assert "The YAML was imported with manual entity mapping" in guide
+    assert "El YAML se importó con asignación manual de entidades" in guide
     assert "A real 0% remains 0" in guide
     assert "the attribute is unknown rather than 0%" in guide
     assert "Un 0 % real sigue siendo 0" in guide
@@ -119,7 +119,7 @@ def test_guide_distinguishes_zero_percentage_from_unknown() -> None:
 def test_distribution_example_contains_no_prototype_fixture_or_private_data() -> None:
     text = DASHBOARD_PATH.read_text(encoding="utf-8").lower()
 
-    assert "p09_" not in text
+    assert "prototype_fixture_" not in text
     assert "example.test" not in text
     assert not re.search(r"\b(?:10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)", text)
     assert "last 24 h" in text or "últimas 24 h" in text
