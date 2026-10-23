@@ -1,0 +1,23 @@
+[project]
+name = "pihole-extended-dev"
+version = "0.0.0"
+description = "Development and test environment for Pi-hole Extended"
+requires-python = ">=3.12,<3.13"
+dependencies = ["homeassistant==2025.1.0"]
+
+[dependency-groups]
+dev = [
+  "pytest==8.3.4",
+  "pytest-asyncio==0.24.0",
+  "pytest-aiohttp==1.0.5",
+  "pytest-freezer==0.4.8",
+  "pytest-socket==0.7.0",
+  "trustme==1.2.1",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--disable-socket --allow-hosts=127.0.0.1,::1,localhost"
+testpaths = ["tests"]
+pythonpath = ["."]
