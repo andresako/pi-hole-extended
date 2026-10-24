@@ -1,59 +1,87 @@
 # Pi-hole Extended
 
-See DNS query activity from **Pi-hole v6** in Home Assistant. The integration creates a device with useful sensors for each Pi-hole client. By default it keeps recent query details and records every new query in Activity/Logbook.
+**See the DNS activity Pi-hole v6 reports to Home Assistant, organized by client.** Pi-hole Extended adds clear per-client counters, optional recent query details, and diagnostics that help you see whether Home Assistant is keeping up.
 
-## What you get
+> A community-built Home Assistant custom integration. It is not affiliated with or endorsed by Home Assistant or Pi-hole.
 
-- One Home Assistant device per Pi-hole client.
-- Four counter sensors per client: total observed queries and allowed/blocked/provisional counts for the active classifier version. Last-minute observation counts are attributes of the total sensor, not separate entities. Existing legacy allowed/blocked entities are disabled by the integration while their registry IDs and Recorder history are retained.
-- Individual query entries in **Settings → System → Logs → Activity** by default.
-- Simple names and `phe_` IDs for per-client sensors; diagnostic IDs are scoped to the integration entry.
+[![Latest release](https://img.shields.io/github/v/release/Andresako/pi-hole-extended?label=release)](https://github.com/Andresako/pi-hole-extended/releases/latest) [![HACS validation](https://github.com/andresako/pi-hole-extended/actions/workflows/hacs.yaml/badge.svg)](https://github.com/andresako/pi-hole-extended/actions/workflows/hacs.yaml) [![Hassfest](https://github.com/andresako/pi-hole-extended/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/andresako/pi-hole-extended/actions/workflows/hassfest.yaml)
 
-## Upgrade notes for 0.8.0
+## At a glance
 
-The two older unversioned allowed/blocked client counters are retired. Home Assistant disables their existing entity-registry entries while preserving their unique IDs, custom entity IDs, custom names, and Recorder history. Automations or dashboards that use those entities should be updated to the versioned allowed/blocked counters. New installations create only the current four client counters.
+- One Home Assistant device for each client found in Pi-hole's visible query history.
+- Four client counters: total observed queries, allowed, blocked, and provisional. Classifier counts are versioned so later changes remain clear.
+- Choose **Detailed query history** for recent query details and optional Activity entries, or **Aggregate totals only** to retain client identities and numeric totals without query rows or domains.
+- Per-entry diagnostics show communication status, last successful read, last observed query, and ingestion coverage.
+- A starter dashboard with four native Home Assistant views, titled **Resumen**, **Clientes**, **Detalle**, and **Diagnóstico** in the example YAML.
 
-In a synthetic test with 100 clients and 100 queries per second, detailed mode processed a 10-minute feed of 60,000 rows with the final cursor about 0.12 seconds after the feed ended. Aggregate mode took about 360 seconds to drain after the same feed ended (about 960 seconds total). Separately, recovering a 60,000-row backlog took about 0.65 seconds in detailed mode and 13.88 seconds in aggregate mode (13.98 seconds maximum across five runs). These local synthetic results are not a throughput guarantee for other hardware or Pi-hole installations. They show that aggregate mode can lag under sustained high-volume input, even though it uses less detail and avoids new Activity entries.
+The integration counts new queries it observes while polling Pi-hole. It does not recreate all traffic Pi-hole has ever handled, and its dashboard does not rank queries by their original event time.
+
+## Requirements
+
+- Home Assistant **2025.1 or newer**.
+- Pi-hole **v6**. The query API contract is checked against FTL **6.1.0–6.8.x**; your Pi-hole also serves its API reference at `/api/docs`.
 
 ## Install with HACS
 
-1. In HACS, open **Integrations → ⋮ → Custom repositories**.
-2. Add `https://github.com/Andresako/pi-hole-extended` and choose **Integration**.
+Pi-hole Extended is installed as a custom HACS repository and is not currently in the HACS default catalog.
+
+1. In Home Assistant, open **HACS → Integrations → ⋮ → Custom repositories**.
+2. Add `https://github.com/Andresako/pi-hole-extended` and select **Integration**.
 3. Install **Pi-hole Extended**, then restart Home Assistant.
-4. Go to **Settings → Devices & services → Add integration**, search for **Pi-hole Extended**, and enter your Pi-hole details.
+4. Open **Settings → Devices & services → Add integration**, search for **Pi-hole Extended**, and follow the setup form.
 
-The integration is installed as a custom HACS repository; it is not currently in HACS's default catalog.
+For a manual installation, download [`pihole_queries-0.8.0.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.8.0/pihole_queries-0.8.0.zip), extract `custom_components/pihole_queries` into your Home Assistant configuration directory, and restart Home Assistant.
 
-## Set up
+## Configure Pi-hole
 
-The integration requires Home Assistant 2025.1 or newer and Pi-hole v6. Its query contract is checked against FTL 6.1.0–6.8.x; each Pi-hole also serves its own API reference at `/api/docs`. Create an application password from Pi-hole's web interface Settings page; Pi-hole shows it only once. During setup, enter:
+Create an application password in Pi-hole's web interface under **Settings**. Pi-hole displays the password only once; see the [Pi-hole authentication guide](https://docs.pi-hole.net/api/auth/).
 
-- Pi-hole hostname or IP address (without `http://`, `https://`, a port, or a path) and its web/API port.
-- Whether Pi-hole uses HTTPS and whether to verify its certificate.
+During setup, provide:
+
+- Pi-hole hostname or IP address, without protocol, port, or path.
+- Web/API port. The port is used exactly as entered, including with HTTPS.
+- Whether to use HTTPS and whether to verify the TLS certificate.
 - The application password.
-- How often Home Assistant checks for new queries (default: 15 seconds).
+- Poll interval, in seconds (default: **15**).
 
-The port is used exactly as entered: HTTPS does not silently change it to 443, so keep a custom port when switching protocol. The password is stored in the Home Assistant config entry. It is not included in this repository or integration logs. Start with a 5-second interval; shorter intervals show new queries sooner and make more API requests. See Pi-hole's [official authentication guide](https://docs.pi-hole.net/api/auth/) for session-based API access.
+The password is stored with the Home Assistant integration entry and is not included in integration logs. Start with the default poll interval; shorter intervals can show new observations sooner and make more API requests.
 
-After setup, wait for at least one polling interval and check the per-entry **Communication status** and **Ingestion coverage** diagnostic sensors. The first read establishes a baseline and does not count or log the queries already in Pi-hole's current snapshot. To check new activity, make a fresh DNS request from a client that uses this Pi-hole, then wait for the next poll. The client's **DNS queries** total should increase; the query appears in Activity only when detailed retention is selected and the Activity option allows it. A blocked query increments a blocked counter; a permitted query increments an allowed counter; an unrecognized or incomplete status remains provisional. The total counts observations made by Home Assistant, not every query Pi-hole handled.
+## See your first observations
 
-If the total increases but Activity has no entry, check that query retention is **Detailed**, Activity events are set to **All** or **Blocked** for the result, and any Activity include filter allows the `pihole_queries` domain. Recorder filters operate on entity states rather than this custom event; if your Recorder configuration excludes the `logbook_entry` event type, allow it there. Activity/Recorder persistence is controlled by Home Assistant and is not verified by this integration. If the total does not increase, check the diagnostic status, endpoint, credentials, poll interval, and whether the query is new to Pi-hole's in-memory history.
+After setup, wait for a successful poll and check **Communication status** and **Ingestion coverage** in the integration's diagnostic entities. The first read establishes a baseline; it does not count the queries already in Pi-hole's current snapshot. Then make a fresh DNS request from a device that uses this Pi-hole and wait for the next poll.
 
-Use the integration's **Reconfigure** action to change the endpoint. Confirm **Same Pi-hole** to preserve its source identity, cursor, and existing entities, including when the protocol or port changes. Choose **Replacement Pi-hole** only when the server was replaced: it starts a new generation and baseline, and disables the previous generation's client sensors while retaining their Recorder history. You can leave the optional password blank to keep the saved password.
+The client's **DNS queries** counter should increase when the new query is observed. Allowed and blocked queries update their respective classifier counters; unrecognized or incomplete results remain provisional and are excluded from the classified percentage. In Detailed mode, a new query can also appear in Home Assistant's **Activity** when the Activity option permits it. The current Activity event text is in Spanish. Activity and Recorder persistence depends on your Home Assistant configuration.
 
-## Query retention
+## Choose what to retain
 
-In the integration options, choose **Detailed query history** or **Aggregate totals only**. Detailed history is the default and keeps recent query rows for sensors. Aggregate mode retains client identity and numeric totals in the integration Store, with no query domains, IDs, raw statuses, or individual query rows; it also disables new Activity entries. The separate Activity option can record all events (the default), blocked events only, or none while detailed history is enabled. These choices do not change the counters.
+In the integration's options, choose one of these modes:
 
-Switching to aggregate mode removes query details from the integration's current Store and legacy backup. It does not erase earlier Recorder or Activity history, exports, or backups; Home Assistant may continue to show data that was already recorded.
+- **Detailed query history** (default): retains recent query details for client sensors. Activity can record **All events**, **Blocked events only**, or **No Activity events**.
+- **Aggregate totals only**: retains client identities and numeric totals, without query domains, IDs, raw statuses, or individual query rows. It disables new Activity entries.
 
-## Update or remove
+Changing to Aggregate removes query details from the integration's current Store and legacy copy. It does not erase data already recorded by Home Assistant, existing Activity history, exports, or backups. See [technical details and limits](docs/DETAILS.md) for retention behavior and high-volume considerations.
 
-For a HACS installation, update **Pi-hole Extended** in HACS and restart Home Assistant when prompted. For a manual installation, replace `custom_components/pihole_queries` with the new files and restart. Keep the integration entry to retain its cursor and counters. To remove it, first record that entry's `entry_id` and, if present, its `source_id`; then delete the entry from **Settings → Devices & services**, uninstall it from HACS or delete its integration folder, and restart Home Assistant. Removing the entry does not automatically delete the integration's Store files under Home Assistant's `.storage` directory. Detailed mode can store the last query and up to ten recent rows per client; aggregate mode keeps the cursor and numeric summaries. The integration has no Store purge action. If you also want to erase those files, make a restorable Home Assistant backup, stop Home Assistant, list files whose names start with `pihole_queries_cursor_<source_id>_` for that entry, then remove only those exact files and its legacy `pihole_queries_cursor_<entry_id>` file when present. This also covers earlier replacement generations for that source. Do not remove files belonging to other source IDs or entries, and do not delete the `.storage` directory. A recreated entry has a new source identity and will not resume the old Store. Previously recorded Activity/Recorder data and external backups follow Home Assistant's retention and backup policies.
+## Add the example dashboard
 
-## More information
+The [starter dashboard YAML](examples/dashboards/pihole-extended.yaml) contains four views built from Home Assistant's native cards. It uses placeholder entity IDs: copy the YAML into a new dashboard and map each placeholder to the entity IDs in your own entity registry. Follow the [dashboard guide](docs/dashboard-examples.md); do not replace an existing dashboard's configuration.
 
-- [Guía en español](README.es.md)
-- [Technical details and limitations](docs/DETAILS.md)
-- [Detalles técnicos en español](docs/DETALLES_ES.md)
-- [Report a problem](https://github.com/Andresako/pi-hole-extended/issues)
+## Updating from 0.7.x
+
+Version 0.8.0 retires the two older unversioned allowed/blocked client counters. Home Assistant disables existing registry entries while retaining their IDs, custom names, and Recorder history. Update dashboards and automations that refer to those counters to use **Allowed (v1)** and **Blocked (v1)**. New installations create only the current four client counters.
+
+For a HACS installation, update the integration in HACS and restart when prompted. Keep the integration entry to retain its cursor and counters. If you change the Pi-hole endpoint, use **Reconfigure** and choose **Same Pi-hole** when it is still the same server; this preserves its source identity and cursor. Choose **Replacement Pi-hole** only after replacing the server, to start a new source generation.
+
+Before rolling back to a version earlier than 0.8.0, restore a compatible full Home Assistant backup together with the matching integration files. Reverting the integration code alone does not reverse the configuration and Store migrations.
+
+## Troubleshooting
+
+- **Counters do not increase:** check the diagnostic communication status, host, port, TLS settings, password, poll interval, and whether Pi-hole still exposes that query as new in its in-memory history.
+- **Counters increase but Activity is empty:** confirm Detailed mode is selected, Activity is set to All or Blocked only for that result, and Home Assistant's Activity/Recorder filters allow the event. Persistence is managed by Home Assistant and is not verified by this integration.
+- **Aggregate mode falls behind during sustained heavy traffic:** aggregate processing can lag when many observations arrive continuously. See the synthetic measurements and their limits in [technical details](docs/DETAILS.md).
+
+## Links
+
+- [Release notes](https://github.com/Andresako/pi-hole-extended/releases/tag/0.8.0) · [All releases](https://github.com/Andresako/pi-hole-extended/releases)
+- [Dashboard guide](docs/dashboard-examples.md) · [Technical details and limitations](docs/DETAILS.md)
+- [Report a problem](https://github.com/Andresako/pi-hole-extended/issues) · [Security policy](SECURITY.md) · [MIT license](LICENSE)
+- [Read this guide in Spanish](README.es.md)
