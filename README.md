@@ -5,9 +5,15 @@ See DNS query activity from **Pi-hole v6** in Home Assistant. The integration cr
 ## What you get
 
 - One Home Assistant device per Pi-hole client.
-- Six counter sensors per client: total observed queries, legacy allowed/blocked counts, and allowed/blocked/provisional counts for the active classifier version. Last-minute observation counts are attributes of the total sensor, not separate entities.
+- Four counter sensors per client: total observed queries and allowed/blocked/provisional counts for the active classifier version. Last-minute observation counts are attributes of the total sensor, not separate entities. Existing legacy allowed/blocked entities are disabled by the integration while their registry IDs and Recorder history are retained.
 - Individual query entries in **Settings → System → Logs → Activity** by default.
 - Simple names and `phe_` IDs for per-client sensors; diagnostic IDs are scoped to the integration entry.
+
+## Upgrade notes for 0.8.0
+
+The two older unversioned allowed/blocked client counters are retired. Home Assistant disables their existing entity-registry entries while preserving their unique IDs, custom entity IDs, custom names, and Recorder history. Automations or dashboards that use those entities should be updated to the versioned allowed/blocked counters. New installations create only the current four client counters.
+
+In a synthetic test with 100 clients and 100 queries per second, detailed mode processed a 10-minute feed of 60,000 rows with the final cursor about 0.12 seconds after the feed ended. Aggregate mode took about 360 seconds to drain after the same feed ended (about 960 seconds total). Separately, recovering a 60,000-row backlog took about 0.65 seconds in detailed mode and 13.88 seconds in aggregate mode (13.98 seconds maximum across five runs). These local synthetic results are not a throughput guarantee for other hardware or Pi-hole installations. They show that aggregate mode can lag under sustained high-volume input, even though it uses less detail and avoids new Activity entries.
 
 ## Install with HACS
 

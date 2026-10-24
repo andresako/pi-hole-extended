@@ -162,6 +162,7 @@ def _archive_client_entities(hass: HomeAssistant, entry: config_entries.ConfigEn
             entity.platform == DOMAIN
             and entity.domain == "sensor"
             and entity.unique_id.startswith(prefix)
+            and getattr(entity, "disabled_by", None) is None
         ):
             registry.async_update_entity(
                 entity.entity_id,

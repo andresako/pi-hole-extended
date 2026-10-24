@@ -13,6 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.util import slugify
@@ -621,6 +622,32 @@ def _entity_unique_prefix(entry: ConfigEntry) -> str:
     return f"{entry.data[CONF_SOURCE_ID]}_{generation}"
 
 
+def _archive_legacy_class_sensors(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Disable retired unversioned class counters for this source generation."""
+    prefix = f"{_entity_unique_prefix(entry)}_"
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if (
+            entity.platform != DOMAIN
+            or entity.domain != "sensor"
+            or not entity.unique_id.startswith(prefix)
+            or not entity.unique_id.endswith(("_allowed", "_blocked"))
+            or not (
+                entity.translation_key in {"legacy_allowed", "legacy_blocked"}
+                or (
+                    entity.translation_key is None
+                    and entity.original_name in {"Permitidas", "Bloqueadas"}
+                )
+            )
+            or entity.disabled_by is not None
+        ):
+            continue
+        registry.async_update_entity(
+            entity.entity_id,
+            disabled_by=RegistryEntryDisabler.INTEGRATION,
+        )
+
+
 def _identity_storage_key(source_id: str, generation: str) -> str:
     """Build a Store key scoped to one Pi-hole source generation."""
     return f"{STORAGE_KEY_PREFIX}_{source_id}_{generation}"
@@ -815,6 +842,7 @@ def _canonical_entity_id(entry: ConfigEntry, entity: er.RegistryEntry) -> str | 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a configured Pi-hole and begin tracking new DNS queries."""
+    _archive_legacy_class_sensors(hass, entry)
     client = PiHoleClient(async_get_clientsession(hass), {**entry.data, **entry.options})
     source_id = _valid_uuid(entry.data.get(CONF_SOURCE_ID))
     generation_value = entry.data.get(CONF_SOURCE_GENERATION)

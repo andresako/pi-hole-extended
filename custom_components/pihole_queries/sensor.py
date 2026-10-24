@@ -39,20 +39,6 @@ SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         icon="mdi:dns",
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
-    SensorEntityDescription(
-        key="allowed",
-        name="Permitidas (histórico legado)",
-        translation_key="legacy_allowed",
-        icon="mdi:check-circle-outline",
-        state_class=SensorStateClass.TOTAL_INCREASING,
-    ),
-    SensorEntityDescription(
-        key="blocked",
-        name="Bloqueadas (histórico legado)",
-        translation_key="legacy_blocked",
-        icon="mdi:cancel",
-        state_class=SensorStateClass.TOTAL_INCREASING,
-    ),
 )
 
 
@@ -115,8 +101,6 @@ DIAGNOSTIC_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
 
 _COUNT_KEYS = {
     "queries": "query_count",
-    "allowed": "allowed_count",
-    "blocked": "blocked_count",
 }
 
 _EPOCH_CLASS_KEYS = {"allowed", "blocked", "provisional"}

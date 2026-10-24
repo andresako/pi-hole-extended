@@ -352,7 +352,6 @@ async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path)
     coordinator = _Coordinator()
     descriptions = {description.key: description for description in SENSOR_DESCRIPTIONS}
     total = PiHoleClientSensor(coordinator, entry, "192.0.2.10", descriptions["queries"])
-    legacy = PiHoleClientSensor(coordinator, entry, "192.0.2.10", descriptions["allowed"])
     epoch_one = PiHoleClientSensor(
         coordinator, entry, "192.0.2.10", descriptions["allowed_v1"]
     )
@@ -369,7 +368,7 @@ async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path)
 
     hass = HomeAssistant(str(tmp_path))
     await hass.async_start()
-    entities = (total, legacy, epoch_one, epoch_two)
+    entities = (total, epoch_one, epoch_two)
     for entity in entities:
         entity.hass = hass
         entity.entity_id = f"sensor.pihole_{entity.entity_description.key}"
@@ -387,7 +386,6 @@ async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path)
         entity.async_write_ha_state()
 
     assert total.unique_id == "entry_192.0.2.10"
-    assert legacy.unique_id == "entry_192.0.2.10_allowed"
     assert epoch_one.unique_id == "entry_192.0.2.10_allowed_v1"
     assert epoch_two.unique_id == "entry_192.0.2.10_allowed_v2"
     assert hass.states.get(total.entity_id).attributes["state_class"] == "total_increasing"
@@ -401,26 +399,36 @@ async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path)
     data["query_count"] = 51
     data["classifier_counts"]["1"]["allowed"] = 1
     data["classifier_counts"]["2"] = {"allowed": 0, "blocked": 0, "provisional": 0}
-    for entity in (total, legacy, epoch_one, epoch_two):
+    for entity in (total, epoch_one, epoch_two):
         entity.async_write_ha_state()
     assert hass.states.get(total.entity_id).state == "51"
-    assert hass.states.get(legacy.entity_id).state == "12"
     assert hass.states.get(epoch_one.entity_id).state == "1"
     assert hass.states.get(epoch_two.entity_id).state == "0"
 
     data["query_count"] = 52
     data["classifier_counts"]["2"]["allowed"] = 1
-    for entity in (total, legacy, epoch_one, epoch_two):
+    for entity in (total, epoch_one, epoch_two):
         entity.async_write_ha_state()
     assert hass.states.get(total.entity_id).state == "52"
-    assert hass.states.get(legacy.entity_id).state == "12"
     assert hass.states.get(epoch_one.entity_id).state == "1"
     assert hass.states.get(epoch_two.entity_id).state == "1"
     await hass.async_stop()
 
 
 def test_sensor_cardinality_stays_within_all_supported_profiles() -> None:
+    from custom_components.pihole_queries.sensor import DIAGNOSTIC_DESCRIPTIONS
+
     profiles = ((5, 30), (25, 150), (100, 600))
-    assert len(SENSOR_DESCRIPTIONS) == 6
-    for clients, entity_budget in profiles:
-        assert clients * len(SENSOR_DESCRIPTIONS) <= entity_budget
+    assert len(SENSOR_DESCRIPTIONS) == 4
+    assert {description.key for description in SENSOR_DESCRIPTIONS} == {
+        "queries",
+        "allowed_v1",
+        "blocked_v1",
+        "provisional_v1",
+    }
+    assert len(DIAGNOSTIC_DESCRIPTIONS) == 4
+    expected_totals = (24, 104, 404)
+    for (clients, entity_budget), expected_total in zip(profiles, expected_totals, strict=True):
+        created_entities = clients * len(SENSOR_DESCRIPTIONS) + len(DIAGNOSTIC_DESCRIPTIONS)
+        assert created_entities == expected_total
+        assert clients * len(SENSOR_DESCRIPTIONS) + len(DIAGNOSTIC_DESCRIPTIONS) <= entity_budget
