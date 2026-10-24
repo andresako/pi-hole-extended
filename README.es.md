@@ -1,6 +1,6 @@
 # Pi-hole Extended
 
-**Consulta en Home Assistant la actividad DNS que Pi-hole v6 detecta, organizada por cliente.** Pi-hole Extended añade contadores claros por cliente, detalles recientes opcionales y diagnósticos para comprobar si Home Assistant mantiene el ritmo.
+**Consulta en Home Assistant la actividad DNS que Pi-hole v6 detecta, organizada por cliente.** Pi-hole Extended ofrece contadores por cliente, detalles recientes opcionales y diagnósticos de conexión y cobertura de consultas.
 
 > Integración personalizada creada por la comunidad. No está afiliada ni cuenta con el respaldo de Home Assistant o Pi-hole.
 
@@ -8,13 +8,13 @@
 
 ## De un vistazo
 
-- Un dispositivo de Home Assistant por cada cliente que aparezca en el historial de consultas visible de Pi-hole.
-- Cinco sensores por cliente: consultas DNS acumuladas, consultas del último minuto, permitidas, bloqueadas y provisionales. La versión del clasificador se conserva internamente para que los cambios posteriores sigan siendo claros.
-- Elige **Historial detallado de consultas** para conservar detalles recientes y, de forma opcional, entradas en Activity; o **Solo totales agregados** para conservar identidades de clientes y totales numéricos sin filas ni dominios de consultas.
-- Diagnósticos por entrada para el estado de comunicación, la última lectura correcta, la última consulta observada y la cobertura de ingesta.
+- Un dispositivo de Home Assistant por cada cliente que aparece en el historial de consultas de Pi-hole.
+- Cinco sensores por cliente: consultas observadas acumuladas, consultas en la ventana del último minuto de Pi-hole, consultas permitidas, bloqueadas y provisionales.
+- Cuatro diagnósticos de la integración: estado de comunicación, última lectura correcta, última consulta observada y cobertura de ingesta.
+- Elige **Historial detallado de consultas** para conservar detalles recientes y entradas opcionales en Activity; o **Solo totales agregados** para conservar identidades de clientes y totales numéricos sin filas ni dominios de consultas.
 - Un panel inicial con cuatro vistas nativas de Home Assistant: **Resumen**, **Clientes**, **Detalle** y **Diagnóstico**.
 
-La integración cuenta las consultas nuevas que observa al consultar Pi-hole. No reconstruye todo el tráfico que Pi-hole haya gestionado ni ordena consultas por su hora original.
+La integración cuenta las consultas nuevas que observa al consultar Pi-hole. No reconstruye todo el tráfico que Pi-hole haya gestionado. El total de entidades es 29 para 5 clientes, 129 para 25 clientes y 504 para 100 clientes (cinco por cliente y cuatro diagnósticos de la integración).
 
 ## Vista previa del panel
 
@@ -31,18 +31,18 @@ Las capturas muestran un panel de ejemplo de Home Assistant con cuatro vistas pe
 ## Requisitos
 
 - Home Assistant **2025.1 o posterior**.
-- Pi-hole **v6**. El contrato de la API de consultas se contrasta con FTL **6.1.0–6.8.x**; Pi-hole también sirve su propia referencia de API en `/api/docs`.
+- Pi-hole **v6**. El contrato de la API de consultas se contrasta con FTL **6.1.0–6.8.x**. Pi-hole también ofrece su referencia de API en `/api/docs`.
 
 ## Instalar con HACS
 
-Pi-hole Extended se instala como repositorio personalizado de HACS y actualmente no está en el catálogo predeterminado.
+Pi-hole Extended se instala añadiendo su repositorio como repositorio personalizado de HACS.
 
 1. En Home Assistant, abre **HACS → Integraciones → ⋮ → Repositorios personalizados**.
 2. Añade `https://github.com/Andresako/pi-hole-extended` y selecciona **Integración**.
 3. Instala **Pi-hole Extended** y reinicia Home Assistant.
 4. Abre **Ajustes → Dispositivos y servicios → Añadir integración**, busca **Pi-hole Extended** y sigue el formulario.
 
-Para instalarla manualmente, descarga [`pihole_queries-0.8.1.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.8.1/pihole_queries-0.8.1.zip), extrae `custom_components/pihole_queries` en el directorio de configuración de Home Assistant y reinicia.
+Para instalarla manualmente, descarga [`pihole_queries-0.8.1.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.8.1/pihole_queries-0.8.1.zip), extrae `custom_components/pihole_queries` en el directorio de configuración de Home Assistant y reinicia Home Assistant.
 
 ## Configurar Pi-hole
 
@@ -51,53 +51,40 @@ Crea una contraseña de aplicación en **Settings** de la interfaz web de Pi-hol
 Durante la configuración, indica:
 
 - El nombre de host o la dirección IP de Pi-hole, sin protocolo, puerto ni ruta.
-- El puerto web/API. Se usa exactamente como se indica, también con HTTPS.
+- El puerto web/API.
 - Si se debe usar HTTPS y verificar el certificado TLS.
 - La contraseña de aplicación.
-- El intervalo de sondeo en segundos (15 de forma predeterminada).
+- El intervalo de sondeo, de **1 a 3600 segundos** (**15 segundos** de forma predeterminada).
 
-La contraseña se guarda en la entrada de integración de Home Assistant y no se incluye en los registros de la integración. Empieza con el intervalo predeterminado; un intervalo menor puede mostrar antes las consultas nuevas y genera más solicitudes a la API.
+La contraseña se guarda en la entrada de integración de Home Assistant y no se incluye en los registros de la integración. Un intervalo menor puede mostrar antes las consultas nuevas y genera más solicitudes a la API.
 
 ## Ver las primeras observaciones
 
 Después de configurar la integración, espera a que se complete un sondeo y revisa **Estado de comunicación** y **Cobertura de ingesta** en las entidades de diagnóstico. La primera lectura establece una línea base: no cuenta las consultas que ya estaban en la instantánea actual de Pi-hole. Después, genera una consulta DNS desde un dispositivo que use este Pi-hole y espera al siguiente sondeo.
 
-El contador **Consultas DNS** del cliente debería aumentar cuando se observe la consulta nueva. Las consultas permitidas y bloqueadas incrementan sus contadores del clasificador; los resultados desconocidos o incompletos quedan como provisionales y no entran en el porcentaje clasificado. En modo Detallado, la consulta nueva también puede aparecer en **Activity** de Home Assistant si la opción de Activity lo permite. El texto actual de las entradas de Activity está en español. Home Assistant controla la persistencia de Activity y Recorder.
+El contador **Consultas DNS** del cliente aumenta cuando se observa una consulta nueva. Las consultas permitidas y bloqueadas incrementan sus contadores del clasificador; los resultados desconocidos o incompletos quedan como provisionales y no entran en el porcentaje clasificado. En modo Detallado, una consulta nueva también puede aparecer en **Activity** de Home Assistant si la opción lo permite. Home Assistant controla la persistencia de Activity y Recorder.
 
 ## Elegir qué conservar
 
-En las opciones de la integración, elige uno de estos modos:
+En las opciones de la integración, elige un modo de conservación:
 
-- **Historial detallado de consultas** (predeterminado): conserva detalles recientes para los sensores de cliente. Activity puede registrar **Todos los eventos**, **Solo eventos bloqueados** o **Sin eventos de Activity**.
-- **Solo totales agregados**: conserva identidades de clientes y totales numéricos, sin dominios, IDs, estados brutos ni filas de consultas individuales. Desactiva las nuevas entradas de Activity.
+- **Historial detallado de consultas** (predeterminado): conserva detalles recientes para los sensores de cliente. Elige si Activity registra **Todos los eventos**, **Solo eventos bloqueados** o **Sin eventos de Activity**.
+- **Solo totales agregados**: conserva identidades de clientes y totales numéricos, sin dominios, IDs, estados brutos ni filas de consultas individuales. Este modo no crea nuevas entradas de Activity.
 
-Al cambiar al modo Agregado se eliminan los detalles de consultas del Store actual de la integración y de su copia heredada. No se borra lo que Home Assistant ya guardó, el historial de Activity, exportaciones ni copias de seguridad. Consulta los [detalles técnicos y límites](docs/DETALLES_ES.md) sobre retención y volumen elevado.
+Consulta los [detalles técnicos y límites](docs/DETALLES_ES.md) sobre conservación y volumen elevado.
 
 ## Añadir el panel de ejemplo
 
 El [YAML del panel inicial](examples/dashboards/pihole-extended.yaml) incluye cuatro vistas creadas con tarjetas nativas de Home Assistant. Usa IDs de entidades de ejemplo: copia el YAML en un panel nuevo y asigna cada marcador a los IDs de tu propio registro de entidades. Sigue la [guía del panel](docs/dashboard-examples.md); no sustituyas la configuración de un panel existente.
 
-## Actualizar desde 0.7.x
-
-La versión 0.8.1 restaura **Consultas (último minuto)** con su ventana original de hora de Pi-hole, identidad, unidad, clase de medición e historial de Recorder. Mantiene separadas las métricas de observación de HA y archiva las antiguas tasas por minuto de permitidas/bloqueadas, conservando sus entradas de registro e historial.
-
-En modo Agregado, el sensor usa cubos anónimos de un segundo basados en la hora de origen; el valor puede variar hasta un segundo en el límite de la ventana. No está disponible si la cobertura es desconocida o parcial, la muestra de API está obsoleta o aún no han transcurrido más de 60 segundos de observación completa. El atributo `queries_observed_last_minute` de **Consultas DNS** mantiene su significado distinto: consultas que Home Assistant acaba de observar. Las tasas actuales del clasificador usan la hora de observación de HA.
-
-La versión 0.8.0 retiró los dos contadores antiguos sin versión de permitidas/bloqueadas por cliente. Home Assistant desactiva sus entradas de registro existentes y conserva IDs, nombres personalizados e historial de Recorder. Actualiza paneles y automatizaciones de los contadores clasificados para que utilicen **Consultas permitidas** y **Consultas bloqueadas**. Las instalaciones nuevas crean cinco sensores por cliente.
-
-Con HACS, actualiza la integración y reinicia cuando se indique. Conserva la entrada de integración para mantener su cursor y contadores. Si cambias el endpoint de Pi-hole, usa **Reconfigurar** y elige **Mismo Pi-hole** si sigue siendo el mismo servidor; así conserva su identidad de origen y cursor. Elige **Pi-hole de reemplazo** solo cuando hayas cambiado el servidor, para iniciar una generación de origen nueva.
-
-Antes de volver a una versión anterior a la 0.8.0, restaura una copia de seguridad completa de Home Assistant compatible junto con los archivos de integración correspondientes. Revertir solo el código de la integración no deshace las migraciones de configuración y Store.
-
 ## Solución de problemas
 
-- **Los contadores no aumentan:** revisa el estado de comunicación, host, puerto, ajustes TLS, contraseña, intervalo de sondeo y si Pi-hole aún expone esa consulta como nueva en su historial en memoria.
-- **Aumentan los contadores, pero Activity está vacío:** confirma que esté seleccionado el modo Detallado, que Activity permita Todos o Solo bloqueados según el resultado, y que los filtros de Activity/Recorder de Home Assistant permitan el evento. Home Assistant controla la persistencia; la integración no la verifica.
+- **Los contadores no aumentan:** revisa el estado de comunicación, host, puerto, ajustes TLS, contraseña, intervalo de sondeo y si Pi-hole aún expone la consulta en su historial en memoria.
+- **Aumentan los contadores, pero Activity está vacío:** confirma que esté seleccionado el modo Detallado, que Activity permita los eventos que quieres registrar y que los filtros de Activity/Recorder de Home Assistant permitan el evento. La integración no verifica la persistencia.
 - **El modo Agregado se retrasa con mucho tráfico sostenido:** puede acumular retraso cuando recibe observaciones continuamente. Consulta las mediciones sintéticas y sus límites en los [detalles técnicos](docs/DETALLES_ES.md).
 
 ## Enlaces
 
-- [Notas de la versión](https://github.com/Andresako/pi-hole-extended/releases/tag/0.8.1) · [Todas las versiones](https://github.com/Andresako/pi-hole-extended/releases)
 - [Guía del panel](docs/dashboard-examples.md) · [Detalles técnicos y limitaciones](docs/DETALLES_ES.md)
 - [Informar de un problema](https://github.com/Andresako/pi-hole-extended/issues) · [Política de seguridad](SECURITY.md) · [Licencia MIT](LICENSE)
 - [Read this guide in English](README.md)
