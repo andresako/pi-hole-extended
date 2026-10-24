@@ -16,6 +16,18 @@
 
 The integration counts new queries it observes while polling Pi-hole. It does not recreate all traffic Pi-hole has ever handled, and its dashboard does not rank queries by their original event time.
 
+## Dashboard previews
+
+The screenshots below show a customized four-view Home Assistant example. Its 24-hour chart uses synthetic observations imported into a disposable Recorder for demonstration; Pi-hole Extended begins counting after setup and does not restore historical Pi-hole queries.
+
+![Pi-hole Extended overview with synthetic client totals and a 24-hour query chart](docs/images/overview.png)
+
+*Demonstration data — simulated Home Assistant observations. Client totals and chart history are synthetic and are shown to demonstrate the dashboard layout.*
+
+![Pi-hole Extended diagnostics with synthetic query history and integration health entities](docs/images/diagnostics.png)
+
+*Demonstration data — simulated Home Assistant observations. The chart is example Recorder history, while connection and ingestion values reflect the isolated demo instance.*
+
 ## Requirements
 
 - Home Assistant **2025.1 or newer**.

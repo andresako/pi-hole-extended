@@ -16,6 +16,18 @@
 
 La integración cuenta las consultas nuevas que observa al consultar Pi-hole. No reconstruye todo el tráfico que Pi-hole haya gestionado ni ordena consultas por su hora original.
 
+## Vista previa del panel
+
+Las capturas muestran un panel de ejemplo de Home Assistant con cuatro vistas personalizadas. El gráfico de 24 horas usa observaciones sintéticas importadas en un Recorder desechable para la demostración; Pi-hole Extended empieza a contar tras configurarse y no recupera consultas históricas de Pi-hole.
+
+![Resumen de Pi-hole Extended con totales sintéticos por cliente y un gráfico DNS de 24 horas](docs/images/overview.png)
+
+*Datos de demostración: observaciones simuladas de Home Assistant. Los totales por cliente y el historial del gráfico son sintéticos y muestran la disposición del panel.*
+
+![Diagnóstico de Pi-hole Extended con historial DNS sintético y entidades de estado de la integración](docs/images/diagnostics.png)
+
+*Datos de demostración: observaciones simuladas de Home Assistant. El gráfico es un historial Recorder de ejemplo; el estado de conexión e ingesta corresponde a la instancia de demostración aislada.*
+
 ## Requisitos
 
 - Home Assistant **2025.1 o posterior**.
