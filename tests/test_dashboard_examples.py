@@ -15,16 +15,16 @@ def test_dashboard_has_four_supported_native_views_and_navigation() -> None:
     dashboard = yaml.safe_load(DASHBOARD_PATH.read_text(encoding="utf-8"))
 
     assert [view["title"] for view in dashboard["views"]] == [
-        "Resumen",
-        "Clientes",
-        "Detalle",
-        "Diagnóstico",
+        "Summary",
+        "Clients",
+        "Details",
+        "Diagnostics",
     ]
     assert [view["path"] for view in dashboard["views"]] == [
-        "resumen",
-        "clientes",
-        "detalle",
-        "diagnostico",
+        "summary",
+        "clients",
+        "details",
+        "diagnostics",
     ]
     assert {
         card["type"]
@@ -83,10 +83,10 @@ def test_summary_exposes_recent_observed_activity_without_claiming_source_time()
         if card["type"] == "markdown" and "queries_observed_last_minute" in card["content"]
     )
 
-    assert "Actividad observada por HA · último minuto" in recent_card["content"]
-    assert "hora original de Pi-hole" in recent_card["content"]
-    assert "sondeo supera un minuto" in recent_card["content"]
-    assert "hasta el siguiente" in recent_card["content"]
+    assert "Activity observed by HA · last minute" in recent_card["content"]
+    assert "historical hourly volume" in recent_card["content"]
+    assert "polling interval" in recent_card["content"]
+    assert "until the next poll" in recent_card["content"]
     for client in range(1, 4):
         assert f"sensor.replace_with_client_{client}_queries" in recent_card["content"]
     assert "blocked_v1" not in recent_card["content"]
@@ -102,7 +102,7 @@ def test_unknown_client_label_is_compact_for_narrow_screens() -> None:
         if row.get("entity") == "sensor.replace_with_unknown_client_queries"
     )
 
-    assert unknown["name"] == "Desconocido · DNS"
+    assert unknown["name"] == "Unknown · DNS"
 
 
 def test_guide_distinguishes_zero_percentage_from_unknown() -> None:
@@ -122,5 +122,5 @@ def test_distribution_example_contains_no_prototype_fixture_or_private_data() ->
     assert "prototype_fixture_" not in text
     assert "example.test" not in text
     assert not re.search(r"\b(?:10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)", text)
-    assert "last 24 h" in text or "últimas 24 h" in text
-    assert "original query time" in text or "hora original" in text
+    assert "last 24 hours" in text
+    assert "original event time" in text
