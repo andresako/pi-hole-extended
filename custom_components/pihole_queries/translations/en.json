@@ -97,6 +97,9 @@
       "queries": {
         "name": "DNS queries"
       },
+      "queries_last_minute": {
+        "name": "Queries (last minute)"
+      },
       "legacy_allowed": {
         "name": "Allowed (legacy history)"
       },
@@ -104,13 +107,13 @@
         "name": "Blocked (legacy history)"
       },
       "allowed_v1": {
-        "name": "Allowed (v1)"
+        "name": "Allowed queries"
       },
       "blocked_v1": {
-        "name": "Blocked (v1)"
+        "name": "Blocked queries"
       },
       "provisional_v1": {
-        "name": "Provisional (v1)"
+        "name": "Provisional queries"
       }
     }
   },

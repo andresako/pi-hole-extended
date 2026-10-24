@@ -51,11 +51,12 @@ def test_all_entity_ids_are_manual_placeholders_documented_in_guide() -> None:
     documented = set(re.findall(r"^\| `([a-z0-9_]+)` \| ([^|]+) \|$", guide, re.MULTILINE))
     expected = {
         **{f"client_{n}_queries": "Consultas DNS" for n in range(1, 5)},
-        "client_1_allowed_v1": "Permitidas (v1)",
-        "client_2_allowed_v1": "Permitidas (v1)",
-        **{f"client_{n}_blocked_v1": "Bloqueadas (v1)" for n in range(1, 4)},
-        "client_1_provisional_v1": "Provisionales (v1)",
-        "client_2_provisional_v1": "Provisionales (v1)",
+        **{f"client_{n}_queries_last_minute": "Queries (last minute)" for n in range(1, 4)},
+        "client_1_allowed_v1": "Allowed queries",
+        "client_2_allowed_v1": "Allowed queries",
+        **{f"client_{n}_blocked_v1": "Blocked queries" for n in range(1, 4)},
+        "client_1_provisional_v1": "Provisional queries",
+        "client_2_provisional_v1": "Provisional queries",
         "unknown_client_queries": "Consultas DNS",
         "entry_communication_status": "Estado de comunicación",
         "entry_last_successful_read": "Última lectura correcta",
@@ -69,26 +70,34 @@ def test_all_entity_ids_are_manual_placeholders_documented_in_guide() -> None:
             labels = (f"Per-entry diagnostic **{semantic}**", f"Diagnóstico por entrada **{semantic}**")
         elif suffix == "unknown_client_queries":
             labels = ("**Consultas DNS** for the unknown client, when present", "**Consultas DNS** del cliente desconocido, si existe")
+        elif suffix.endswith("queries_last_minute"):
+            labels = ("Client's **Queries (last minute)** sensor", "Sensor **Consultas (último minuto)** del cliente")
+        elif suffix.endswith(("allowed_v1", "blocked_v1", "provisional_v1")):
+            spanish = {
+                "allowed_v1": "Consultas permitidas",
+                "blocked_v1": "Consultas bloqueadas",
+                "provisional_v1": "Consultas provisionales",
+            }[suffix.removeprefix("client_1_").removeprefix("client_2_").removeprefix("client_3_")]
+            labels = (f"Client's **{semantic}** sensor", f"Sensor **{spanish}** del cliente")
         else:
             labels = (f"Client's **{semantic}** sensor", f"Sensor **{semantic}** del cliente")
         for label in labels:
             assert (suffix, label) in documented
 
 
-def test_summary_exposes_recent_observed_activity_without_claiming_source_time() -> None:
+def test_summary_uses_restored_source_time_minute_sensor() -> None:
     dashboard = yaml.safe_load(DASHBOARD_PATH.read_text(encoding="utf-8"))
     summary = dashboard["views"][0]
     recent_card = next(
         card for card in summary["cards"]
-        if card["type"] == "markdown" and "queries_observed_last_minute" in card["content"]
+        if card["type"] == "markdown" and "queries_last_minute" in card["content"]
     )
 
-    assert "Activity observed by HA · last minute" in recent_card["content"]
-    assert "historical hourly volume" in recent_card["content"]
-    assert "polling interval" in recent_card["content"]
-    assert "until the next poll" in recent_card["content"]
+    assert "Queries · last minute" in recent_card["content"]
+    assert "original query time" in recent_card["content"]
+    assert "one-second buckets" in recent_card["content"]
     for client in range(1, 4):
-        assert f"sensor.replace_with_client_{client}_queries" in recent_card["content"]
+        assert f"sensor.replace_with_client_{client}_queries_last_minute" in recent_card["content"]
     assert "blocked_v1" not in recent_card["content"]
 
 
@@ -111,9 +120,9 @@ def test_guide_distinguishes_zero_percentage_from_unknown() -> None:
     assert "The YAML was imported with manual entity mapping" in guide
     assert "El YAML se importó con asignación manual de entidades" in guide
     assert "A real 0% remains 0" in guide
-    assert "the attribute is unknown rather than 0%" in guide
+    assert "the percentage is unknown rather than 0%" in guide
     assert "Un 0 % real sigue siendo 0" in guide
-    assert "el atributo queda desconocido" in guide
+    assert "el porcentaje queda desconocido" in guide
 
 
 def test_distribution_example_contains_no_prototype_fixture_or_private_data() -> None:

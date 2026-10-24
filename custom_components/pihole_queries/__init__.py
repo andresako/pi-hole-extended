@@ -161,6 +161,7 @@ class _IdentityStore:
             "queries_last_minute",
             "allowed_last_minute",
             "blocked_last_minute",
+            "query_time_buckets",
             "classifier_version",
             "classifier_counts",
             "classifier_rates",
@@ -238,6 +239,26 @@ class _IdentityStore:
                 seen.add(key)
             return True
 
+        def valid_query_time_buckets(value: Any) -> bool:
+            if not isinstance(value, list) or len(value) > 61:
+                return False
+            seen: set[int] = set()
+            for bucket in value:
+                if (
+                    not isinstance(bucket, dict)
+                    or set(bucket) != {"second", "count"}
+                    or isinstance(bucket.get("second"), bool)
+                    or not isinstance(bucket.get("second"), int)
+                    or bucket["second"] < 0
+                    or isinstance(bucket.get("count"), bool)
+                    or not isinstance(bucket.get("count"), int)
+                    or bucket["count"] < 0
+                    or bucket["second"] in seen
+                ):
+                    return False
+                seen.add(bucket["second"])
+            return True
+
         def valid_pending(value: Any) -> bool:
             if not isinstance(value, dict):
                 return False
@@ -247,13 +268,17 @@ class _IdentityStore:
                     or not key
                     or len(key) > 255
                     or not isinstance(item, dict)
-                    or set(item) != {"client_name", "client_ip", "counts", "buckets"}
+                    or not {"client_name", "client_ip", "counts", "buckets"}.issubset(item)
+                    or set(item) - {
+                        "client_name", "client_ip", "counts", "buckets", "query_time_buckets"
+                    }
                     or any(
                         item[name] is not None and not isinstance(item[name], str)
                         for name in ("client_name", "client_ip")
                     )
                     or not valid_counts({"1": item.get("counts")})
                     or not valid_buckets(item.get("buckets"))
+                    or not valid_query_time_buckets(item.get("query_time_buckets", []))
                     or any(
                         item[name] is not None and len(item[name]) > 255
                         for name in ("client_name", "client_ip")
@@ -288,6 +313,7 @@ class _IdentityStore:
                     "allowed_last_minute",
                     "blocked_last_minute",
                     "queries_observed_last_minute",
+                    "queries_last_minute",
                 }:
                     valid = isinstance(value, int) and not isinstance(value, bool) and value >= 0
                 elif field == "classifier_version":
@@ -307,6 +333,8 @@ class _IdentityStore:
                     continue
                 elif field == "activity_buckets":
                     valid = valid_buckets(value)
+                elif field == "query_time_buckets":
+                    valid = valid_query_time_buckets(value)
                 if not valid:
                     summary.pop(field)
                     changed = True
@@ -381,6 +409,26 @@ class _IdentityStore:
                 return math.isfinite(raw)
             except (OverflowError, TypeError, ValueError):
                 return False
+
+        def valid_query_time_buckets(raw: Any) -> bool:
+            if not isinstance(raw, list) or len(raw) > 61:
+                return False
+            seen: set[int] = set()
+            for bucket in raw:
+                if (
+                    not isinstance(bucket, dict)
+                    or set(bucket) != {"second", "count"}
+                    or isinstance(bucket.get("second"), bool)
+                    or not isinstance(bucket.get("second"), int)
+                    or bucket["second"] < 0
+                    or isinstance(bucket.get("count"), bool)
+                    or not isinstance(bucket.get("count"), int)
+                    or bucket["count"] < 0
+                    or bucket["second"] in seen
+                ):
+                    return False
+                seen.add(bucket["second"])
+            return True
 
         def sanitize_counts(raw: Any) -> dict[str, dict[str, int]]:
             if not isinstance(raw, dict):
@@ -476,6 +524,10 @@ class _IdentityStore:
                     if not isinstance(activity, list) or any(
                         not isinstance(item, dict)
                         or not finite_number(item.get("observed_at"))
+                        or (
+                            "query_time" in item
+                            and not finite_number(item.get("query_time"))
+                        )
                         or isinstance(item.get("classifier_version"), bool)
                         or not isinstance(item.get("classifier_version"), int)
                         or item.get("classifier_version") < 0
@@ -516,6 +568,16 @@ class _IdentityStore:
                     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
                         summary.pop("queries_observed_last_minute")
                         malformed = True
+                if "queries_last_minute" in summary:
+                    count = summary["queries_last_minute"]
+                    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+                        summary.pop("queries_last_minute")
+                        malformed = True
+                if "query_time_buckets" in summary and not valid_query_time_buckets(
+                    summary["query_time_buckets"]
+                ):
+                    summary.pop("query_time_buckets")
+                    malformed = True
                 clean_clients[str(key)] = summary
             data["clients"] = clean_clients
 
@@ -623,7 +685,7 @@ def _entity_unique_prefix(entry: ConfigEntry) -> str:
 
 
 def _archive_legacy_class_sensors(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Disable retired unversioned class counters for this source generation."""
+    """Disable retired legacy class counters for this source generation."""
     prefix = f"{_entity_unique_prefix(entry)}_"
     registry = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
@@ -631,14 +693,7 @@ def _archive_legacy_class_sensors(hass: HomeAssistant, entry: ConfigEntry) -> No
             entity.platform != DOMAIN
             or entity.domain != "sensor"
             or not entity.unique_id.startswith(prefix)
-            or not entity.unique_id.endswith(("_allowed", "_blocked"))
-            or not (
-                entity.translation_key in {"legacy_allowed", "legacy_blocked"}
-                or (
-                    entity.translation_key is None
-                    and entity.original_name in {"Permitidas", "Bloqueadas"}
-                )
-            )
+            or not _is_retired_legacy_class_sensor(entity)
             or entity.disabled_by is not None
         ):
             continue
@@ -646,6 +701,49 @@ def _archive_legacy_class_sensors(hass: HomeAssistant, entry: ConfigEntry) -> No
             entity.entity_id,
             disabled_by=RegistryEntryDisabler.INTEGRATION,
         )
+
+
+def _is_retired_legacy_class_sensor(entity: er.RegistryEntry) -> bool:
+    """Match only the two known 0.6 class descriptors, never other entities."""
+    legacy_classes = (
+        entity.unique_id.endswith("_allowed")
+        and (
+            entity.translation_key == "legacy_allowed"
+            or (
+                entity.translation_key is None
+                and entity.original_name == "Permitidas"
+            )
+        )
+    ) or (
+        entity.unique_id.endswith("_blocked")
+        and (
+            entity.translation_key == "legacy_blocked"
+            or (
+                entity.translation_key is None
+                and entity.original_name == "Bloqueadas"
+            )
+        )
+    )
+    legacy_class_windows = (
+        entity.unique_id.endswith("_allowed_last_minute")
+        and (
+            entity.translation_key == "allowed_last_minute"
+            or (
+                entity.translation_key is None
+                and entity.original_name == "Permitidas (último minuto)"
+            )
+        )
+    ) or (
+        entity.unique_id.endswith("_blocked_last_minute")
+        and (
+            entity.translation_key == "blocked_last_minute"
+            or (
+                entity.translation_key is None
+                and entity.original_name == "Bloqueadas (último minuto)"
+            )
+        )
+    )
+    return legacy_classes or legacy_class_windows
 
 
 def _identity_storage_key(source_id: str, generation: str) -> str:

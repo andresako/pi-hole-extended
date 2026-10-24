@@ -419,15 +419,16 @@ def test_sensor_cardinality_stays_within_all_supported_profiles() -> None:
     from custom_components.pihole_queries.sensor import DIAGNOSTIC_DESCRIPTIONS
 
     profiles = ((5, 30), (25, 150), (100, 600))
-    assert len(SENSOR_DESCRIPTIONS) == 4
+    assert len(SENSOR_DESCRIPTIONS) == 5
     assert {description.key for description in SENSOR_DESCRIPTIONS} == {
         "queries",
+        "queries_last_minute",
         "allowed_v1",
         "blocked_v1",
         "provisional_v1",
     }
     assert len(DIAGNOSTIC_DESCRIPTIONS) == 4
-    expected_totals = (24, 104, 404)
+    expected_totals = (29, 129, 504)
     for (clients, entity_budget), expected_total in zip(profiles, expected_totals, strict=True):
         created_entities = clients * len(SENSOR_DESCRIPTIONS) + len(DIAGNOSTIC_DESCRIPTIONS)
         assert created_entities == expected_total

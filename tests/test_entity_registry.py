@@ -201,6 +201,45 @@ async def test_retired_class_entities_are_archived_without_rewriting_registry_st
         f"{entry.data[CONF_SOURCE_ID]}_{entry.data[CONF_SOURCE_GENERATION]}_192.0.2.10",
         config_entry=entry,
     )
+    old_minute = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{entry.data[CONF_SOURCE_ID]}_{entry.data[CONF_SOURCE_GENERATION]}_192.0.2.10_queries_last_minute",
+        config_entry=entry,
+        suggested_object_id="favorite_old_minute_count",
+        original_name="Consultas (último minuto)",
+        translation_key=None,
+        device_id=client_device.id,
+    )
+    old_minute = registry.async_update_entity(
+        old_minute.entity_id, new_entity_id="sensor.custom_old_minute_count"
+    )
+    hass.states.async_set(old_minute.entity_id, "7")
+    old_allowed_rate = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{entry.data[CONF_SOURCE_ID]}_{entry.data[CONF_SOURCE_GENERATION]}_192.0.2.10_allowed_last_minute",
+        config_entry=entry,
+        suggested_object_id="favorite_old_allowed_rate",
+        original_name="Permitidas (último minuto)",
+        translation_key=None,
+        device_id=client_device.id,
+    )
+    old_allowed_rate = registry.async_update_entity(
+        old_allowed_rate.entity_id, new_entity_id="sensor.custom_old_allowed_rate"
+    )
+    hass.states.async_set(old_allowed_rate.entity_id, "5")
+    old_blocked_rate = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{entry.data[CONF_SOURCE_ID]}_{entry.data[CONF_SOURCE_GENERATION]}_192.0.2.10_blocked_last_minute",
+        config_entry=entry,
+        original_name="Bloqueadas (último minuto)",
+        translation_key=None,
+    )
+    registry.async_update_entity(
+        old_blocked_rate.entity_id, disabled_by=RegistryEntryDisabler.USER
+    )
     classified = registry.async_get_or_create(
         "sensor",
         DOMAIN,
@@ -226,11 +265,18 @@ async def test_retired_class_entities_are_archived_without_rewriting_registry_st
     allowed_unique_id = allowed.unique_id
     blocked_entity_id = blocked.entity_id
     blocked_unique_id = blocked.unique_id
+    old_minute_entity_id = old_minute.entity_id
+    old_minute_unique_id = old_minute.unique_id
+    old_allowed_rate_entity_id = old_allowed_rate.entity_id
+    old_allowed_rate_unique_id = old_allowed_rate.unique_id
     _archive_legacy_class_sensors(hass, entry)
     _archive_legacy_class_sensors(hass, entry)
 
     archived_allowed = registry.async_get(allowed_entity_id)
     user_disabled_blocked = registry.async_get(blocked_entity_id)
+    archived_minute = registry.async_get(old_minute_entity_id)
+    archived_allowed_rate = registry.async_get(old_allowed_rate_entity_id)
+    user_disabled_blocked_rate = registry.async_get(old_blocked_rate.entity_id)
     assert archived_allowed is not None
     assert archived_allowed.unique_id == allowed_unique_id
     assert archived_allowed.original_name == "Kitchen allowed history"
@@ -240,12 +286,26 @@ async def test_retired_class_entities_are_archived_without_rewriting_registry_st
     assert user_disabled_blocked.unique_id == blocked_unique_id
     assert user_disabled_blocked.original_name == "Kitchen blocked history"
     assert user_disabled_blocked.disabled_by is RegistryEntryDisabler.USER
+    assert archived_minute is not None
+    assert archived_minute.unique_id == old_minute_unique_id
+    assert archived_minute.entity_id == "sensor.custom_old_minute_count"
+    assert archived_minute.original_name == "Consultas (último minuto)"
+    assert archived_minute.disabled_by is None
+    assert archived_allowed_rate is not None
+    assert archived_allowed_rate.unique_id == old_allowed_rate_unique_id
+    assert archived_allowed_rate.entity_id == "sensor.custom_old_allowed_rate"
+    assert archived_allowed_rate.original_name == "Permitidas (último minuto)"
+    assert archived_allowed_rate.disabled_by is RegistryEntryDisabler.INTEGRATION
+    assert user_disabled_blocked_rate is not None
+    assert user_disabled_blocked_rate.disabled_by is RegistryEntryDisabler.USER
     assert registry.async_get(total.entity_id).disabled_by is None
     assert registry.async_get(classified.entity_id).disabled_by is None
     assert registry.async_get(ambiguous_total.entity_id).disabled_by is None
     assert registry.async_get(second_instance.entity_id).disabled_by is None
     assert dr.async_get(hass).async_get(client_device.id).name == "Kitchen DNS client"
     assert hass.states.get(allowed_entity_id).state == "31"
+    assert hass.states.get(old_minute_entity_id).state == "7"
+    assert hass.states.get(old_allowed_rate_entity_id).state == "5"
     await hass.async_stop()
 
 
@@ -357,8 +417,8 @@ async def test_pre_translation_legacy_counters_are_archived_by_original_name(tmp
 
 
 @pytest.mark.asyncio
-async def test_new_sensor_setup_adds_no_legacy_class_entities(tmp_path) -> None:
-    """New entries publish four per-client counters and four diagnostics."""
+async def test_new_sensor_setup_adds_restored_minute_sensor_and_four_diagnostics(tmp_path) -> None:
+    """New entries publish five client sensors and four diagnostics."""
     hass = HomeAssistant(str(tmp_path))
     entry = SimpleNamespace(
         entry_id="new-install-entry",
@@ -381,13 +441,18 @@ async def test_new_sensor_setup_adds_no_legacy_class_entities(tmp_path) -> None:
     added = []
     await async_setup_sensor_entry(hass, entry, added.extend)
 
-    client_keys = {entity.entity_description.key for entity in added[:4]}
-    diagnostic_keys = {entity.entity_description.key for entity in added[4:]}
+    client_keys = {entity.entity_description.key for entity in added[:5]}
+    diagnostic_keys = {entity.entity_description.key for entity in added[5:]}
     assert client_keys == {description.key for description in SENSOR_DESCRIPTIONS} == {
         "queries",
+        "queries_last_minute",
         "allowed_v1",
         "blocked_v1",
         "provisional_v1",
     }
     assert diagnostic_keys == {description.key for description in DIAGNOSTIC_DESCRIPTIONS}
-    assert len(added) == 8
+    assert len(added) == 9
+    minute_sensor = next(
+        entity for entity in added if entity.entity_description.key == "queries_last_minute"
+    )
+    assert minute_sensor.unique_id == "new-install-endpoint_192.0.2.10_queries_last_minute"

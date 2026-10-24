@@ -97,6 +97,9 @@
       "queries": {
         "name": "Consultas DNS"
       },
+      "queries_last_minute": {
+        "name": "Consultas (último minuto)"
+      },
       "legacy_allowed": {
         "name": "Permitidas (histórico legado)"
       },
@@ -104,13 +107,13 @@
         "name": "Bloqueadas (histórico legado)"
       },
       "allowed_v1": {
-        "name": "Permitidas (v1)"
+        "name": "Consultas permitidas"
       },
       "blocked_v1": {
-        "name": "Bloqueadas (v1)"
+        "name": "Consultas bloqueadas"
       },
       "provisional_v1": {
-        "name": "Provisionales (v1)"
+        "name": "Consultas provisionales"
       }
     }
   },

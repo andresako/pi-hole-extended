@@ -22,20 +22,17 @@ views:
             name: Client 3
       - type: markdown
         content: |
-          ### Activity observed by HA · last minute
+          ### Queries · last minute
 
-          Rolling count of queries observed by the integration. This is not Pi-hole's
-          historical hourly volume. It updates with each poll; if the polling interval
-          exceeds one minute, the value may be stale until the next poll.
+          Rolling count by Pi-hole's original query time when available. In aggregate
+          mode, one-second buckets can differ at the window boundary. The sensor stays
+          unavailable when coverage is unknown or a fresh sample is unavailable.
 
-          {% set count = state_attr('sensor.replace_with_client_1_queries', 'queries_observed_last_minute') %}
-          - Client 1: {{ count if count is not none else 'Unavailable' }}
-          {% set count = state_attr('sensor.replace_with_client_2_queries', 'queries_observed_last_minute') %}
-          - Client 2: {{ count if count is not none else 'Unavailable' }}
-          {% set count = state_attr('sensor.replace_with_client_3_queries', 'queries_observed_last_minute') %}
-          - Client 3: {{ count if count is not none else 'Unavailable' }}
+          - Client 1: {{ states('sensor.replace_with_client_1_queries_last_minute') }}
+          - Client 2: {{ states('sensor.replace_with_client_2_queries_last_minute') }}
+          - Client 3: {{ states('sensor.replace_with_client_3_queries_last_minute') }}
       - type: entities
-        title: Blocked v1 · cumulative
+        title: Blocked queries · cumulative
         entities:
           # Static comparison of up to five clients from the same instance.
           - entity: sensor.replace_with_client_1_blocked_v1
@@ -91,19 +88,19 @@ views:
           - entity: sensor.replace_with_client_1_queries
             name: Client 1 · observed queries
           - entity: sensor.replace_with_client_1_allowed_v1
-            name: Client 1 · allowed (v1)
+            name: Client 1 · allowed queries
           - entity: sensor.replace_with_client_1_blocked_v1
-            name: Client 1 · blocked (v1)
+            name: Client 1 · blocked queries
           - entity: sensor.replace_with_client_1_provisional_v1
-            name: Client 1 · provisional (v1)
+            name: Client 1 · provisional queries
           - entity: sensor.replace_with_client_2_queries
             name: Client 2 · observed queries
           - entity: sensor.replace_with_client_2_allowed_v1
-            name: Client 2 · allowed (v1)
+            name: Client 2 · allowed queries
           - entity: sensor.replace_with_client_2_blocked_v1
-            name: Client 2 · blocked (v1)
+            name: Client 2 · blocked queries
           - entity: sensor.replace_with_client_2_provisional_v1
-            name: Client 2 · provisional (v1)
+            name: Client 2 · provisional queries
   - title: Diagnostics
     path: diagnostics
     icon: mdi:heart-pulse

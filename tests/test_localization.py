@@ -62,11 +62,20 @@ def test_all_client_and_diagnostic_sensor_names_have_both_translations() -> None
         for catalog in translations.values():
             assert catalog["entity"]["sensor"][description.translation_key]["name"]
 
+    assert translations["en"]["entity"]["sensor"]["allowed_v1"]["name"] == "Allowed queries"
+    assert translations["en"]["entity"]["sensor"]["blocked_v1"]["name"] == "Blocked queries"
+    assert translations["en"]["entity"]["sensor"]["provisional_v1"]["name"] == "Provisional queries"
+    assert "v1" not in " ".join(
+        translations["en"]["entity"]["sensor"][key]["name"]
+        for key in ("allowed_v1", "blocked_v1", "provisional_v1")
+    )
+
 
 def test_translation_changes_do_not_change_client_unique_ids() -> None:
     entry = SimpleNamespace(unique_id="stable-entry", entry_id="entry-id")
     expected = {
         "queries": "stable-entry_192.0.2.10",
+        "queries_last_minute": "stable-entry_192.0.2.10_queries_last_minute",
         "allowed_v1": "stable-entry_192.0.2.10_allowed_v1",
         "blocked_v1": "stable-entry_192.0.2.10_blocked_v1",
         "provisional_v1": "stable-entry_192.0.2.10_provisional_v1",

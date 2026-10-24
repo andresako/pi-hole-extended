@@ -9,7 +9,7 @@
 ## De un vistazo
 
 - Un dispositivo de Home Assistant por cada cliente que aparezca en el historial de consultas visible de Pi-hole.
-- Cuatro contadores por cliente: consultas observadas, permitidas, bloqueadas y provisionales. Los contadores del clasificador incluyen su versión para que los cambios posteriores sigan siendo claros.
+- Cinco sensores por cliente: consultas DNS acumuladas, consultas del último minuto, permitidas, bloqueadas y provisionales. La versión del clasificador se conserva internamente para que los cambios posteriores sigan siendo claros.
 - Elige **Historial detallado de consultas** para conservar detalles recientes y, de forma opcional, entradas en Activity; o **Solo totales agregados** para conservar identidades de clientes y totales numéricos sin filas ni dominios de consultas.
 - Diagnósticos por entrada para el estado de comunicación, la última lectura correcta, la última consulta observada y la cobertura de ingesta.
 - Un panel inicial con cuatro vistas nativas de Home Assistant: **Resumen**, **Clientes**, **Detalle** y **Diagnóstico**.
@@ -79,7 +79,7 @@ El [YAML del panel inicial](examples/dashboards/pihole-extended.yaml) incluye cu
 
 ## Actualizar desde 0.7.x
 
-La versión 0.8.0 retira los dos contadores antiguos sin versión de permitidas/bloqueadas por cliente. Home Assistant deshabilita las entradas existentes del registro y conserva sus IDs, nombres personalizados e historial de Recorder. Actualiza los paneles y automatizaciones que usen esos contadores para que utilicen **Permitidas (v1)** y **Bloqueadas (v1)**. Las instalaciones nuevas solo crean los cuatro contadores actuales.
+La versión 0.8.0 retiró los dos contadores antiguos sin versión de permitidas/bloqueadas por cliente. La integración restaura **Consultas (último minuto)** con su identidad e historial originales y archiva las antiguas tasas por minuto de permitidas/bloqueadas, conservando sus entradas de registro y Recorder. Actualiza paneles y automatizaciones de los contadores clasificados para que utilicen **Consultas permitidas** y **Consultas bloqueadas**. Las instalaciones nuevas crean cinco sensores por cliente.
 
 Con HACS, actualiza la integración y reinicia cuando se indique. Conserva la entrada de integración para mantener su cursor y contadores. Si cambias el endpoint de Pi-hole, usa **Reconfigurar** y elige **Mismo Pi-hole** si sigue siendo el mismo servidor; así conserva su identidad de origen y cursor. Elige **Pi-hole de reemplazo** solo cuando hayas cambiado el servidor, para iniciar una generación de origen nueva.
 
