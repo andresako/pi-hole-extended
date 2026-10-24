@@ -5,9 +5,15 @@ Consulta la actividad DNS de **Pi-hole v6** en Home Assistant. La integración c
 ## Qué incluye
 
 - Un dispositivo de Home Assistant por cliente.
-- Seis sensores de contadores por cliente: consultas observadas, contadores legados de permitidas/bloqueadas y contadores permitidas/bloqueadas/provisionales de la versión activa del clasificador. Las observaciones del último minuto son atributos del sensor total, no entidades separadas.
+- Cuatro sensores de contadores por cliente: consultas observadas y contadores permitidas/bloqueadas/provisionales de la versión activa del clasificador. Las observaciones del último minuto son atributos del sensor total, no entidades separadas. Las entidades legadas de permitidas/bloqueadas ya existentes quedan deshabilitadas por la integración; se conservan sus IDs de registro y el historial de Recorder.
 - Entradas individuales en **Ajustes → Sistema → Registros → Actividad** de forma predeterminada.
 - Nombres sencillos e IDs `phe_` para sensores por cliente; los IDs diagnósticos corresponden a cada entrada de la integración.
+
+## Notas de actualización para 0.8.0
+
+Se retiran los dos contadores antiguos sin versión de permitidas/bloqueadas por cliente. Home Assistant deshabilita sus entradas existentes del registro de entidades y conserva sus unique IDs, entity IDs personalizados, nombres personalizados e historial de Recorder. Actualiza las automatizaciones o paneles que usen esas entidades para utilizar los contadores versionados de permitidas/bloqueadas. Las instalaciones nuevas solo crean los cuatro contadores actuales.
+
+En una prueba sintética con 100 clientes y 100 consultas por segundo, el modo detallado procesó un flujo de 10 minutos y 60.000 filas, y alcanzó el cursor final unos 0,12 segundos después de terminar el flujo. El modo agregado tardó unos 360 segundos en vaciar la cola tras ese mismo flujo (unos 960 segundos en total). Por separado, recuperar un backlog de 60.000 filas tardó unos 0,65 segundos de mediana en modo detallado y 13,88 segundos de mediana en modo agregado (13,98 segundos como máximo en cinco pruebas). Son resultados de pruebas sintéticas locales, no una garantía de rendimiento para otros equipos o instalaciones Pi-hole. Muestran que el modo agregado puede acumular retraso con un flujo sostenido de gran volumen, aunque conserva menos detalles y evita nuevas entradas de Activity.
 
 ## Instalar con HACS
 

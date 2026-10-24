@@ -67,8 +67,6 @@ def test_translation_changes_do_not_change_client_unique_ids() -> None:
     entry = SimpleNamespace(unique_id="stable-entry", entry_id="entry-id")
     expected = {
         "queries": "stable-entry_192.0.2.10",
-        "allowed": "stable-entry_192.0.2.10_allowed",
-        "blocked": "stable-entry_192.0.2.10_blocked",
         "allowed_v1": "stable-entry_192.0.2.10_allowed_v1",
         "blocked_v1": "stable-entry_192.0.2.10_blocked_v1",
         "provisional_v1": "stable-entry_192.0.2.10_provisional_v1",

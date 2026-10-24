@@ -702,6 +702,13 @@ def test_archive_helper_disables_only_current_generation_client_sensors(monkeypa
             domain="sensor",
         ),
         SimpleNamespace(
+            entity_id="sensor.user_disabled",
+            unique_id="http://old.example.test:80_192.0.2.12",
+            platform=DOMAIN,
+            domain="sensor",
+            disabled_by=RegistryEntryDisabler.USER,
+        ),
+        SimpleNamespace(
             entity_id="sensor.diagnostic",
             unique_id="entry-1_communication_status",
             platform=DOMAIN,
