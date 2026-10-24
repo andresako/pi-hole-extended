@@ -42,7 +42,7 @@ Pi-hole Extended is installed as a custom HACS repository and is not currently i
 3. Install **Pi-hole Extended**, then restart Home Assistant.
 4. Open **Settings → Devices & services → Add integration**, search for **Pi-hole Extended**, and follow the setup form.
 
-For a manual installation, download [`pihole_queries-0.8.0.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.8.0/pihole_queries-0.8.0.zip), extract `custom_components/pihole_queries` into your Home Assistant configuration directory, and restart Home Assistant.
+For a manual installation, download [`pihole_queries-0.8.1.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.8.1/pihole_queries-0.8.1.zip), extract `custom_components/pihole_queries` into your Home Assistant configuration directory, and restart Home Assistant.
 
 ## Configure Pi-hole
 
@@ -79,9 +79,11 @@ The [starter dashboard YAML](examples/dashboards/pihole-extended.yaml) contains 
 
 ## Updating from 0.7.x
 
-Version 0.8.0 retires the two older unversioned allowed/blocked client counters. Home Assistant disables existing registry entries while retaining their IDs, custom names, and Recorder history. Update dashboards and automations that refer to those counters to use **Allowed queries** and **Blocked queries**. New installations create five client entities: DNS queries, Queries (last minute), and three classification counters.
+Version 0.8.1 restores **Queries (last minute)** with its original Pi-hole event-time window, entity identity, unit, measurement class, and Recorder history. It keeps HA-observation metrics separate and archives the obsolete per-class minute entities while preserving their registry entries and history.
 
-The restored **Queries (last minute)** sensor reuses its original entity identity and Recorder history because it uses the same Pi-hole event-time window. In Aggregate mode, the sensor uses anonymous one-second source-time buckets and can differ by up to one second at the boundary. It stays unavailable when coverage is unknown or partial, the API sample is stale, or until more than 60 seconds of complete observation have elapsed. The `queries_observed_last_minute` attribute on **DNS queries** retains its separate meaning: queries newly observed by Home Assistant. Existing allowed/blocked last-minute entities are archived while retaining their registry entries and history; current classifier-rate attributes use HA observation time.
+In Aggregate mode, the sensor uses anonymous one-second source-time buckets and can differ by up to one second at the boundary. It stays unavailable when coverage is unknown or partial, the API sample is stale, or until more than 60 seconds of complete observation have elapsed. The `queries_observed_last_minute` attribute on **DNS queries** retains its separate meaning: queries newly observed by Home Assistant. Current classifier-rate attributes use HA observation time.
+
+Version 0.8.0 retires the two older unversioned allowed/blocked client counters. Home Assistant disables existing registry entries while retaining their IDs, custom names, and Recorder history. Update dashboards and automations that refer to those counters to use **Allowed queries** and **Blocked queries**. New installations create five client entities: DNS queries, Queries (last minute), and three classification counters.
 
 For a HACS installation, update the integration in HACS and restart when prompted. Keep the integration entry to retain its cursor and counters. If you change the Pi-hole endpoint, use **Reconfigure** and choose **Same Pi-hole** when it is still the same server; this preserves its source identity and cursor. Choose **Replacement Pi-hole** only after replacing the server, to start a new source generation.
 
@@ -95,7 +97,7 @@ Before rolling back to a version earlier than 0.8.0, restore a compatible full H
 
 ## Links
 
-- [Release notes](https://github.com/Andresako/pi-hole-extended/releases/tag/0.8.0) · [All releases](https://github.com/Andresako/pi-hole-extended/releases)
+- [Release notes](https://github.com/Andresako/pi-hole-extended/releases/tag/0.8.1) · [All releases](https://github.com/Andresako/pi-hole-extended/releases)
 - [Dashboard guide](docs/dashboard-examples.md) · [Technical details and limitations](docs/DETAILS.md)
 - [Report a problem](https://github.com/Andresako/pi-hole-extended/issues) · [Security policy](SECURITY.md) · [MIT license](LICENSE)
 - [Read this guide in Spanish](README.es.md)

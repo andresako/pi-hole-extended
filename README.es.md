@@ -42,7 +42,7 @@ Pi-hole Extended se instala como repositorio personalizado de HACS y actualmente
 3. Instala **Pi-hole Extended** y reinicia Home Assistant.
 4. Abre **Ajustes → Dispositivos y servicios → Añadir integración**, busca **Pi-hole Extended** y sigue el formulario.
 
-Para instalarla manualmente, descarga [`pihole_queries-0.8.0.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.8.0/pihole_queries-0.8.0.zip), extrae `custom_components/pihole_queries` en el directorio de configuración de Home Assistant y reinicia.
+Para instalarla manualmente, descarga [`pihole_queries-0.8.1.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.8.1/pihole_queries-0.8.1.zip), extrae `custom_components/pihole_queries` en el directorio de configuración de Home Assistant y reinicia.
 
 ## Configurar Pi-hole
 
@@ -79,7 +79,11 @@ El [YAML del panel inicial](examples/dashboards/pihole-extended.yaml) incluye cu
 
 ## Actualizar desde 0.7.x
 
-La versión 0.8.0 retiró los dos contadores antiguos sin versión de permitidas/bloqueadas por cliente. La integración restaura **Consultas (último minuto)** con su identidad e historial originales y archiva las antiguas tasas por minuto de permitidas/bloqueadas, conservando sus entradas de registro y Recorder. Actualiza paneles y automatizaciones de los contadores clasificados para que utilicen **Consultas permitidas** y **Consultas bloqueadas**. Las instalaciones nuevas crean cinco sensores por cliente.
+La versión 0.8.1 restaura **Consultas (último minuto)** con su ventana original de hora de Pi-hole, identidad, unidad, clase de medición e historial de Recorder. Mantiene separadas las métricas de observación de HA y archiva las antiguas tasas por minuto de permitidas/bloqueadas, conservando sus entradas de registro e historial.
+
+En modo Agregado, el sensor usa cubos anónimos de un segundo basados en la hora de origen; el valor puede variar hasta un segundo en el límite de la ventana. No está disponible si la cobertura es desconocida o parcial, la muestra de API está obsoleta o aún no han transcurrido más de 60 segundos de observación completa. El atributo `queries_observed_last_minute` de **Consultas DNS** mantiene su significado distinto: consultas que Home Assistant acaba de observar. Las tasas actuales del clasificador usan la hora de observación de HA.
+
+La versión 0.8.0 retiró los dos contadores antiguos sin versión de permitidas/bloqueadas por cliente. Home Assistant desactiva sus entradas de registro existentes y conserva IDs, nombres personalizados e historial de Recorder. Actualiza paneles y automatizaciones de los contadores clasificados para que utilicen **Consultas permitidas** y **Consultas bloqueadas**. Las instalaciones nuevas crean cinco sensores por cliente.
 
 Con HACS, actualiza la integración y reinicia cuando se indique. Conserva la entrada de integración para mantener su cursor y contadores. Si cambias el endpoint de Pi-hole, usa **Reconfigurar** y elige **Mismo Pi-hole** si sigue siendo el mismo servidor; así conserva su identidad de origen y cursor. Elige **Pi-hole de reemplazo** solo cuando hayas cambiado el servidor, para iniciar una generación de origen nueva.
 
@@ -93,7 +97,7 @@ Antes de volver a una versión anterior a la 0.8.0, restaura una copia de seguri
 
 ## Enlaces
 
-- [Notas de la versión](https://github.com/Andresako/pi-hole-extended/releases/tag/0.8.0) · [Todas las versiones](https://github.com/Andresako/pi-hole-extended/releases)
+- [Notas de la versión](https://github.com/Andresako/pi-hole-extended/releases/tag/0.8.1) · [Todas las versiones](https://github.com/Andresako/pi-hole-extended/releases)
 - [Guía del panel](docs/dashboard-examples.md) · [Detalles técnicos y limitaciones](docs/DETALLES_ES.md)
 - [Informar de un problema](https://github.com/Andresako/pi-hole-extended/issues) · [Política de seguridad](SECURITY.md) · [Licencia MIT](LICENSE)
 - [Read this guide in English](README.md)
