@@ -12,7 +12,7 @@
 - Four client counters: total observed queries, allowed, blocked, and provisional. Classifier counts are versioned so later changes remain clear.
 - Choose **Detailed query history** for recent query details and optional Activity entries, or **Aggregate totals only** to retain client identities and numeric totals without query rows or domains.
 - Per-entry diagnostics show communication status, last successful read, last observed query, and ingestion coverage.
-- A starter dashboard with four native Home Assistant views, titled **Resumen**, **Clientes**, **Detalle**, and **Diagnóstico** in the example YAML.
+- A starter dashboard with four native Home Assistant views, titled **Summary**, **Clients**, **Details**, and **Diagnostics** in the example YAML.
 
 The integration counts new queries it observes while polling Pi-hole. It does not recreate all traffic Pi-hole has ever handled, and its dashboard does not rank queries by their original event time.
 

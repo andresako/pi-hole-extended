@@ -1,134 +1,134 @@
-title: Pi-hole Extended
+title: Pi-hole Extended Dashboard
 views:
-  - title: Resumen
-    path: resumen
+  - title: Summary
+    path: summary
     icon: mdi:view-dashboard
     cards:
       - type: markdown
         content: |
           ## Pi-hole Extended
 
-          Muestra una instancia por vista. Las consultas son acumuladas desde la configuración;
-          el gráfico usa la hora de registro de HA, no la hora original de Pi-hole.
+          Show one instance per view. Query totals accumulate from setup onward;
+          the graph uses HA's recording time, not Pi-hole's original event time.
       - type: entities
-        title: Consultas acumuladas
+        title: Cumulative queries
         entities:
-          # Reemplaza cada ID con el ID actual de la entidad en Ajustes → Entidades.
+          # Replace each ID with the current entity ID from Settings → Entities.
           - entity: sensor.replace_with_client_1_queries
-            name: Cliente 1
+            name: Client 1
           - entity: sensor.replace_with_client_2_queries
-            name: Cliente 2
+            name: Client 2
           - entity: sensor.replace_with_client_3_queries
-            name: Cliente 3
+            name: Client 3
       - type: markdown
         content: |
-          ### Actividad observada por HA · último minuto
+          ### Activity observed by HA · last minute
 
-          Cuenta móvil de consultas observadas por la integración. No es el volumen histórico
-          por hora original de Pi-hole. Se actualiza con cada sondeo; si el intervalo de
-          sondeo supera un minuto, el valor puede quedar desfasado hasta el siguiente.
+          Rolling count of queries observed by the integration. This is not Pi-hole's
+          historical hourly volume. It updates with each poll; if the polling interval
+          exceeds one minute, the value may be stale until the next poll.
 
           {% set count = state_attr('sensor.replace_with_client_1_queries', 'queries_observed_last_minute') %}
-          - Cliente 1: {{ count if count is not none else 'No disponible' }}
+          - Client 1: {{ count if count is not none else 'Unavailable' }}
           {% set count = state_attr('sensor.replace_with_client_2_queries', 'queries_observed_last_minute') %}
-          - Cliente 2: {{ count if count is not none else 'No disponible' }}
+          - Client 2: {{ count if count is not none else 'Unavailable' }}
           {% set count = state_attr('sensor.replace_with_client_3_queries', 'queries_observed_last_minute') %}
-          - Cliente 3: {{ count if count is not none else 'No disponible' }}
+          - Client 3: {{ count if count is not none else 'Unavailable' }}
       - type: entities
-        title: Bloqueadas v1 · acumulado
+        title: Blocked v1 · cumulative
         entities:
-          # Comparación estática de hasta cinco clientes de la misma instancia.
+          # Static comparison of up to five clients from the same instance.
           - entity: sensor.replace_with_client_1_blocked_v1
-            name: Cliente 1
+            name: Client 1
           - entity: sensor.replace_with_client_2_blocked_v1
-            name: Cliente 2
+            name: Client 2
           - entity: sensor.replace_with_client_3_blocked_v1
-            name: Cliente 3
+            name: Client 3
       - type: history-graph
-        title: Consultas acumuladas · 24 h
+        title: Cumulative queries · last 24 hours
         hours_to_show: 24
         refresh_interval: 60
         entities:
           - entity: sensor.replace_with_client_1_queries
-            name: Cliente 1
+            name: Client 1
           - entity: sensor.replace_with_client_2_queries
-            name: Cliente 2
+            name: Client 2
           - entity: sensor.replace_with_client_3_queries
-            name: Cliente 3
-  - title: Clientes
-    path: clientes
+            name: Client 3
+  - title: Clients
+    path: clients
     icon: mdi:devices
     cards:
       - type: markdown
         content: >
-          Sustituye las entidades de ejemplo por las de tus clientes. Añade o quita filas
-          manualmente para conservar acceso a clientes inactivos y desconocidos.
+          Replace the example entities with your clients' entities. Add or remove rows
+          manually to keep access to inactive and unknown clients.
       - type: entities
-        title: Clientes · consultas acumuladas
+        title: Clients · cumulative queries
         entities:
           - entity: sensor.replace_with_client_1_queries
-            name: Cliente 1 · consultas observadas
+            name: Client 1 · observed queries
           - entity: sensor.replace_with_client_2_queries
-            name: Cliente 2 · consultas observadas
+            name: Client 2 · observed queries
           - entity: sensor.replace_with_client_3_queries
-            name: Cliente 3 · consultas observadas
+            name: Client 3 · observed queries
           - entity: sensor.replace_with_client_4_queries
-            name: Cliente 4 · consultas observadas
+            name: Client 4 · observed queries
           - entity: sensor.replace_with_unknown_client_queries
-            name: Desconocido · DNS
-  - title: Detalle
-    path: detalle
+            name: Unknown · DNS
+  - title: Details
+    path: details
     icon: mdi:magnify
     cards:
       - type: markdown
         content: >
-          Selecciona una entidad para abrir el cuadro estándar de Home Assistant y consultar
-          el historial disponible y sus atributos. Esta vista no ofrece una tabla DNS completa,
-          una búsqueda interactiva ni filtros coordinados.
+          Select an entity to open Home Assistant's standard entity dialog and view its
+          available history and attributes. This view does not provide a complete DNS
+          query table, interactive search, or coordinated filters.
       - type: entities
-        title: Cliente · contadores observados
+        title: Client · observed counters
         entities:
           - entity: sensor.replace_with_client_1_queries
-            name: Cliente 1 · consultas observadas
+            name: Client 1 · observed queries
           - entity: sensor.replace_with_client_1_allowed_v1
-            name: Cliente 1 · permitidas (v1)
+            name: Client 1 · allowed (v1)
           - entity: sensor.replace_with_client_1_blocked_v1
-            name: Cliente 1 · bloqueadas (v1)
+            name: Client 1 · blocked (v1)
           - entity: sensor.replace_with_client_1_provisional_v1
-            name: Cliente 1 · provisionales (v1)
+            name: Client 1 · provisional (v1)
           - entity: sensor.replace_with_client_2_queries
-            name: Cliente 2 · consultas observadas
+            name: Client 2 · observed queries
           - entity: sensor.replace_with_client_2_allowed_v1
-            name: Cliente 2 · permitidas (v1)
+            name: Client 2 · allowed (v1)
           - entity: sensor.replace_with_client_2_blocked_v1
-            name: Cliente 2 · bloqueadas (v1)
+            name: Client 2 · blocked (v1)
           - entity: sensor.replace_with_client_2_provisional_v1
-            name: Cliente 2 · provisionales (v1)
-  - title: Diagnóstico
-    path: diagnostico
+            name: Client 2 · provisional (v1)
+  - title: Diagnostics
+    path: diagnostics
     icon: mdi:heart-pulse
     cards:
       - type: markdown
         content: >
-          Sustituye estas entidades por las cuatro de diagnóstico de una entrada. Estado de
-          comunicación, frescura, cobertura y persistencia son señales distintas. Una lectura
-          correcta no confirma que Recorder haya guardado cada evento.
+          Replace these entities with the four diagnostic entities for one entry.
+          Communication status, freshness, coverage, and persistence are separate signals.
+          A successful read does not confirm that Recorder saved every event.
       - type: entities
-        title: Estado de la integración
+        title: Integration status
         entities:
           - entity: sensor.replace_with_entry_communication_status
-            name: Estado de comunicación
+            name: Communication status
           - entity: sensor.replace_with_entry_last_successful_read
-            name: Última lectura correcta
+            name: Last successful read
           - entity: sensor.replace_with_entry_last_query_observed
-            name: Última consulta observada
+            name: Last query observed
           - entity: sensor.replace_with_entry_ingestion_coverage
-            name: Cobertura de ingesta
+            name: Ingestion coverage
       - type: history-graph
-        title: Estado y cobertura · últimas 24 h
+        title: Status and coverage · last 24 hours
         hours_to_show: 24
         entities:
           - entity: sensor.replace_with_entry_communication_status
-            name: Estado
+            name: Status
           - entity: sensor.replace_with_entry_ingestion_coverage
-            name: Cobertura
+            name: Coverage
