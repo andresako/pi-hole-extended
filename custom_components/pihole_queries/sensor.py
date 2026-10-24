@@ -39,6 +39,15 @@ SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         icon="mdi:dns",
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
+    SensorEntityDescription(
+        key="queries_last_minute",
+        name="Consultas (último minuto)",
+        translation_key="queries_last_minute",
+        icon="mdi:speedometer",
+        native_unit_of_measurement="consultas/min",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+    ),
 )
 
 
@@ -48,21 +57,21 @@ def _classifier_descriptions(version: int) -> tuple[SensorEntityDescription, ...
     return (
         SensorEntityDescription(
             key=f"allowed_{suffix}",
-            name=f"Permitidas ({suffix})",
+            name="Consultas permitidas",
             translation_key=f"allowed_{suffix}",
             icon="mdi:check-circle-outline",
             state_class=SensorStateClass.TOTAL_INCREASING,
         ),
         SensorEntityDescription(
             key=f"blocked_{suffix}",
-            name=f"Bloqueadas ({suffix})",
+            name="Consultas bloqueadas",
             translation_key=f"blocked_{suffix}",
             icon="mdi:cancel",
             state_class=SensorStateClass.TOTAL_INCREASING,
         ),
         SensorEntityDescription(
             key=f"provisional_{suffix}",
-            name=f"Provisionales ({suffix})",
+            name="Consultas provisionales",
             translation_key=f"provisional_{suffix}",
             icon="mdi:help-circle-outline",
             state_class=SensorStateClass.TOTAL_INCREASING,
@@ -101,6 +110,7 @@ DIAGNOSTIC_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
 
 _COUNT_KEYS = {
     "queries": "query_count",
+    "queries_last_minute": "queries_last_minute",
 }
 
 _EPOCH_CLASS_KEYS = {"allowed", "blocked", "provisional"}
@@ -208,7 +218,7 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
         )
 
     @property
-    def native_value(self) -> int | float:
+    def native_value(self) -> int | float | None:
         """Return this entity's accumulated count."""
         data = self._client_data
         metric = self.entity_description.key
@@ -227,6 +237,11 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
                     return int(epoch.get(base, 0))
                 except (TypeError, ValueError):
                     return 0
+        if metric == "queries_last_minute":
+            value = data.get(_COUNT_KEYS[metric])
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                return None
+            return value
         if metric in _COUNT_KEYS:
             try:
                 return int(data.get(_COUNT_KEYS[metric], 0))
@@ -235,12 +250,41 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
         return 0
 
     @property
+    def available(self) -> bool:
+        """Require a fresh, complete source-time window for this rolling count."""
+        if not super().available:
+            return False
+        if self.entity_description.key != "queries_last_minute":
+            return True
+        if (
+            not getattr(self.coordinator, "query_time_window_ready", False)
+            or getattr(self.coordinator, "coverage", "unknown") != "complete"
+        ):
+            return False
+        last_success = getattr(self.coordinator, "last_successful_read", None)
+        if not isinstance(last_success, datetime):
+            return False
+        last_success = last_success.astimezone(UTC)
+        now = dt_util.utcnow()
+        if last_success > now:
+            return False
+        interval = self.coordinator.update_interval.total_seconds()
+        return (now - last_success).total_seconds() <= 2 * interval
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Expose rolling windows and classification totals without extra entities."""
-        data = self._client_data
-        metric = self.entity_description.key
-        if metric != "queries":
+        """Expose the observation window's time source and sample freshness."""
+        if self.entity_description.key == "queries_last_minute":
+            return {
+                "window_seconds": 60,
+                "timestamp_source": "Pi-hole query.time, with HA observation fallback",
+                "last_successful_read": getattr(
+                    self.coordinator, "last_successful_read", None
+                ),
+            }
+        if self.entity_description.key != "queries":
             return None
+        data = self._client_data
         version = str(data.get("classifier_version", CLASSIFIER_VERSION))
         counts = data.get("classifier_counts", {})
         active_counts = counts.get(version, {}) if isinstance(counts, dict) else {}

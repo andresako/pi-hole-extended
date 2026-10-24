@@ -87,6 +87,66 @@ def _timestamp_number(value: Any) -> float | None:
         return None
 
 
+def _query_time_for_minute_window(query: dict[str, Any], observed_at: float) -> float | None:
+    """Use Pi-hole's event time, falling back to observation time as in 0.6."""
+    query_time = _timestamp_number(query.get("time"))
+    if query_time is None or query_time < 0:
+        return observed_at
+    if query_time > observed_at:
+        return None
+    return query_time
+
+
+def _add_query_time_bucket(summary: dict[str, Any], query_time: float, observed_at: float) -> None:
+    """Add one anonymous query to a bounded source-time second bucket."""
+    second = int(query_time)
+    buckets = summary.setdefault("query_time_buckets", [])
+    if not isinstance(buckets, list):
+        buckets = []
+    bucket = next(
+        (
+            item
+            for item in buckets
+            if isinstance(item, dict) and item.get("second") == second
+        ),
+        None,
+    )
+    if bucket is None:
+        bucket = {"second": second, "count": 0}
+        buckets.append(bucket)
+    bucket["count"] += 1
+    cutoff = int(observed_at) - 61
+    summary["query_time_buckets"] = [
+        item
+        for item in buckets
+        if isinstance(item, dict)
+        and isinstance(item.get("second"), int)
+        and item["second"] >= cutoff
+    ][-61:]
+
+
+def _valid_query_time_buckets(value: Any) -> bool:
+    """Validate bounded, anonymous per-second source-time totals."""
+    if not isinstance(value, list) or len(value) > 61:
+        return False
+    seen: set[int] = set()
+    for bucket in value:
+        if (
+            not isinstance(bucket, dict)
+            or set(bucket) != {"second", "count"}
+            or isinstance(bucket.get("second"), bool)
+            or not isinstance(bucket.get("second"), int)
+            or bucket["second"] < 0
+            or isinstance(bucket.get("count"), bool)
+            or not isinstance(bucket.get("count"), int)
+            or bucket["count"] < 0
+            or bucket["second"] in seen
+        ):
+            return False
+        seen.add(bucket["second"])
+    return True
+
+
 def _blocked(status: Any) -> bool:
     """Return whether the exact status is explicitly classified as blocked."""
     return _classification(status) == "blocked"
@@ -245,6 +305,11 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         # but does not prove Recorder persistence or retain a last-read claim.
         self.last_successful_read: datetime | None = None
         self.last_api_attempt_successful: bool | None = None
+        # The one-minute source-time metric is withheld until a complete 60s
+        # observation span has followed startup, when older Store formats may
+        # lack enough timestamped rows to reconstruct that window.
+        self._query_time_window_started_at: float | None = None
+        self.query_time_window_ready = False
         self.awaiting_generation = False
         self.recovery_cursor: int | None = None
         self._client_store_invalid = False
@@ -281,7 +346,11 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     or not key
                     or len(key) > 255
                     or not isinstance(item, dict)
-                    or set(item) != {"client_name", "client_ip", "counts", "buckets"}
+                    or not {"client_name", "client_ip", "counts", "buckets"}.issubset(item)
+                    or set(item) - {
+                        "client_name", "client_ip", "counts", "buckets", "query_time_buckets"
+                    }
+                    or not _valid_query_time_buckets(item.get("query_time_buckets", []))
                 ):
                     self._store_state_invalid = True
                     break
@@ -523,12 +592,21 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                             self._client_store_invalid = True
                             break
                         observed_at = activity.get("observed_at")
+                        query_time = activity.get("query_time")
                         version = activity.get("classifier_version")
                         classification = activity.get("classification")
                         if (
                             isinstance(observed_at, bool)
                             or not isinstance(observed_at, (int, float))
                             or not math.isfinite(observed_at)
+                            or (
+                                "query_time" in activity
+                                and (
+                                    isinstance(query_time, bool)
+                                    or not isinstance(query_time, (int, float))
+                                    or not math.isfinite(query_time)
+                                )
+                            )
                             or isinstance(version, bool)
                             or not isinstance(version, int)
                             or version < 0
@@ -537,6 +615,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                         ):
                             self._client_store_invalid = True
                             break
+            if "query_time_buckets" in summary and not _valid_query_time_buckets(
+                summary["query_time_buckets"]
+            ):
+                self._client_store_invalid = True
             if "activity_buckets" in summary:
                 buckets = summary["activity_buckets"]
                 if not isinstance(buckets, list) or len(buckets) > 61:
@@ -1211,11 +1293,19 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     "client_ip": client_ip,
                     "counts": empty_classifier_counts(),
                     "buckets": [],
+                    "query_time_buckets": [],
                 },
             )
             classification = _classification(row.get("status"))
             item["counts"][classification] += 1
-            observed_second = int(time.time())
+            observed_at = time.time()
+            query_time = _query_time_for_minute_window(row, observed_at)
+            if query_time is None:
+                self._query_time_window_started_at = None
+                self.query_time_window_ready = False
+            else:
+                _add_query_time_bucket(item, query_time, observed_at)
+            observed_second = int(observed_at)
             bucket = next(
                 (
                     value
@@ -1279,6 +1369,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     "classifier_counts": {str(CLASSIFIER_VERSION): empty_classifier_counts()},
                     "classifier_rates": {str(CLASSIFIER_VERSION): empty_classifier_counts()},
                     "queries_observed_last_minute": 0,
+                    "queries_last_minute": 0,
+                    "query_time_buckets": [],
                     "activity_buckets": [],
                 },
             )
@@ -1293,6 +1385,28 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 item["counts"].values()
             )
             summary["classifier_version"] = CLASSIFIER_VERSION
+            if "query_time_buckets" not in item:
+                self._query_time_window_started_at = None
+                self.query_time_window_ready = False
+            for source_bucket in item.get("query_time_buckets", []):
+                target = summary.setdefault("query_time_buckets", [])
+                existing = next(
+                    (
+                        bucket
+                        for bucket in target
+                        if isinstance(bucket, dict)
+                        and bucket.get("second") == source_bucket["second"]
+                    ),
+                    None,
+                )
+                if existing is None:
+                    target.append(dict(source_bucket))
+                else:
+                    existing["count"] += source_bucket["count"]
+            if "query_time_buckets" in summary:
+                summary["query_time_buckets"] = sorted(
+                    summary["query_time_buckets"], key=lambda bucket: bucket["second"]
+                )[-61:]
             # Recovery can overlap the already observed 60-second window. Keep
             # one bucket per second/version and add the anonymous totals so the
             # Store scrub does not mistake valid data for a malformed duplicate.
@@ -1340,7 +1454,18 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self._update_client(row, query_id, count_as_new=False)
 
     def _update_minute_query_counts(self, sampled_at: float) -> None:
-        """Count newly observed queries in the inclusive HA-clock window."""
+        """Update source-time and HA-observation windows independently."""
+        if getattr(self, "coverage", "unknown") != "complete" or getattr(
+            self, "awaiting_generation", False
+        ):
+            self._query_time_window_started_at = None
+            self.query_time_window_ready = False
+        else:
+            if getattr(self, "_query_time_window_started_at", None) is None:
+                self._query_time_window_started_at = sampled_at
+            self.query_time_window_ready = (
+                sampled_at - self._query_time_window_started_at > 60
+            )
         if getattr(self, "retention_mode", RETENTION_DETAIL) == RETENTION_AGGREGATE:
             self._update_aggregate_minute_counts(sampled_at)
             return
@@ -1350,6 +1475,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             if not isinstance(recent, list):
                 recent = []
             activity: list[dict[str, Any]] = []
+            source_count = 0
             try:
                 version = int(summary.get("classifier_version", CLASSIFIER_VERSION))
             except (TypeError, ValueError):
@@ -1368,9 +1494,24 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     continue
                 if classification not in rates:
                     continue
+                query_time = item.get("query_time")
+                if (
+                    isinstance(query_time, (int, float))
+                    and not isinstance(query_time, bool)
+                    and math.isfinite(query_time)
+                    and window_start <= query_time <= sampled_at
+                ):
+                    source_count += 1
                 activity.append(
                     {
                         "observed_at": observed_at,
+                        **(
+                            {"query_time": query_time}
+                            if isinstance(query_time, (int, float))
+                            and not isinstance(query_time, bool)
+                            and math.isfinite(query_time)
+                            else {}
+                        ),
                         "classifier_version": item_version,
                         "classification": classification,
                     }
@@ -1379,6 +1520,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     rates[classification] += 1
             summary["recent_activity"] = activity
             summary["queries_observed_last_minute"] = len(activity)
+            summary["queries_last_minute"] = source_count
             saved_rates = summary.get("classifier_rates")
             if not isinstance(saved_rates, dict):
                 saved_rates = {}
@@ -1430,6 +1572,24 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             summary["queries_observed_last_minute"] = sum(
                 sum(bucket[name] for name in ("allowed", "blocked", "provisional"))
                 for bucket in buckets
+            )
+            source_buckets = summary.get("query_time_buckets", [])
+            if not isinstance(source_buckets, list):
+                source_buckets = []
+            source_buckets = [
+                bucket
+                for bucket in source_buckets
+                if isinstance(bucket, dict)
+                and isinstance(bucket.get("second"), int)
+                and not isinstance(bucket.get("second"), bool)
+                and window_start <= bucket["second"] <= window_end
+                and isinstance(bucket.get("count"), int)
+                and not isinstance(bucket.get("count"), bool)
+                and bucket["count"] >= 0
+            ][-61:]
+            summary["query_time_buckets"] = source_buckets
+            summary["queries_last_minute"] = sum(
+                bucket["count"] for bucket in source_buckets
             )
             saved_rates = summary.get("classifier_rates")
             if not isinstance(saved_rates, dict):
@@ -1555,6 +1715,15 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             classification = _classification(query.get("status"))
             active_counts[classification] += 1
             observed_at = time.time()
+            query_time = _query_time_for_minute_window(query, observed_at)
+            if query_time is None:
+                # A future FTL clock cannot support a trustworthy rolling
+                # window. Re-establish a full observation span before zeroes
+                # become visible again.
+                self._query_time_window_started_at = None
+                self.query_time_window_ready = False
+            elif getattr(self, "retention_mode", RETENTION_DETAIL) == RETENTION_AGGREGATE:
+                _add_query_time_bucket(summary, query_time, observed_at)
             if getattr(self, "retention_mode", RETENTION_DETAIL) == RETENTION_AGGREGATE:
                 second = int(observed_at)
                 buckets = summary.setdefault("activity_buckets", [])
@@ -1586,6 +1755,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 activity.append(
                     {
                         "observed_at": observed_at,
+                        **({"query_time": query_time} if query_time is not None else {}),
                         "classifier_version": CLASSIFIER_VERSION,
                         "classification": classification,
                     }

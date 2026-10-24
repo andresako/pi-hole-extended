@@ -21,20 +21,23 @@ Replace the placeholders by selecting entities in the registry; never build IDs 
 | `client_2_queries` | Client's **Consultas DNS** sensor |
 | `client_3_queries` | Client's **Consultas DNS** sensor |
 | `client_4_queries` | Client's **Consultas DNS** sensor |
-| `client_1_allowed_v1` | Client's **Permitidas (v1)** sensor |
-| `client_2_allowed_v1` | Client's **Permitidas (v1)** sensor |
-| `client_1_blocked_v1` | Client's **Bloqueadas (v1)** sensor |
-| `client_2_blocked_v1` | Client's **Bloqueadas (v1)** sensor |
-| `client_3_blocked_v1` | Client's **Bloqueadas (v1)** sensor |
-| `client_1_provisional_v1` | Client's **Provisionales (v1)** sensor |
-| `client_2_provisional_v1` | Client's **Provisionales (v1)** sensor |
+| `client_1_queries_last_minute` | Client's **Queries (last minute)** sensor |
+| `client_2_queries_last_minute` | Client's **Queries (last minute)** sensor |
+| `client_3_queries_last_minute` | Client's **Queries (last minute)** sensor |
+| `client_1_allowed_v1` | Client's **Allowed queries** sensor |
+| `client_2_allowed_v1` | Client's **Allowed queries** sensor |
+| `client_1_blocked_v1` | Client's **Blocked queries** sensor |
+| `client_2_blocked_v1` | Client's **Blocked queries** sensor |
+| `client_3_blocked_v1` | Client's **Blocked queries** sensor |
+| `client_1_provisional_v1` | Client's **Provisional queries** sensor |
+| `client_2_provisional_v1` | Client's **Provisional queries** sensor |
 | `unknown_client_queries` | **Consultas DNS** for the unknown client, when present |
 | `entry_communication_status` | Per-entry diagnostic **Estado de comunicación** |
 | `entry_last_successful_read` | Per-entry diagnostic **Última lectura correcta** |
 | `entry_last_query_observed` | Per-entry diagnostic **Última consulta observada** |
 | `entry_ingestion_coverage` | Per-entry diagnostic **Cobertura de ingesta** |
 
-The Summary activity card reads `queries_observed_last_minute` from the first three clients' **Consultas DNS** attributes. It is a rolling count of queries newly observed by the integration in the last minute and follows the integration's polling updates; if the polling interval is longer than one minute, the value can remain stale until the next poll. It does not use Pi-hole's original event timestamp. The blocked-count card compares a small, manually selected set of cumulative **classifier v1** counters. It is an observed lifetime count for each selected entity, not a time-period ranking. The history graph shows changes in cumulative totals recorded by Home Assistant over its displayed time range; it does not reconstruct Pi-hole's original query time. Classifier counters from different versions or source generations must not be compared as one series. Provisional observations are not included in the classified percentage. To inspect `blocked_percentage`, open the client's **Consultas DNS** entity in Details and expand **Attributes** in Home Assistant's entity dialog. A real 0% remains 0; if there are no allowed or blocked observations, the attribute is unknown rather than 0%.
+The Summary activity card uses the dedicated **Queries (last minute)** sensors. They count by Pi-hole's `query.time` where it is valid, matching the original rolling-window meaning; missing or invalid times fall back to when Home Assistant observed the query. Aggregate mode stores anonymous one-second source-time buckets, so its count can differ by up to one second at the window boundary. The sensor is unavailable when the API sample is stale or coverage is unknown/partial, and after startup until more than 60 seconds of complete observation are available. The blocked-count card compares a small, manually selected set of cumulative classifier counters. It is an observed lifetime count for each selected entity, not a time-period ranking. The history graph shows changes in cumulative totals recorded by Home Assistant over its displayed time range; it does not reconstruct Pi-hole's original query time. Counters from different classifier epochs or source generations must not be compared as one series. Provisional observations are not included in the classified percentage. To inspect `active_classifier_version` and `blocked_percentage`, open the client's **Consultas DNS** entity in Details and expand **Attributes** in Home Assistant's entity dialog. A real 0% remains 0; if there are no allowed or blocked observations, the percentage is unknown rather than 0%.
 
 The four tabs provide standard navigation. In Details, selecting an entity opens Home Assistant's standard entity dialog with the history and attributes that are available. This dashboard does not provide a complete DNS query table, interactive search, coordinated filters, per-user data access, or a privacy boundary. Hiding a tab does not restrict access to its data.
 
@@ -46,7 +49,7 @@ Each entry has its own diagnostic entities and client entities. Choose all rows 
 
 This native-card example is based on a dashboard tested on Home Assistant Core 2025.1.0. It uses the built-in `entities`, `history-graph`, and `markdown` cards. The YAML was imported with manual entity mapping and observed at 390×844 and 1440×900 CSS pixels, with all four views and keyboard navigation. A separate prototype was checked with long names, zero, unavailable, and diagnostic states. Those observations do not establish behavior on other Home Assistant releases or screen sizes.
 
-Per-period query volumes based on Pi-hole's original event timestamps are unavailable. No view in this example plots that metric. Recorder history remains subject to Home Assistant retention and exclusions; the integration does not verify event persistence.
+The rolling last-minute sensor is not a historical per-period query volume or a reconstructed Recorder series. Recorder history remains subject to Home Assistant retention and exclusions; the integration does not verify event persistence.
 
 ---
 
@@ -73,20 +76,23 @@ Reemplaza los marcadores eligiendo entidades del registro; nunca construyas IDs 
 | `client_2_queries` | Sensor **Consultas DNS** del cliente |
 | `client_3_queries` | Sensor **Consultas DNS** del cliente |
 | `client_4_queries` | Sensor **Consultas DNS** del cliente |
-| `client_1_allowed_v1` | Sensor **Permitidas (v1)** del cliente |
-| `client_2_allowed_v1` | Sensor **Permitidas (v1)** del cliente |
-| `client_1_blocked_v1` | Sensor **Bloqueadas (v1)** del cliente |
-| `client_2_blocked_v1` | Sensor **Bloqueadas (v1)** del cliente |
-| `client_3_blocked_v1` | Sensor **Bloqueadas (v1)** del cliente |
-| `client_1_provisional_v1` | Sensor **Provisionales (v1)** del cliente |
-| `client_2_provisional_v1` | Sensor **Provisionales (v1)** del cliente |
+| `client_1_queries_last_minute` | Sensor **Consultas (último minuto)** del cliente |
+| `client_2_queries_last_minute` | Sensor **Consultas (último minuto)** del cliente |
+| `client_3_queries_last_minute` | Sensor **Consultas (último minuto)** del cliente |
+| `client_1_allowed_v1` | Sensor **Consultas permitidas** del cliente |
+| `client_2_allowed_v1` | Sensor **Consultas permitidas** del cliente |
+| `client_1_blocked_v1` | Sensor **Consultas bloqueadas** del cliente |
+| `client_2_blocked_v1` | Sensor **Consultas bloqueadas** del cliente |
+| `client_3_blocked_v1` | Sensor **Consultas bloqueadas** del cliente |
+| `client_1_provisional_v1` | Sensor **Consultas provisionales** del cliente |
+| `client_2_provisional_v1` | Sensor **Consultas provisionales** del cliente |
 | `unknown_client_queries` | **Consultas DNS** del cliente desconocido, si existe |
 | `entry_communication_status` | Diagnóstico por entrada **Estado de comunicación** |
 | `entry_last_successful_read` | Diagnóstico por entrada **Última lectura correcta** |
 | `entry_last_query_observed` | Diagnóstico por entrada **Última consulta observada** |
 | `entry_ingestion_coverage` | Diagnóstico por entrada **Cobertura de ingesta** |
 
-La tarjeta de actividad en Summary lee `queries_observed_last_minute` de los atributos de **Consultas DNS** de los tres primeros clientes. Es un conteo móvil de consultas recién observadas por la integración en el último minuto y se actualiza con los sondeos; si el intervalo de sondeo supera un minuto, el valor puede quedar desfasado hasta el siguiente sondeo. No usa la hora original del evento de Pi-hole. La tarjeta de bloqueadas compara un conjunto pequeño elegido manualmente de contadores acumulados **del clasificador v1**. Es un total observado desde la instalación por entidad, no un ranking por periodo. El gráfico muestra cambios en los acumulados registrados por Home Assistant durante el intervalo visible; no reconstruye la hora original de cada consulta en Pi-hole. No combines en una misma serie contadores de distintas versiones del clasificador o generaciones de origen. Las observaciones provisionales no se incluyen en el porcentaje clasificado. Para consultar `blocked_percentage`, abre **Consultas DNS** del cliente en Details y despliega **Atributos** en el cuadro de entidad de Home Assistant. Un 0 % real sigue siendo 0; si aún no hay observaciones permitidas ni bloqueadas, el atributo queda desconocido y no se convierte en 0 %.
+La tarjeta de actividad en Summary usa los sensores independientes **Consultas (último minuto)**. Cuentan por la hora `query.time` de Pi-hole cuando es válida, recuperando el significado original de la ventana; si falta o no es válida, usan la hora en que HA observó la consulta. En modo agregado se guardan cubos numéricos por segundo, por lo que el conteo puede variar hasta un segundo en el borde de la ventana. El sensor no está disponible si la muestra API está obsoleta, la cobertura es desconocida/parcial, o hasta superar 60 segundos de observación completa después del arranque. La tarjeta de bloqueadas compara un conjunto pequeño elegido manualmente de contadores acumulados del clasificador. Es un total observado desde la instalación por entidad, no un ranking por periodo. El gráfico muestra cambios en los acumulados registrados por Home Assistant durante el intervalo visible; no reconstruye la hora original de cada consulta en Pi-hole. No combines en una misma serie contadores de distintas épocas del clasificador o generaciones de origen. Las observaciones provisionales no se incluyen en el porcentaje clasificado. Para consultar `active_classifier_version` y `blocked_percentage`, abre **Consultas DNS** del cliente en Details y despliega **Atributos** en el cuadro de entidad de Home Assistant. Un 0 % real sigue siendo 0; si aún no hay observaciones permitidas ni bloqueadas, el porcentaje queda desconocido y no se convierte en 0 %.
 
 Las cuatro pestañas usan la navegación estándar. En Details, al seleccionar una entidad se abre el cuadro estándar de Home Assistant con el historial y atributos disponibles. Este panel no proporciona una tabla DNS completa, búsqueda interactiva, filtros coordinados, control de acceso por usuario ni separación privada de datos. Ocultar una pestaña no restringe el acceso a sus datos.
 
@@ -98,4 +104,4 @@ Cada entrada tiene sus propias entidades de diagnóstico y de cliente. Elige tod
 
 Este ejemplo de tarjetas nativas se basa en un panel probado con Home Assistant Core 2025.1.0. Usa las tarjetas integradas `entities`, `history-graph` y `markdown`. El YAML se importó con asignación manual de entidades y se observó a 390×844 y 1440×900 píxeles CSS, con las cuatro vistas y navegación por teclado. Por separado, un prototipo se comprobó con nombres largos y estados cero, no disponible y diagnóstico. Esto no demuestra el comportamiento en otras versiones de Home Assistant ni otros tamaños de pantalla.
 
-Los volúmenes por periodo basados en la hora original de las consultas de Pi-hole no están disponibles. Este ejemplo no representa esa métrica. El historial de Recorder depende de la retención y exclusiones de Home Assistant; la integración no comprueba la persistencia de los eventos.
+El sensor móvil del último minuto no es un volumen histórico por periodos ni una serie de Recorder reconstruida. El historial de Recorder depende de la retención y exclusiones de Home Assistant; la integración no comprueba la persistencia de los eventos.

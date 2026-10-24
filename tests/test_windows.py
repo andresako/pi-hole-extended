@@ -5,9 +5,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 from datetime import UTC, datetime
+from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
+from homeassistant.components.sensor import SensorStateClass
 
 from custom_components.pihole_queries.coordinator import (
     PiHoleQueryCoordinator,
@@ -230,3 +232,178 @@ def test_ha_sensor_exposes_ingestion_window_and_epoch_statistics() -> None:
     assert provisional.native_value == 1
     assert attrs["blocked_percentage"] == pytest.approx(100 / 3)
     assert attrs["classified_count"] == 3
+
+
+def test_last_minute_sensor_preserves_zero_and_missing_values() -> None:
+    class _Coordinator:
+        client_data = {"192.0.2.10": {"queries_last_minute": 4}}
+
+        def async_add_listener(self, _listener):
+            return lambda: None
+
+    coordinator = _Coordinator()
+    entry = SimpleNamespace(unique_id="entry", entry_id="entry")
+    description = next(
+        description
+        for description in SENSOR_DESCRIPTIONS
+        if description.key == "queries_last_minute"
+    )
+    sensor = PiHoleClientSensor(coordinator, entry, "192.0.2.10", description)
+
+    assert sensor.native_value == 4
+    assert sensor.entity_description.state_class is SensorStateClass.MEASUREMENT
+    assert sensor.entity_description.native_unit_of_measurement == "consultas/min"
+    assert sensor.extra_state_attributes["window_seconds"] == 60
+    assert sensor.extra_state_attributes["timestamp_source"] == (
+        "Pi-hole query.time, with HA observation fallback"
+    )
+
+    coordinator.client_data["192.0.2.10"]["queries_last_minute"] = 0
+    assert sensor.native_value == 0
+    del coordinator.client_data["192.0.2.10"]["queries_last_minute"]
+    assert sensor.native_value is None
+
+
+def test_last_minute_sensor_stays_unavailable_until_fresh_complete_window() -> None:
+    class _Coordinator:
+        client_data = {"192.0.2.10": {"queries_last_minute": 0}}
+        last_update_success = True
+        update_interval = timedelta(seconds=60)
+        last_successful_read = dt_util.utcnow()
+        coverage = "complete"
+        query_time_window_ready = False
+
+        def async_add_listener(self, _listener):
+            return lambda: None
+
+    coordinator = _Coordinator()
+    entry = SimpleNamespace(unique_id="entry", entry_id="entry")
+    description = next(
+        description
+        for description in SENSOR_DESCRIPTIONS
+        if description.key == "queries_last_minute"
+    )
+    sensor = PiHoleClientSensor(coordinator, entry, "192.0.2.10", description)
+
+    assert sensor.native_value == 0
+    assert sensor.available is False
+    coordinator.query_time_window_ready = True
+    assert sensor.available is True
+    coordinator.coverage = "partial"
+    assert sensor.available is False
+    coordinator.coverage = "complete"
+    coordinator.last_update_success = False
+    assert sensor.available is False
+
+
+def test_source_time_window_needs_full_observation_span_and_future_time_resets_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sampled_at = 1_735_689_600.0
+    coordinator = _coordinator_with_client(
+        {
+            "client_name": "test-client",
+            "client_ip": "192.0.2.10",
+            "recent_activity": [],
+        }
+    )
+    coordinator.coverage = "complete"
+    coordinator.awaiting_generation = False
+    coordinator.retention_mode = "detail"
+    coordinator._query_time_window_started_at = None
+    coordinator.query_time_window_ready = False
+
+    coordinator._update_minute_query_counts(sampled_at)
+    assert coordinator.query_time_window_ready is False
+    coordinator._update_minute_query_counts(sampled_at + 59.999)
+    assert coordinator.query_time_window_ready is False
+    coordinator._update_minute_query_counts(sampled_at + 60)
+    assert coordinator.query_time_window_ready is False
+    coordinator._update_minute_query_counts(sampled_at + 60.001)
+    assert coordinator.query_time_window_ready is True
+
+    monkeypatch.setattr(
+        "custom_components.pihole_queries.coordinator.time.time",
+        lambda: sampled_at + 60,
+    )
+    coordinator._update_client(
+        {
+            "time": sampled_at + 61,
+            "status": "FORWARDED",
+            "client": {"ip": "192.0.2.10", "name": "test-client"},
+        },
+        1,
+        count_as_new=True,
+    )
+    assert coordinator.query_time_window_ready is False
+    assert coordinator._query_time_window_started_at is None
+    assert "query_time" not in coordinator.client_data["192.0.2.10"]["recent_activity"][-1]
+
+
+def test_source_time_window_is_inclusive_and_separate_from_ha_observation_window() -> None:
+    now = 1_735_689_600.75
+    coordinator = _coordinator_with_client(
+        {
+            "classifier_version": 1,
+            "recent_activity": [
+                {
+                    "observed_at": now,
+                    "query_time": now - 60,
+                    "classifier_version": 1,
+                    "classification": "allowed",
+                },
+                {
+                    "observed_at": now,
+                    "query_time": now - 60.001,
+                    "classifier_version": 1,
+                    "classification": "blocked",
+                },
+                {
+                    "observed_at": now,
+                    "query_time": now,
+                    "classifier_version": 1,
+                    "classification": "provisional",
+                },
+                {
+                    "observed_at": now,
+                    "query_time": now + 0.001,
+                    "classifier_version": 1,
+                    "classification": "allowed",
+                },
+            ],
+        }
+    )
+    coordinator.retention_mode = "detail"
+    coordinator.coverage = "complete"
+    coordinator.awaiting_generation = False
+    coordinator._query_time_window_started_at = now - 61
+    coordinator.query_time_window_ready = True
+
+    coordinator._update_minute_query_counts(now)
+    summary = coordinator.client_data["192.0.2.10"]
+
+    assert summary["queries_last_minute"] == 2
+    assert summary["queries_observed_last_minute"] == 4
+
+
+def test_aggregate_source_time_bucket_boundary_is_at_most_one_second_coarse() -> None:
+    now = 1_735_689_600.75
+    coordinator = _coordinator_with_client(
+        {
+            "classifier_version": 1,
+            "activity_buckets": [],
+            "query_time_buckets": [
+                {"second": int(now - 60), "count": 2},
+                {"second": int(now - 60) - 1, "count": 3},
+                {"second": int(now), "count": 1},
+            ],
+        }
+    )
+    coordinator.retention_mode = "aggregate"
+
+    coordinator._update_aggregate_minute_counts(now)
+
+    summary = coordinator.client_data["192.0.2.10"]
+    # The partial boundary second is retained because aggregate mode does not
+    # keep per-query timestamps; the preceding full second is discarded.
+    assert summary["queries_last_minute"] == 3
