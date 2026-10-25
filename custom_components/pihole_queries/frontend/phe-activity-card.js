@@ -28,7 +28,7 @@ const PHE_TEXT = {
     unusualNow: "Unusual activity", none: "None", rate: "queries/min", base: "usual", noBase: "not enough history for a baseline",
     unavailable: "Not available: 5/15/30 min blocks need a range of 10 days or less.", tooMany: "Too many blocks for this range.",
     biggerThanRange: "The block is larger than the range.", ingest: "Time is when Home Assistant received the data.",
-    times: "x usual", configHint: "Choose the devices in the card editor.",
+    times: "x usual", hide: "Hide from chart", show: "Show in chart", history: "Open history", configHint: "Choose the devices in the card editor.",
     editTitle: "Title", editDevices: "Devices", editBucket: "Block size", editSpan: "Range", editLog: "Logarithmic scale", editChartType: "Chart type", editLine: "Lines", editBar: "Bars", editOverview: "Warn about unusual activity", editOverviewHelp: "Lists any device (even if not in the chart) that has been unusually active in the last two hours, and shows a red counter. Nothing is shown while all devices are normal.", editDevicesHelp: "Up to 12. Leave empty to show the three busiest.", editInvalid: "That block size is not available for this range; the card will use a larger one.",
   },
   es: {
@@ -38,7 +38,7 @@ const PHE_TEXT = {
     unusualNow: "Actividad inusual", none: "Ninguna", rate: "consultas/min", base: "habitual", noBase: "sin historial suficiente para una referencia",
     unavailable: "No disponible: los bloques de 5/15/30 min requieren un rango de 10 días o menos.", tooMany: "Demasiados bloques para este rango.",
     biggerThanRange: "El bloque es mayor que el rango.", ingest: "La hora es la de recepción del dato en Home Assistant.",
-    times: "x lo habitual", configHint: "Elige los dispositivos en el editor de la tarjeta.",
+    times: "x lo habitual", hide: "Ocultar de la gráfica", show: "Mostrar en la gráfica", history: "Abrir historial", configHint: "Elige los dispositivos en el editor de la tarjeta.",
     editTitle: "Título", editDevices: "Dispositivos", editBucket: "Tamaño de bloque", editSpan: "Rango", editLog: "Escala logarítmica", editChartType: "Tipo de gráfica", editLine: "Líneas", editBar: "Barras", editOverview: "Avisar de actividad inusual", editOverviewHelp: "Lista cualquier dispositivo (aunque no esté en la gráfica) con actividad inusual en las últimas dos horas y muestra un contador rojo. No se muestra nada mientras todos estén normales.", editDevicesHelp: "Hasta 12. Vacío muestra los tres más activos.", editInvalid: "Ese bloque no está disponible para este rango; la tarjeta usará uno mayor.",
   },
 };
@@ -99,6 +99,7 @@ class PheActivityCard extends HTMLElement {
     this._status = "loading";
     this._overview = {};
     this._scale = null;
+    this._hidden = new Set();
     this._timer = null;
     this._seq = 0;
   }
@@ -226,7 +227,7 @@ class PheActivityCard extends HTMLElement {
     if (!this._data) return `<div class="note">${t.loading}</div>`;
     const d = this._data;
     const W = 800, H = 260, L = 46, R = 10, T = 10, B = 24;
-    const ids = this._state.selected.filter((id) => d.series[id]);
+    const ids = this._state.selected.filter((id) => d.series[id] && !this._hidden.has(id));
     let max = 1;
     for (const id of ids) for (const p of d.series[id].points) max = Math.max(max, p.rate);
     const log = this._state.log;
@@ -293,7 +294,11 @@ class PheActivityCard extends HTMLElement {
       const detail = !s ? "" : !s.has_baseline ? t.noBase : latest ? `${pheFmt(latest.rate)} ${t.rate} · ${t.base} ${pheFmt(latest.base)}` : "";
       return { id, color, unusual, score: s ? s.score : 0, label: this._label(id), detail };
     }).sort((a, b) => b.score - a.score);
-    return rows.map((r) => `<div class="row${r.unusual ? " alert" : ""}"><span class="dot" style="background:${r.color}"></span><span class="name">${this._esc(r.label)}</span><span class="detail">${this._esc(r.detail)}</span>${r.unusual ? `<span class="pill">${t.unusual}</span>` : ""}</div>`).join("");
+    return rows.map((r) => {
+      const off = this._hidden.has(r.id);
+      const dot = off ? `border:2px solid ${r.color};background:transparent` : `background:${r.color}`;
+      return `<div class="row${r.unusual ? " alert" : ""}${off ? " off" : ""}"><button class="dot" data-toggle="${r.id}" style="${dot}" aria-pressed="${!off}" title="${off ? t.show : t.hide}" aria-label="${off ? t.show : t.hide}: ${this._esc(r.label)}"></button><button class="name" data-info="${r.id}" title="${t.history}">${this._esc(r.label)}</button><span class="detail">${this._esc(r.detail)}</span>${r.unusual ? `<span class="pill">${t.unusual}</span>` : ""}</div>`;
+    }).join("");
   }
 
   _esc(v) { return String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -332,8 +337,11 @@ class PheActivityCard extends HTMLElement {
         .legend { margin-top:6px; }
         .row { display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; padding:4px 0; border-top:1px solid var(--divider-color,#eee); font-size:.88rem; }
         .row.alert .name { color:${PHE_ALERT}; font-weight:500; }
-        .dot { width:10px; height:10px; border-radius:50%; flex:none; }
-        .name { flex:1 1 120px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--primary-text-color); }
+        button.dot, button.name { font:inherit; padding:0; margin:0; border:none; background:none; cursor:pointer; }
+        .dot { width:12px; height:12px; border-radius:50%; flex:none; box-sizing:border-box; }
+        .name { flex:1 1 120px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--primary-text-color); text-align:left; }
+        .name:hover { text-decoration:underline; }
+        .row.off .name, .row.off .detail { opacity:.45; }
         .detail { color:var(--secondary-text-color); font-size:.78rem; text-align:right; }
         .pill { background:${PHE_ALERT}; color:#fff; border-radius:10px; padding:1px 8px; font-size:.72rem; }
         .foot { margin-top:6px; font-size:.72rem; color:var(--secondary-text-color); }
@@ -351,6 +359,16 @@ class PheActivityCard extends HTMLElement {
 
   _bind() {
     const r = this.shadowRoot;
+    r.querySelectorAll("[data-toggle]").forEach((b) => {
+      b.onclick = () => {
+        const id = b.dataset.toggle;
+        if (this._hidden.has(id)) this._hidden.delete(id); else this._hidden.add(id);
+        this._render();
+      };
+    });
+    r.querySelectorAll("[data-info]").forEach((b) => {
+      b.onclick = () => this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: b.dataset.info }, bubbles: true, composed: true }));
+    });
     const hit = r.querySelector(".hit");
     if (hit && this._data) {
       hit.onpointermove = (e) => this._showTip(e);
@@ -377,6 +395,7 @@ class PheActivityCard extends HTMLElement {
     const lines = [];
     const points = [];
     for (const id of this._state.selected) {
+      if (this._hidden.has(id)) continue;
       const s = d.series[id];
       const p = s && s.points.find((q) => q.t === slot);
       if (!p) continue;
