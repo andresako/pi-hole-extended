@@ -27,8 +27,8 @@ const PHE_TEXT = {
     noSelection: "Pick one or more devices.", loading: "Loading…", error: "Could not load data",
     unusualNow: "Unusual activity", none: "None", rate: "queries/min", base: "usual", noBase: "not enough history for a baseline",
     unavailable: "Not available: 5/15/30 min blocks need a range of 10 days or less.", tooMany: "Too many blocks for this range.",
-    biggerThanRange: "The block is larger than the range.", ingest: "Time is when Home Assistant received the data.",
-    times: "x usual", hide: "Hide from chart", show: "Show in chart", history: "Open history", configHint: "Choose the devices in the card editor.",
+    biggerThanRange: "The block is larger than the range.",
+    times: "x usual", hide: "Hide from chart", show: "Show in chart", history: "Open history",
     editTitle: "Title", editDevices: "Devices", editBucket: "Block size", editSpan: "Range", editLog: "Logarithmic scale", editChartType: "Chart type", editLine: "Lines", editBar: "Bars", editOverview: "Warn about unusual activity", editOverviewHelp: "Lists any device (even if not in the chart) that has been unusually active in the last two hours, and shows a red counter. Nothing is shown while all devices are normal.", editDevicesHelp: "Up to 12. Leave empty to show the three busiest.", editInvalid: "That block size is not available for this range; the card will use a larger one.",
   },
   es: {
@@ -37,8 +37,8 @@ const PHE_TEXT = {
     noSelection: "Elige uno o más dispositivos.", loading: "Cargando…", error: "No se pudieron cargar los datos",
     unusualNow: "Actividad inusual", none: "Ninguna", rate: "consultas/min", base: "habitual", noBase: "sin historial suficiente para una referencia",
     unavailable: "No disponible: los bloques de 5/15/30 min requieren un rango de 10 días o menos.", tooMany: "Demasiados bloques para este rango.",
-    biggerThanRange: "El bloque es mayor que el rango.", ingest: "La hora es la de recepción del dato en Home Assistant.",
-    times: "x lo habitual", hide: "Ocultar de la gráfica", show: "Mostrar en la gráfica", history: "Abrir historial", configHint: "Elige los dispositivos en el editor de la tarjeta.",
+    biggerThanRange: "El bloque es mayor que el rango.",
+    times: "x lo habitual", hide: "Ocultar de la gráfica", show: "Mostrar en la gráfica", history: "Abrir historial",
     editTitle: "Título", editDevices: "Dispositivos", editBucket: "Tamaño de bloque", editSpan: "Rango", editLog: "Escala logarítmica", editChartType: "Tipo de gráfica", editLine: "Líneas", editBar: "Barras", editOverview: "Avisar de actividad inusual", editOverviewHelp: "Lista cualquier dispositivo (aunque no esté en la gráfica) con actividad inusual en las últimas dos horas y muestra un contador rojo. No se muestra nada mientras todos estén normales.", editDevicesHelp: "Hasta 12. Vacío muestra los tres más activos.", editInvalid: "Ese bloque no está disponible para este rango; la tarjeta usará uno mayor.",
   },
 };
@@ -309,7 +309,6 @@ class PheActivityCard extends HTMLElement {
     const overview = unusual.length
       ? unusual.map((u) => `<span class="chip alert">${this._esc(u.device.label)} · ${u.multiple ? pheFmt(u.multiple) + "×" : pheFmt(u.rate) + " " + t.rate}</span>`).join("")
       : "";
-    const configured = Array.isArray(this._cfg.entities) && this._cfg.entities.length > 0;
     this.shadowRoot.innerHTML = `
       <style>
         :host { display:block; }
@@ -344,7 +343,6 @@ class PheActivityCard extends HTMLElement {
         .row.off .name, .row.off .detail { opacity:.45; }
         .detail { color:var(--secondary-text-color); font-size:.78rem; text-align:right; }
         .pill { background:${PHE_ALERT}; color:#fff; border-radius:10px; padding:1px 8px; font-size:.72rem; }
-        .foot { margin-top:6px; font-size:.72rem; color:var(--secondary-text-color); }
       </style>
       <ha-card>
         ${this._cfg.title || unusual.length ? `<div class="head"><h2>${this._esc(this._cfg.title || "")}</h2>${unusual.length ? `<span class="badge">${unusual.length} ${t.unusual}</span>` : ""}</div>` : ""}
@@ -352,7 +350,6 @@ class PheActivityCard extends HTMLElement {
         ${this._state.overview && unusual.length ? `<div class="overview"><b>${t.unusualNow}:</b> ${overview}</div>` : ""}
         ${this._chart()}
         <div class="legend">${this._legend()}</div>
-        <div class="foot">${t.ingest}${configured ? "" : " " + t.configHint}</div>
       </ha-card>`;
     this._bind();
   }
