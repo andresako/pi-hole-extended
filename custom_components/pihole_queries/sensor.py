@@ -25,7 +25,6 @@ from .const import (
     CONF_SOURCE_ID,
     DOMAIN,
     LEGACY_SOURCE_GENERATION,
-    RETENTION_AGGREGATE,
 )
 from .coordinator import PiHoleQueryCoordinator
 from .classification import CLASSIFIER_VERSION
@@ -315,9 +314,6 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
             "blocked_percentage": (100 * blocked / classified) if classified else None,
             "provisional_count": provisional,
         }
-        if getattr(self.coordinator, "retention_mode", None) != RETENTION_AGGREGATE:
-            attributes["last_query"] = data.get("last_query")
-            attributes["recent_queries"] = data.get("recent_queries", [])
         return attributes
 
 

@@ -55,16 +55,16 @@
   "options": {
     "step": {
       "init": {
-        "title": "Frecuencia y conservación de consultas",
-        "description": "Elige cómo conservar los detalles. El modo agregado elimina los detalles del Store de la integración, incluida su copia heredada, pero no borra el historial previo de Recorder o Activity.",
+        "title": "Frecuencia y Activity",
+        "description": "Elige si la integración envía eventos de consultas nuevas a Home Assistant Activity. La integración no conserva detalles de consultas.",
         "data": {
           "scan_interval": "Frecuencia de consulta (segundos)",
-          "retention_mode": "Conservación de consultas",
+          "retention_mode": "Política de Activity",
           "activity_mode": "Eventos de Activity"
         },
         "data_description": {
-          "retention_mode": "Detalle conserva filas recientes de consultas. Agregado mantiene solo identidad del cliente y totales numéricos.",
-          "activity_mode": "Elige todos los eventos, solo bloqueados o ninguno. La conservación agregada siempre desactiva las entradas de Activity."
+          "retention_mode": "Activity habilitada envía entradas según su opción de eventos. Solo totales suprime las nuevas entradas de Activity.",
+          "activity_mode": "Elige todos los eventos, solo bloqueados o ninguno. Solo totales siempre desactiva las entradas de Activity."
         }
       }
     }
@@ -120,8 +120,8 @@
   "selector": {
     "retention_mode": {
       "options": {
-        "detail": "Historial detallado de consultas",
-        "aggregate": "Solo totales agregados"
+        "detail": "Activity habilitada (predeterminado)",
+        "aggregate": "Solo totales (sin Activity)"
       }
     },
     "activity_mode": {

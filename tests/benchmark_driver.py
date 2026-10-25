@@ -92,33 +92,24 @@ def nearest_rank(values: list[float], percentile: float) -> float:
 
 
 def store_payload_metrics(payload: Any) -> dict[str, Any]:
-    """Describe query rows actually serialized in this Home Assistant Store payload."""
+    """Describe bounded numeric summaries in the serialized Store payload."""
     if not isinstance(payload, dict):
-        return {"cursor": None, "client_count": 0, "recent_query_rows": 0,
-                "unique_recent_query_ids": 0, "recent_activity_rows": 0,
-                "aggregate_pending_rows": 0}
+        return {"cursor": None, "client_count": 0, "activity_bucket_rows": 0,
+                "query_time_bucket_rows": 0, "aggregate_pending_rows": 0}
     clients = payload.get("clients", {})
     if not isinstance(clients, dict):
         clients = {}
-    recent_queries: list[Any] = []
-    for summary in clients.values():
-        if isinstance(summary, dict) and isinstance(summary.get("recent_queries", []), list):
-            recent_queries.extend(summary.get("recent_queries", []))
-    query_ids = {
-        row.get("id") for row in recent_queries
-        if isinstance(row, dict) and isinstance(row.get("id"), int)
-    }
-    recent_activity_rows = sum(
-        len(summary.get("recent_activity", []))
-        for summary in clients.values()
-        if isinstance(summary, dict)
-        and isinstance(summary.get("recent_activity", []), list)
-    )
     activity_bucket_rows = sum(
         len(summary.get("activity_buckets", []))
         for summary in clients.values()
         if isinstance(summary, dict)
         and isinstance(summary.get("activity_buckets", []), list)
+    )
+    query_time_bucket_rows = sum(
+        len(summary.get("query_time_buckets", []))
+        for summary in clients.values()
+        if isinstance(summary, dict)
+        and isinstance(summary.get("query_time_buckets", []), list)
     )
     stored_query_count_total = sum(
         int(summary.get("query_count", 0))
@@ -145,14 +136,12 @@ def store_payload_metrics(payload: Any) -> dict[str, Any]:
     return {
         "cursor": payload.get("cursor"),
         "client_count": len(clients),
-        "recent_query_rows": len(recent_queries),
-        "unique_recent_query_ids": len(query_ids),
-        "recent_activity_rows": recent_activity_rows,
         "activity_bucket_rows": activity_bucket_rows,
+        "query_time_bucket_rows": query_time_bucket_rows,
         "stored_query_count_total": stored_query_count_total,
         "aggregate_pending_rows": len(aggregate_pending)
         if isinstance(aggregate_pending, (dict, list)) else 0,
-        "aggregate_forbidden_fields_found": sorted(found_forbidden),
+        "query_detail_fields_found": sorted(found_forbidden),
     }
 
 
@@ -226,7 +215,6 @@ def make_store(hass: HomeAssistant, entry: Any, mode: str) -> Any:
             legacy,
             SOURCE_ID,
             LEGACY_SOURCE_GENERATION,
-            aggregate_mode=mode == "aggregate",
         )
         initial = {
             "cursor": 0,
@@ -519,9 +507,6 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         "store_save_completed": store_saves["completed"],
         "store_save_errors": store_saves["errors"],
         "store_final_payload_metrics": store_payload_metrics(store_payload),
-        "store_persisted_recent_query_rows": store_payload_metrics(store_payload)["recent_query_rows"],
-        "store_persisted_unique_recent_query_ids": store_payload_metrics(store_payload)["unique_recent_query_ids"],
-        "store_persisted_recent_activity_rows": store_payload_metrics(store_payload)["recent_activity_rows"],
         "store_persisted_cursor": store_payload_metrics(store_payload)["cursor"],
         "logbook_calls_attempted": logbook_calls.attempted,
         "logbook_calls_completed": logbook_calls.completed,

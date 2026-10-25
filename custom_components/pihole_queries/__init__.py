@@ -20,7 +20,6 @@ from homeassistant.util import slugify
 
 from .api import PiHoleClient
 from .const import (
-    CONF_RETENTION_MODE,
     CONF_SOURCE_GENERATION,
     CONF_SOURCE_ID,
     DOMAIN,
@@ -29,7 +28,6 @@ from .const import (
     PLATFORMS,
     STORAGE_KEY_PREFIX,
     STORAGE_VERSION,
-    RETENTION_AGGREGATE,
 )
 from .coordinator import PiHoleQueryCoordinator
 
@@ -82,18 +80,15 @@ class _IdentityStore:
         legacy: Store,
         source_id: str,
         generation: str,
-        *,
-        aggregate_mode: bool = False,
     ) -> None:
         self.current = current
         self.legacy = legacy
         self.source_id = source_id
         self.generation = generation
-        self.aggregate_mode = aggregate_mode
 
     @staticmethod
-    def _remove_query_details(data: Any) -> bool:
-        """Keep only known aggregate Store fields and remove per-query details."""
+    def _sanitize_store_data(data: Any) -> bool:
+        """Keep the cursor, client totals, and bounded numeric summaries."""
         if not isinstance(data, dict):
             return False
         root_fields = {
@@ -377,14 +372,16 @@ class _IdentityStore:
         return changed
 
     async def _sanitize_legacy_backup(self) -> None:
-        """Remove details from the v1 backup without deleting its aggregates."""
+        """Remove obsolete query rows from the v1 backup."""
         legacy = await self.legacy.async_load()
         if legacy is not None and not isinstance(legacy, dict):
-            # A malformed root cannot be inspected safely. Replace it with an
-            # empty Store so aggregate mode cannot leave opaque payloads behind.
-            await self.legacy.async_save({})
+            # The root cannot be inspected safely. Replace it with a small
+            # diagnostic marker so opaque query payloads are not retained.
+            await self.legacy.async_save(
+                {"coverage": "unknown", "coverage_reason": "invalid_legacy_store"}
+            )
             return
-        if self._remove_query_details(legacy):
+        if self._sanitize_store_data(legacy):
             await self.legacy.async_save(legacy)
 
     @staticmethod
@@ -488,6 +485,8 @@ class _IdentityStore:
                     malformed = True
                     continue
                 summary = dict(raw_summary)
+                for field in ("last_query", "last_query_id", "recent_queries", "recent_activity"):
+                    summary.pop(field, None)
                 count = summary.get("query_count")
                 if (
                     "query_count" not in summary
@@ -519,46 +518,6 @@ class _IdentityStore:
                             summary[field] = clean_counts
                         else:
                             summary.pop(field)
-                if "recent_activity" in summary:
-                    activity = summary["recent_activity"]
-                    if not isinstance(activity, list) or any(
-                        not isinstance(item, dict)
-                        or not finite_number(item.get("observed_at"))
-                        or (
-                            "query_time" in item
-                            and not finite_number(item.get("query_time"))
-                        )
-                        or isinstance(item.get("classifier_version"), bool)
-                        or not isinstance(item.get("classifier_version"), int)
-                        or item.get("classifier_version") < 0
-                        or not isinstance(item.get("classification"), str)
-                        or item.get("classification") not in {"allowed", "blocked", "provisional"}
-                        for item in activity
-                    ):
-                        summary.pop("recent_activity")
-                        malformed = True
-                if "recent_queries" in summary:
-                    recent = summary["recent_queries"]
-                    if not isinstance(recent, list):
-                        summary.pop("recent_queries")
-                        malformed = True
-                    else:
-                        clean_recent = [
-                            item
-                            for item in recent
-                            if isinstance(item, dict) and valid_id(item.get("id"))
-                        ]
-                        if len(clean_recent) != len(recent):
-                            summary["recent_queries"] = clean_recent
-                            malformed = True
-                if "last_query_id" in summary and not valid_id(summary["last_query_id"]):
-                    summary.pop("last_query_id")
-                    malformed = True
-                if "last_query" in summary and summary["last_query"] is not None and not isinstance(
-                    summary["last_query"], dict
-                ):
-                    summary.pop("last_query")
-                    malformed = True
                 for field in ("client_name", "client_ip"):
                     if field in summary and not isinstance(summary[field], str):
                         summary.pop(field)
@@ -605,28 +564,25 @@ class _IdentityStore:
             prepared = self._prepare_legacy_data(
                 current["data"], invalid_reason="invalid_store_state"
             )
-            if self.aggregate_mode:
-                changed = prepared != current["data"]
-                changed = self._remove_query_details(prepared) or changed
-                if changed:
-                    await self.current.async_save(
-                        {
-                            "schema_version": STORAGE_VERSION,
-                            "source_id": self.source_id,
-                            "source_generation": self.generation,
-                            "data": prepared,
-                        }
-                    )
-            if self.aggregate_mode:
-                await self._sanitize_legacy_backup()
+            changed = prepared != current["data"]
+            changed = self._sanitize_store_data(prepared) or changed
+            if changed:
+                await self.current.async_save(
+                    {
+                        "schema_version": STORAGE_VERSION,
+                        "source_id": self.source_id,
+                        "source_generation": self.generation,
+                        "data": prepared,
+                    }
+                )
+            await self._sanitize_legacy_backup()
             return prepared
 
         if self.generation != LEGACY_SOURCE_GENERATION:
             # The v1 key is scoped only by entry_id and therefore belongs to
             # the first generation. Importing it here would carry the retired
             # Pi-hole cursor and counters into a replacement server.
-            if self.aggregate_mode:
-                await self._sanitize_legacy_backup()
+            await self._sanitize_legacy_backup()
             return None
 
         legacy = await self.legacy.async_load()
@@ -637,13 +593,11 @@ class _IdentityStore:
             # The coordinator marks coverage unknown and writes a valid v2 map
             # only after a fresh baseline. In aggregate mode the unusable v1
             # root must also be scrubbed so opaque data cannot retain queries.
-            if self.aggregate_mode:
-                await self._sanitize_legacy_backup()
+            await self._sanitize_legacy_backup()
             return prepared
-        if self.aggregate_mode:
-            if self._remove_query_details(legacy):
-                await self.legacy.async_save(legacy)
-            self._remove_query_details(prepared)
+        if self._sanitize_store_data(legacy):
+            await self.legacy.async_save(legacy)
+        self._sanitize_store_data(prepared)
         await self.current.async_save(
             {
                 "schema_version": STORAGE_VERSION,
@@ -965,7 +919,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ),
         source_id,
         generation,
-        aggregate_mode=entry.options.get(CONF_RETENTION_MODE) == RETENTION_AGGREGATE,
     )
     coordinator = PiHoleQueryCoordinator(hass, entry, client, store)
     try:

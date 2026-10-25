@@ -26,7 +26,6 @@ from .const import (
     ACTIVITY_ALL,
     ACTIVITY_BLOCKED,
     ACTIVITY_NONE,
-    CLIENT_QUERY_HISTORY,
     CONF_ACTIVITY_MODE,
     CONF_RETENTION_MODE,
     CONF_SCAN_INTERVAL,
@@ -234,46 +233,6 @@ def _client_key(
     return key, client_name or client_ip or "Cliente desconocido", client_ip or "Desconocida"
 
 
-def _query_summary(query: dict[str, Any], query_id: int) -> dict[str, Any]:
-    """Keep the useful fields for a client's entity attributes."""
-    event_time = _origin_time(query)
-    classification = _classification(query.get("status"))
-
-    reply = query.get("reply") or {}
-    if not isinstance(reply, dict):
-        reply = {}
-    ede = query.get("ede") or {}
-    if not isinstance(ede, dict):
-        ede = {}
-
-    return {
-        "id": query_id,
-        "time": (
-            dt_util.as_local(event_time).isoformat(sep=" ", timespec="seconds")
-            if event_time is not None
-            else None
-        ),
-        "domain": str(query.get("domain") or "Desconocido"),
-        "result": {
-            "allowed": "permitida",
-            "blocked": "bloqueada",
-            "provisional": "provisional",
-        }[classification],
-        "classification": classification,
-        "status": query.get("status") if "status" in query else None,
-        "status_present": "status" in query,
-        "classifier_version": CLASSIFIER_VERSION,
-        "type": query.get("type"),
-        "reply": reply.get("type"),
-        "reply_time": reply.get("time"),
-        "cname": query.get("cname"),
-        "list_id": query.get("list_id"),
-        "dnssec": query.get("dnssec"),
-        "upstream": query.get("upstream"),
-        "ede": ede.get("text"),
-    }
-
-
 class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     """Poll query IDs and maintain bounded, persistent summaries for each client."""
 
@@ -427,7 +386,13 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         except (KeyError, TypeError, ValueError):
             cursor_valid = False
             self.coverage = "unknown"
-            self.coverage_reason = "invalid_legacy_cursor"
+            saved_reason = saved.get("coverage_reason")
+            self.coverage_reason = (
+                saved_reason
+                if isinstance(saved_reason, str)
+                and saved_reason in {"invalid_legacy_store", "invalid_store_state"}
+                else "invalid_legacy_cursor"
+            )
             _LOGGER.warning("Se ignoró un cursor local de Pi-hole no válido")
         coverage = saved.get("coverage")
         if "coverage" in saved and (
@@ -527,6 +492,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 self._client_store_invalid = True
                 continue
             summary = value
+            # Older releases stored individual query details and observation
+            # rows. Discard them as soon as the Store is loaded.
+            for field in ("last_query", "last_query_id", "recent_queries", "recent_activity"):
+                summary.pop(field, None)
             raw_count = summary.get("query_count")
             if (
                 "query_count" not in summary
@@ -582,39 +551,6 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                         clean_rates[epoch] = epoch_rates
                     if len(clean_rates) != len(classifier_rates):
                         summary["classifier_rates"] = clean_rates
-            if "recent_activity" in summary:
-                recent_activity = summary["recent_activity"]
-                if not isinstance(recent_activity, list):
-                    self._client_store_invalid = True
-                else:
-                    for activity in recent_activity:
-                        if not isinstance(activity, dict):
-                            self._client_store_invalid = True
-                            break
-                        observed_at = activity.get("observed_at")
-                        query_time = activity.get("query_time")
-                        version = activity.get("classifier_version")
-                        classification = activity.get("classification")
-                        if (
-                            isinstance(observed_at, bool)
-                            or not isinstance(observed_at, (int, float))
-                            or not math.isfinite(observed_at)
-                            or (
-                                "query_time" in activity
-                                and (
-                                    isinstance(query_time, bool)
-                                    or not isinstance(query_time, (int, float))
-                                    or not math.isfinite(query_time)
-                                )
-                            )
-                            or isinstance(version, bool)
-                            or not isinstance(version, int)
-                            or version < 0
-                            or not isinstance(classification, str)
-                            or classification not in {"allowed", "blocked", "provisional"}
-                        ):
-                            self._client_store_invalid = True
-                            break
             if "query_time_buckets" in summary and not _valid_query_time_buckets(
                 summary["query_time_buckets"]
             ):
@@ -654,28 +590,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                             self._client_store_invalid = True
                             break
                         seen_buckets.add(bucket_key)
-            if "last_query_id" in summary and _query_id(
-                {"id": summary.get("last_query_id")}
-            ) is None:
-                self._client_store_invalid = True
-            recent = summary.get("recent_queries", [])
-            if not isinstance(recent, list):
-                summary["recent_queries"] = []
-                self.coverage = "unknown"
-                self.coverage_reason = "invalid_client_summaries"
-            else:
-                valid_recent = [
-                    item
-                    for item in recent
-                    if isinstance(item, dict)
-                    and _query_id({"id": item.get("id")}) is not None
-                ]
-                if len(valid_recent) != len(recent):
-                    summary["recent_queries"] = valid_recent
-                    self.coverage = "unknown"
-                    self.coverage_reason = "invalid_client_summaries"
-            if getattr(self, "retention_mode", RETENTION_DETAIL) != RETENTION_AGGREGATE:
-                summary.pop("activity_buckets", None)
+            summary.setdefault("activity_buckets", [])
+            summary.setdefault("query_time_buckets", [])
             self.client_data[str(key)] = summary
         if getattr(self, "_client_store_invalid", False) or getattr(
             self, "_store_state_invalid", False
@@ -705,21 +621,15 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         return await self._async_update_data_snapshot()
 
     def _data_snapshot(self) -> dict[str, dict[str, Any]]:
-        """Copy observer data without duplicating the private ingestion journal."""
+        """Copy the bounded numeric client summaries for Home Assistant."""
         snapshot: dict[str, dict[str, Any]] = {}
+        obsolete_fields = {"last_query", "last_query_id", "recent_queries", "recent_activity"}
         for key, summary in self.client_data.items():
             if not isinstance(summary, dict):
                 continue
-            # Exact per-query observation timestamps remain in client_data and
-            # Store for rolling-window calculations. They are not exposed by
-            # any entity; copying their potentially large journal into HA's
-            # coordinator snapshot would retain a second copy of every row.
-            visible_summary = {
-                field: value
-                for field, value in summary.items()
-                if field != "recent_activity"
-            }
-            snapshot[key] = deepcopy(visible_summary)
+            snapshot[key] = deepcopy(
+                {field: value for field, value in summary.items() if field not in obsolete_fields}
+            )
         return snapshot
 
     async def _async_get_queries(self, *, length: int, cursor: int | None = None) -> dict[str, Any]:
@@ -1454,7 +1364,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self._update_client(row, query_id, count_as_new=False)
 
     def _update_minute_query_counts(self, sampled_at: float) -> None:
-        """Update source-time and HA-observation windows independently."""
+        """Update rolling counters from bounded numeric buckets."""
         if getattr(self, "coverage", "unknown") != "complete" or getattr(
             self, "awaiting_generation", False
         ):
@@ -1466,68 +1376,9 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self.query_time_window_ready = (
                 sampled_at - self._query_time_window_started_at > 60
             )
-        if getattr(self, "retention_mode", RETENTION_DETAIL) == RETENTION_AGGREGATE:
-            self._update_aggregate_minute_counts(sampled_at)
-            return
-        window_start = sampled_at - 60
-        for summary in self.client_data.values():
-            recent = summary.get("recent_activity", [])
-            if not isinstance(recent, list):
-                recent = []
-            activity: list[dict[str, Any]] = []
-            source_count = 0
-            try:
-                version = int(summary.get("classifier_version", CLASSIFIER_VERSION))
-            except (TypeError, ValueError):
-                version = CLASSIFIER_VERSION
-            rates = empty_classifier_counts()
-            for item in recent:
-                if not isinstance(item, dict):
-                    continue
-                try:
-                    observed_at = float(item["observed_at"])
-                    item_version = int(item["classifier_version"])
-                    classification = item["classification"]
-                except (KeyError, TypeError, ValueError):
-                    continue
-                if not math.isfinite(observed_at) or not window_start <= observed_at <= sampled_at:
-                    continue
-                if classification not in rates:
-                    continue
-                query_time = item.get("query_time")
-                if (
-                    isinstance(query_time, (int, float))
-                    and not isinstance(query_time, bool)
-                    and math.isfinite(query_time)
-                    and window_start <= query_time <= sampled_at
-                ):
-                    source_count += 1
-                activity.append(
-                    {
-                        "observed_at": observed_at,
-                        **(
-                            {"query_time": query_time}
-                            if isinstance(query_time, (int, float))
-                            and not isinstance(query_time, bool)
-                            and math.isfinite(query_time)
-                            else {}
-                        ),
-                        "classifier_version": item_version,
-                        "classification": classification,
-                    }
-                )
-                if item_version == version:
-                    rates[classification] += 1
-            summary["recent_activity"] = activity
-            summary["queries_observed_last_minute"] = len(activity)
-            summary["queries_last_minute"] = source_count
-            saved_rates = summary.get("classifier_rates")
-            if not isinstance(saved_rates, dict):
-                saved_rates = {}
-            saved_rates[str(version)] = rates
-            summary["classifier_rates"] = saved_rates
+        self._update_bucket_minute_counts(sampled_at)
 
-    def _update_aggregate_minute_counts(self, sampled_at: float) -> None:
+    def _update_bucket_minute_counts(self, sampled_at: float) -> None:
         """Roll up bounded numeric second buckets without query-level rows."""
         window_start = int(sampled_at - 60)
         window_end = int(sampled_at)
@@ -1628,15 +1479,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 "queries_last_minute": 0,
                 "allowed_last_minute": 0,
                 "blocked_last_minute": 0,
-                **(
-                    {
-                        "last_query_id": 0,
-                        "recent_queries": [],
-                        "recent_activity": [],
-                    }
-                    if getattr(self, "retention_mode", RETENTION_DETAIL) != RETENTION_AGGREGATE
-                    else {"activity_buckets": []}
-                ),
+                "activity_buckets": [],
+                "query_time_buckets": [],
                 "classifier_version": CLASSIFIER_VERSION,
                 "classifier_counts": {str(CLASSIFIER_VERSION): empty_classifier_counts()},
                 "classifier_rates": {str(CLASSIFIER_VERSION): empty_classifier_counts()},
@@ -1660,56 +1504,6 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             except (TypeError, ValueError):
                 active_counts[classification] = 0
 
-        if getattr(self, "retention_mode", RETENTION_DETAIL) != RETENTION_AGGREGATE:
-            recent = summary.setdefault("recent_queries", [])
-            if not isinstance(recent, list):
-                recent = []
-            recent = [item for item in recent if isinstance(item, dict)]
-            summary["recent_queries"] = recent
-
-            # New rows arrive in increasing, unique ID order. Preserve the
-            # legacy sort for imported/malformed histories, while avoiding a
-            # full sort for the normal append-only Store history.
-            ordered_integer_history = all(
-                type(item.get("id")) is int and item["id"] >= 0
-                for item in recent
-            ) and all(
-                recent[index - 1]["id"] <= recent[index]["id"]
-                for index in range(1, len(recent))
-            )
-            append_history = ordered_integer_history and (
-                not recent or recent[-1]["id"] < query_id
-            )
-            history_is_full_and_newer = (
-                ordered_integer_history
-                and len(recent) >= CLIENT_QUERY_HISTORY
-                and recent[0]["id"] > query_id
-            )
-            already_present = (
-                False
-                if append_history or history_is_full_and_newer
-                else any(item.get("id") == query_id for item in recent)
-            )
-            query_details: dict[str, Any] | None = None
-            if not already_present and not history_is_full_and_newer:
-                query_details = _query_summary(query, query_id)
-                recent.append(query_details)
-            if not append_history and not history_is_full_and_newer:
-                recent.sort(key=lambda item: _query_id({"id": item.get("id")}) or 0)
-            del recent[:-CLIENT_QUERY_HISTORY]
-
-            try:
-                last_query_id = int(summary.get("last_query_id", 0))
-            except (TypeError, ValueError):
-                last_query_id = 0
-            if query_id > last_query_id or "last_query" not in summary:
-                summary["last_query_id"] = query_id
-                if query_details is None:
-                    query_details = _query_summary(query, query_id)
-                # Keep the outer dictionaries independent, as they were when
-                # built by separate calls, while reusing the expensive fields.
-                summary["last_query"] = query_details.copy()
-
         if count_as_new:
             summary["query_count"] = int(summary.get("query_count", 0)) + 1
             classification = _classification(query.get("status"))
@@ -1722,45 +1516,28 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 # become visible again.
                 self._query_time_window_started_at = None
                 self.query_time_window_ready = False
-            elif getattr(self, "retention_mode", RETENTION_DETAIL) == RETENTION_AGGREGATE:
-                _add_query_time_bucket(summary, query_time, observed_at)
-            if getattr(self, "retention_mode", RETENTION_DETAIL) == RETENTION_AGGREGATE:
-                second = int(observed_at)
-                buckets = summary.setdefault("activity_buckets", [])
-                if not isinstance(buckets, list):
-                    buckets = []
-                bucket = next(
-                    (
-                        item
-                        for item in buckets
-                        if isinstance(item, dict)
-                        and item.get("second") == second
-                        and item.get("classifier_version") == CLASSIFIER_VERSION
-                    ),
-                    None,
-                )
-                if bucket is None:
-                    bucket = {
-                        "second": second,
-                        "classifier_version": CLASSIFIER_VERSION,
-                        **empty_classifier_counts(),
-                    }
-                    buckets.append(bucket)
-                bucket[classification] += 1
-                summary["activity_buckets"] = buckets[-61:]
             else:
-                activity = summary.setdefault("recent_activity", [])
-                if not isinstance(activity, list):
-                    activity = []
-                activity.append(
-                    {
-                        "observed_at": observed_at,
-                        **({"query_time": query_time} if query_time is not None else {}),
-                        "classifier_version": CLASSIFIER_VERSION,
-                        "classification": classification,
-                    }
-                )
-                summary["recent_activity"] = activity
+                _add_query_time_bucket(summary, query_time, observed_at)
+            second = int(observed_at)
+            buckets = summary.setdefault("activity_buckets", [])
+            bucket = next(
+                (
+                    item
+                    for item in buckets
+                    if item.get("second") == second
+                    and item.get("classifier_version") == CLASSIFIER_VERSION
+                ),
+                None,
+            )
+            if bucket is None:
+                bucket = {
+                    "second": second,
+                    "classifier_version": CLASSIFIER_VERSION,
+                    **empty_classifier_counts(),
+                }
+                buckets.append(bucket)
+            bucket[classification] += 1
+            summary["activity_buckets"] = buckets[-61:]
 
     async def _log_query(self, row: dict[str, Any]) -> None:
         """Write one new query to Home Assistant Activity."""

@@ -212,7 +212,6 @@ async def test_replacement_aggregate_scrubs_legacy_backup_without_importing_it()
         old,
         "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        aggregate_mode=True,
     )
 
     assert await store.async_load() is None
@@ -326,7 +325,8 @@ async def test_v2_malformed_client_fields_are_excluded_and_coverage_is_unknown()
     assert prepared["coverage_reason"] == "invalid_store_state"
     assert coordinator.coverage == "unknown"
     assert coordinator.coverage_reason == "invalid_store_state"
-    assert current.value["data"] == data
+    assert current.value["data"] == prepared
+    assert "allowed_count" not in current.value["data"]["clients"]["192.0.2.10"]
 
 
 @pytest.mark.asyncio
@@ -370,7 +370,9 @@ async def test_legacy_store_import_tolerates_malformed_fields_and_keeps_valid_to
     assert "last_query" not in summary
     assert imported["coverage"] == "unknown"
     assert imported["coverage_reason"] == "invalid_legacy_store"
-    assert old.value == legacy_data
+    old_summary = old.value["clients"]["192.0.2.10"]
+    assert "classifier_counts" not in old_summary
+    assert not {"last_query", "last_query_id", "recent_queries", "recent_activity"} & old_summary.keys()
     assert current.value["data"] == imported
     coordinator = _coordinator_for_store(store)
     await coordinator.async_load_cursor()
@@ -423,8 +425,14 @@ async def test_non_mapping_legacy_store_roots_fail_closed_as_invalid_store(root_
     assert imported == root_value
     assert coordinator.coverage == "unknown"
     assert coordinator.coverage_reason == "invalid_legacy_store"
-    assert old.value == root_value
-    assert current.value is None
+    assert old.value == {
+        "coverage": "unknown",
+        "coverage_reason": "invalid_legacy_store",
+    }
+    assert current.value["data"] == {
+        "coverage": "unknown",
+        "coverage_reason": "invalid_legacy_store",
+    }
 
 
 @pytest.mark.asyncio

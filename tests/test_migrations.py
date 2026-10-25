@@ -107,10 +107,9 @@ async def test_published_v7_1_entry_and_store_v1_migrate_with_real_ha_store(
     assert client["query_count"] == 42
     assert client["allowed_count"] == 31
     assert client["blocked_count"] == 11
-    assert client["recent_queries"] == [
-        {"id": 9001, "domain": "dns.example.test"}
-    ]
-    assert await old_store.async_load() == legacy_payload
+    assert not {"last_query", "last_query_id", "recent_queries", "recent_activity"} & client.keys()
+    legacy_after_import = await old_store.async_load()
+    assert "dns.example.test" not in repr(legacy_after_import)
 
     envelope = await current_store.async_load()
     assert envelope == {
@@ -138,5 +137,6 @@ async def test_published_v7_1_entry_and_store_v1_migrate_with_real_ha_store(
         entry.data[CONF_SOURCE_GENERATION],
     )
     assert await restarted.async_load() == imported
-    assert await old_store.async_load() == legacy_payload
+    old_after_restart = await old_store.async_load()
+    assert "dns.example.test" not in repr(old_after_restart)
     await hass.async_stop()

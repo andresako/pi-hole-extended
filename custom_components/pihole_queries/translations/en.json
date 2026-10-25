@@ -55,16 +55,16 @@
   "options": {
     "step": {
       "init": {
-        "title": "Polling and query retention",
-        "description": "Choose how query details are retained. Aggregate mode removes query details from the integration Store, including its legacy backup, but does not erase prior Recorder or Activity history.",
+        "title": "Polling and Activity",
+        "description": "Choose whether the integration sends new query events to Home Assistant Activity. Query details are not retained by the integration.",
         "data": {
           "scan_interval": "Polling interval (seconds)",
-          "retention_mode": "Query retention",
+          "retention_mode": "Activity policy",
           "activity_mode": "Activity events"
         },
         "data_description": {
-          "retention_mode": "Detail preserves recent query rows. Aggregate keeps client identity and numeric totals only.",
-          "activity_mode": "Choose all events, blocked events only, or none. Aggregate retention always disables Activity entries."
+          "retention_mode": "Activity enabled sends entries according to the Activity setting. Totals only suppresses new Activity entries.",
+          "activity_mode": "Choose all events, blocked events only, or none. Totals only always disables Activity entries."
         }
       }
     }
@@ -120,8 +120,8 @@
   "selector": {
     "retention_mode": {
       "options": {
-        "detail": "Detailed query history",
-        "aggregate": "Aggregate totals only"
+        "detail": "Activity enabled (default)",
+        "aggregate": "Totals only (no Activity)"
       }
     },
     "activity_mode": {

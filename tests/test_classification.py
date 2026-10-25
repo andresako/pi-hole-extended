@@ -131,9 +131,6 @@ def _coordinator(rows: list[dict[str, Any]], *, stored: dict[str, Any] | None = 
                 "query_count": 5,
                 "allowed_count": 4,
                 "blocked_count": 1,
-                "last_query_id": 100,
-                "recent_queries": [],
-                "recent_activity": [],
             }
         },
     )
@@ -165,9 +162,8 @@ async def test_unknown_first_observation_is_not_reclassified_or_recaptured(froze
         "blocked": 0,
         "provisional": 1,
     }
-    assert summary["recent_queries"][-1]["status"] == "UNKNOWN"
-    assert summary["recent_queries"][-1]["result"] == "provisional"
-    assert summary["recent_queries"][-1]["classification"] == "provisional"
+    assert "last_query" not in summary
+    assert "recent_queries" not in summary
     assert len(coordinator.hass.services.calls) == 1
 
     coordinator.client.rows = [_row(101, "GRAVITY")]
@@ -175,7 +171,7 @@ async def test_unknown_first_observation_is_not_reclassified_or_recaptured(froze
 
     assert second["192.0.2.10"]["query_count"] == 6
     assert second["192.0.2.10"]["classifier_counts"]["1"]["provisional"] == 1
-    assert second["192.0.2.10"]["recent_queries"][-1]["status"] == "UNKNOWN"
+    assert "recent_queries" not in second["192.0.2.10"]
     assert len(coordinator.hass.services.calls) == 1
 
 
@@ -200,9 +196,8 @@ async def test_overlapping_api_pages_count_and_log_each_id_once(frozen_time) -> 
         "blocked": 1,
         "provisional": 1,
     }
-    assert [item["id"] for item in summary["recent_queries"]] == [101, 102]
-    assert summary["recent_queries"][0]["status"] == "UNKNOWN"
-    assert len(coordinator.client_data["192.0.2.10"]["recent_activity"]) == 2
+    assert "recent_queries" not in summary
+    assert len(summary["activity_buckets"]) == 1
     assert summary["queries_observed_last_minute"] == 2
     assert len(coordinator.hass.services.calls) == 2
 
@@ -216,19 +211,13 @@ async def test_missing_and_null_status_are_provisional_in_ingestion_and_store(fr
 
     data = await coordinator._async_update_data()
     summary = data["192.0.2.10"]
-    recent = {item["id"]: item for item in summary["recent_queries"]}
-
     assert summary["query_count"] == 7
     assert summary["classifier_counts"]["1"] == {
         "allowed": 0,
         "blocked": 0,
         "provisional": 2,
     }
-    assert recent[101]["status"] is None
-    assert recent[101]["status_present"] is False
-    assert recent[101]["classification"] == "provisional"
-    assert recent[102]["status"] is None
-    assert recent[102]["status_present"] is True
+    assert "recent_queries" not in summary
     assert "Estado: ausente" in coordinator.hass.services.calls[0]["message"]
     assert "Estado: None" in coordinator.hass.services.calls[1]["message"]
     assert coordinator.store.value["clients"]["192.0.2.10"]["classifier_counts"]["1"]["provisional"] == 2
@@ -257,9 +246,6 @@ async def test_classifier_change_starts_a_new_epoch_without_reclassifying_old_id
                 "blocked_count": 2,
                 "classifier_version": 1,
                 "classifier_counts": {"1": {"allowed": 3, "blocked": 2, "provisional": 1}},
-                "last_query_id": 100,
-                "recent_queries": [],
-                "recent_activity": [],
             }
         },
     }

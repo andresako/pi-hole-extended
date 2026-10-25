@@ -1,6 +1,6 @@
 # Pi-hole Extended
 
-**Consulta en Home Assistant la actividad DNS que Pi-hole v6 detecta, organizada por cliente.** Pi-hole Extended ofrece contadores por cliente, detalles recientes opcionales y diagnósticos de conexión y cobertura de consultas.
+**Consulta en Home Assistant la actividad DNS que Pi-hole v6 detecta, organizada por cliente.** Pi-hole Extended ofrece contadores por cliente y diagnósticos de conexión y cobertura de consultas.
 
 > Integración personalizada creada por la comunidad. No está afiliada ni cuenta con el respaldo de Home Assistant o Pi-hole.
 
@@ -11,7 +11,7 @@
 - Un dispositivo de Home Assistant por cada cliente que aparece en el historial de consultas de Pi-hole.
 - Cinco sensores por cliente: consultas observadas acumuladas, consultas en la ventana del último minuto de Pi-hole, consultas permitidas, bloqueadas y provisionales.
 - Cuatro diagnósticos de la integración: estado de comunicación, última lectura correcta, última consulta observada y cobertura de ingesta.
-- Elige **Historial detallado de consultas** para conservar detalles recientes y entradas opcionales en Activity; o **Solo totales agregados** para conservar identidades de clientes y totales numéricos sin filas ni dominios de consultas.
+- Elige si Home Assistant Activity registra todas las consultas nuevas, solo las bloqueadas o ninguna. La integración no conserva detalles de consultas en atributos de sensores ni en su Store.
 - Un panel inicial con cuatro vistas nativas de Home Assistant: **Resumen**, **Clientes**, **Detalle** y **Diagnóstico**.
 
 La integración cuenta las consultas nuevas que observa al consultar Pi-hole. No reconstruye todo el tráfico que Pi-hole haya gestionado. El total de entidades es 29 para 5 clientes, 129 para 25 clientes y 504 para 100 clientes (cinco por cliente y cuatro diagnósticos de la integración).
@@ -42,7 +42,7 @@ Pi-hole Extended se instala añadiendo su repositorio como repositorio personali
 3. Instala **Pi-hole Extended** y reinicia Home Assistant.
 4. Abre **Ajustes → Dispositivos y servicios → Añadir integración**, busca **Pi-hole Extended** y sigue el formulario.
 
-Para instalarla manualmente, descarga [`pihole_queries-0.8.1.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.8.1/pihole_queries-0.8.1.zip), extrae `custom_components/pihole_queries` en el directorio de configuración de Home Assistant y reinicia Home Assistant.
+Para instalarla manualmente, descarga [`pihole_queries-0.9.0.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.9.0/pihole_queries-0.9.0.zip), extrae `custom_components/pihole_queries` en el directorio de configuración de Home Assistant y reinicia Home Assistant.
 
 ## Configurar Pi-hole
 
@@ -62,14 +62,14 @@ La contraseña se guarda en la entrada de integración de Home Assistant y no se
 
 Después de configurar la integración, espera a que se complete un sondeo y revisa **Estado de comunicación** y **Cobertura de ingesta** en las entidades de diagnóstico. La primera lectura establece una línea base: no cuenta las consultas que ya estaban en la instantánea actual de Pi-hole. Después, genera una consulta DNS desde un dispositivo que use este Pi-hole y espera al siguiente sondeo.
 
-El contador **Consultas DNS** del cliente aumenta cuando se observa una consulta nueva. Las consultas permitidas y bloqueadas incrementan sus contadores del clasificador; los resultados desconocidos o incompletos quedan como provisionales y no entran en el porcentaje clasificado. En modo Detallado, una consulta nueva también puede aparecer en **Activity** de Home Assistant si la opción lo permite. Home Assistant controla la persistencia de Activity y Recorder.
+El contador **Consultas DNS** del cliente aumenta cuando se observa una consulta nueva. Las consultas permitidas y bloqueadas incrementan sus contadores del clasificador; los resultados desconocidos o incompletos quedan como provisionales y no entran en el porcentaje clasificado. Con Activity habilitada, una consulta nueva también puede aparecer en **Activity** de Home Assistant si la opción lo permite. Home Assistant controla la persistencia de Activity y Recorder.
 
 ## Elegir qué conservar
 
 En las opciones de la integración, elige un modo de conservación:
 
-- **Historial detallado de consultas** (predeterminado): conserva detalles recientes para los sensores de cliente. Elige si Activity registra **Todos los eventos**, **Solo eventos bloqueados** o **Sin eventos de Activity**.
-- **Solo totales agregados**: conserva identidades de clientes y totales numéricos, sin dominios, IDs, estados brutos ni filas de consultas individuales. Este modo no crea nuevas entradas de Activity.
+- **Activity habilitada** (predeterminado): envía eventos nuevos a Activity según la opción seleccionada. La integración no conserva detalles de consultas.
+- **Solo totales**: mantiene identidades de clientes y totales numéricos y no crea nuevas entradas de Activity.
 
 Consulta los [detalles técnicos y límites](docs/DETALLES_ES.md) sobre conservación y volumen elevado.
 
@@ -80,8 +80,7 @@ El [YAML del panel inicial](examples/dashboards/pihole-extended.yaml) incluye cu
 ## Solución de problemas
 
 - **Los contadores no aumentan:** revisa el estado de comunicación, host, puerto, ajustes TLS, contraseña, intervalo de sondeo y si Pi-hole aún expone la consulta en su historial en memoria.
-- **Aumentan los contadores, pero Activity está vacío:** confirma que esté seleccionado el modo Detallado, que Activity permita los eventos que quieres registrar y que los filtros de Activity/Recorder de Home Assistant permitan el evento. La integración no verifica la persistencia.
-- **El modo Agregado se retrasa con mucho tráfico sostenido:** puede acumular retraso cuando recibe observaciones continuamente. Consulta las mediciones sintéticas y sus límites en los [detalles técnicos](docs/DETALLES_ES.md).
+- **Aumentan los contadores, pero Activity está vacío:** confirma que esté seleccionada la opción Activity habilitada, que Activity permita los eventos que quieres registrar y que sus filtros de Home Assistant permitan el evento. La integración no verifica la persistencia.
 
 ## Enlaces
 

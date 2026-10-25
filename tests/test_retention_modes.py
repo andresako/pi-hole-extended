@@ -232,7 +232,6 @@ async def test_recovery_merges_overlapping_activity_buckets_before_store_scrub(
         legacy,
         "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd",
         "legacy",
-        aggregate_mode=True,
     )
     loaded = await store.async_load()
     assert loaded["clients"]["192.0.2.10"]["activity_buckets"] == buckets
@@ -399,7 +398,7 @@ async def test_aggregate_store_transition_removes_only_query_details_from_v1_and
             "data": deepcopy(legacy_data),
         }
     )
-    store = _IdentityStore(current, legacy, source_id, generation, aggregate_mode=True)
+    store = _IdentityStore(current, legacy, source_id, generation)
 
     await store.async_load()
 
@@ -425,7 +424,6 @@ async def test_aggregate_import_from_v1_sanitizes_only_details_before_v2_copy() 
         legacy,
         source_id,
         "legacy",
-        aggregate_mode=True,
     )
 
     prepared = await store.async_load()
@@ -461,7 +459,7 @@ async def test_aggregate_scrubs_malformed_clients_and_unknown_root_fields_from_b
             },
         }
     )
-    store = _IdentityStore(current, legacy, source_id, "legacy", aggregate_mode=True)
+    store = _IdentityStore(current, legacy, source_id, "legacy")
 
     loaded = await store.async_load()
 
@@ -474,16 +472,19 @@ async def test_aggregate_scrubs_malformed_clients_and_unknown_root_fields_from_b
 
 
 @pytest.mark.asyncio
-async def test_aggregate_replaces_uninspectable_legacy_root_before_returning() -> None:
+async def test_uninspectable_legacy_root_is_replaced_with_diagnostic_marker() -> None:
     source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
     legacy = MemoryStore([{"query": "secret.example.test"}])
     current = MemoryStore(None)
-    store = _IdentityStore(current, legacy, source_id, "legacy", aggregate_mode=True)
+    store = _IdentityStore(current, legacy, source_id, "legacy")
 
     loaded = await store.async_load()
 
     assert isinstance(loaded, list)
-    assert legacy.value == {}
+    assert legacy.value == {
+        "coverage": "unknown",
+        "coverage_reason": "invalid_legacy_store",
+    }
     assert "secret.example.test" not in repr(legacy.value)
     assert current.value is None
 
@@ -545,7 +546,7 @@ async def test_aggregate_scrubs_opaque_epochs_and_pending_payloads_in_both_store
             "data": data,
         }
     )
-    store = _IdentityStore(current, legacy, source_id, "legacy", aggregate_mode=True)
+    store = _IdentityStore(current, legacy, source_id, "legacy")
 
     loaded = await store.async_load()
 
@@ -595,7 +596,7 @@ async def test_aggregate_preserves_valid_bounded_pending_aggregates() -> None:
         }
     )
     current = MemoryStore(None)
-    store = _IdentityStore(current, legacy, source_id, "legacy", aggregate_mode=True)
+    store = _IdentityStore(current, legacy, source_id, "legacy")
 
     loaded = await store.async_load()
 
@@ -632,7 +633,7 @@ async def test_aggregate_discards_pending_checkpoint_outside_confirmed_cursor_in
         }
     )
     current = MemoryStore(None)
-    store = _IdentityStore(current, legacy, source_id, "legacy", aggregate_mode=True)
+    store = _IdentityStore(current, legacy, source_id, "legacy")
 
     loaded = await store.async_load()
 
@@ -660,7 +661,7 @@ async def test_v2_scrubbing_retry_completes_legacy_store_after_second_write_fail
         }
     )
     legacy.save_error = OSError("synthetic legacy Store failure")
-    store = _IdentityStore(current, legacy, source_id, generation, aggregate_mode=True)
+    store = _IdentityStore(current, legacy, source_id, generation)
 
     with pytest.raises(OSError, match="legacy Store"):
         await store.async_load()
@@ -687,7 +688,6 @@ async def test_v1_import_retry_completes_current_store_after_second_write_failur
         legacy,
         source_id,
         "legacy",
-        aggregate_mode=True,
     )
 
     with pytest.raises(OSError, match="current Store"):
@@ -736,7 +736,7 @@ async def test_switch_from_aggregate_pending_to_detail_rereads_from_confirmed_cu
     assert detail.cursor == 103
     assert detail.client_data["192.0.2.10"]["query_count"] == 8
     assert len(detail.hass.services.calls) == 3
-    assert len(detail.client_data["192.0.2.10"]["recent_queries"]) == 3
+    assert "recent_queries" not in detail.client_data["192.0.2.10"]
 
 
 @pytest.mark.asyncio
