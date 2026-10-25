@@ -29,7 +29,7 @@ const PHE_TEXT = {
     unavailable: "Not available: 5/15/30 min blocks need a range of 10 days or less.", tooMany: "Too many blocks for this range.",
     biggerThanRange: "The block is larger than the range.", ingest: "Time is when Home Assistant received the data.",
     times: "x usual", configHint: "Choose the devices in the card editor.",
-    editTitle: "Title", editDevices: "Devices", editBucket: "Block size", editSpan: "Range", editLog: "Logarithmic scale", editChartType: "Chart type", editLine: "Lines", editBar: "Bars", editOverview: "Show devices with unusual activity", editDevicesHelp: "Up to 12. Leave empty to show the three busiest.", editInvalid: "That block size is not available for this range; the card will use a larger one.",
+    editTitle: "Title", editDevices: "Devices", editBucket: "Block size", editSpan: "Range", editLog: "Logarithmic scale", editChartType: "Chart type", editLine: "Lines", editBar: "Bars", editOverview: "Warn about unusual activity", editOverviewHelp: "Lists any device (even if not in the chart) that has been unusually active in the last two hours, and shows a red counter. Nothing is shown while all devices are normal.", editDevicesHelp: "Up to 12. Leave empty to show the three busiest.", editInvalid: "That block size is not available for this range; the card will use a larger one.",
   },
   es: {
     title: "Actividad por dispositivo", devices: "Dispositivos", add: "Añadir dispositivo…", bucket: "Bloque", span: "Rango",
@@ -39,7 +39,7 @@ const PHE_TEXT = {
     unavailable: "No disponible: los bloques de 5/15/30 min requieren un rango de 10 días o menos.", tooMany: "Demasiados bloques para este rango.",
     biggerThanRange: "El bloque es mayor que el rango.", ingest: "La hora es la de recepción del dato en Home Assistant.",
     times: "x lo habitual", configHint: "Elige los dispositivos en el editor de la tarjeta.",
-    editTitle: "Título", editDevices: "Dispositivos", editBucket: "Tamaño de bloque", editSpan: "Rango", editLog: "Escala logarítmica", editChartType: "Tipo de gráfica", editLine: "Líneas", editBar: "Barras", editOverview: "Mostrar dispositivos con actividad inusual", editDevicesHelp: "Hasta 12. Vacío muestra los tres más activos.", editInvalid: "Ese bloque no está disponible para este rango; la tarjeta usará uno mayor.",
+    editTitle: "Título", editDevices: "Dispositivos", editBucket: "Tamaño de bloque", editSpan: "Rango", editLog: "Escala logarítmica", editChartType: "Tipo de gráfica", editLine: "Líneas", editBar: "Barras", editOverview: "Avisar de actividad inusual", editOverviewHelp: "Lista cualquier dispositivo (aunque no esté en la gráfica) con actividad inusual en las últimas dos horas y muestra un contador rojo. No se muestra nada mientras todos estén normales.", editDevicesHelp: "Hasta 12. Vacío muestra los tres más activos.", editInvalid: "Ese bloque no está disponible para este rango; la tarjeta usará uno mayor.",
   },
 };
 
@@ -300,7 +300,7 @@ class PheActivityCard extends HTMLElement {
 
   _render() {
     const t = this._t;
-    const unusual = this._unusualNow();
+    const unusual = this._state.overview ? this._unusualNow() : [];
     const overview = unusual.length
       ? unusual.map((u) => `<span class="chip alert">${this._esc(u.device.label)} · ${u.multiple ? pheFmt(u.multiple) + "×" : pheFmt(u.rate) + " " + t.rate}</span>`).join("")
       : "";
@@ -450,7 +450,7 @@ class PheActivityCardEditor extends HTMLElement {
       this.append(this._form, this._note);
     }
     const labels = { title: t.editTitle, entities: t.editDevices, bucket: t.editBucket, span: t.editSpan, chart_type: t.editChartType, log_scale: t.editLog, show_overview: t.editOverview };
-    const helpers = { entities: t.editDevicesHelp };
+    const helpers = { entities: t.editDevicesHelp, show_overview: t.editOverviewHelp };
     this._form.hass = this._hass;
     this._form.data = this._config;
     this._form.schema = pheEditorSchema(pheDiscover(this._hass.states, this._config.names), t);
