@@ -289,11 +289,10 @@ class PheActivityCard extends HTMLElement {
 
   _render() {
     const t = this._t;
-    const { bucket, span } = this._state;
     const unusual = this._unusualNow();
     const overview = unusual.length
       ? unusual.map((u) => `<span class="chip alert">${this._esc(u.device.label)} · ${u.multiple ? pheFmt(u.multiple) + "×" : pheFmt(u.rate) + " " + t.rate}</span>`).join("")
-      : `<span class="muted">${t.none}</span>`;
+      : "";
     const configured = Array.isArray(this._cfg.entities) && this._cfg.entities.length > 0;
     this.shadowRoot.innerHTML = `
       <style>
@@ -301,8 +300,8 @@ class PheActivityCard extends HTMLElement {
         ha-card { padding:12px 16px 14px; }
         .head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
         h2 { font-size:1.1rem; font-weight:500; margin:0; flex:1 1 auto; color:var(--primary-text-color); }
-        .badge { background:${unusual.length ? PHE_ALERT : "var(--divider-color,#ddd)"}; color:${unusual.length ? "#fff" : "var(--secondary-text-color)"}; border-radius:12px; padding:2px 10px; font-size:.8rem; }
-        .sub { color:var(--secondary-text-color); font-size:.8rem; margin:-4px 0 6px; }
+        h2:empty { display:none; }
+        .badge { margin-left:auto; background:${unusual.length ? PHE_ALERT : "var(--divider-color,#ddd)"}; color:${unusual.length ? "#fff" : "var(--secondary-text-color)"}; border-radius:12px; padding:2px 10px; font-size:.8rem; }
         .overview { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:4px 0 8px; font-size:.85rem; }
         .overview b { font-weight:500; color:var(--secondary-text-color); }
         .chip { border:1px solid var(--divider-color,#ccc); border-radius:14px; padding:3px 10px; color:var(--primary-text-color); font-size:.8rem; }
@@ -328,10 +327,9 @@ class PheActivityCard extends HTMLElement {
         .foot { margin-top:6px; font-size:.72rem; color:var(--secondary-text-color); }
       </style>
       <ha-card>
-        <div class="head"><h2>${this._esc(this._cfg.title || t.title)}</h2><span class="badge">${unusual.length ? unusual.length + " " + t.unusual : "OK"}</span></div>
-        <div class="sub">${t.bucket} ${bucket} · ${t.span} ${span}</div>
+        ${this._cfg.title || unusual.length ? `<div class="head"><h2>${this._esc(this._cfg.title || "")}</h2>${unusual.length ? `<span class="badge">${unusual.length} ${t.unusual}</span>` : ""}</div>` : ""}
         ${this._devices.length ? "" : `<div class="note">${t.noDevices}</div>`}
-        ${this._state.overview ? `<div class="overview"><b>${t.unusualNow}:</b> ${overview}</div>` : ""}
+        ${this._state.overview && unusual.length ? `<div class="overview"><b>${t.unusualNow}:</b> ${overview}</div>` : ""}
         ${this._chart()}
         <div class="legend">${this._legend()}</div>
         <div class="foot">${t.ingest}${configured ? "" : " " + t.configHint}</div>
