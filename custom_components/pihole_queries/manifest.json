@@ -1,12 +1,22 @@
 {
   "domain": "pihole_queries",
   "name": "Pi-hole Extended",
-  "codeowners": ["@andresako"],
+  "after_dependencies": [
+    "frontend",
+    "http",
+    "websocket_api"
+  ],
+  "codeowners": [
+    "@andresako"
+  ],
   "config_flow": true,
-  "dependencies": ["logbook", "recorder"],
+  "dependencies": [
+    "logbook",
+    "recorder"
+  ],
   "documentation": "https://github.com/Andresako/pi-hole-extended#readme",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/Andresako/pi-hole-extended/issues",
   "requirements": [],
-  "version": "0.9.0"
+  "version": "0.10.0"
 }

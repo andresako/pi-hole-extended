@@ -77,6 +77,18 @@ Consulta los [detalles técnicos y límites](docs/DETALLES_ES.md) sobre conserva
 
 El [YAML del panel inicial](examples/dashboards/pihole-extended.yaml) incluye cuatro vistas creadas con tarjetas nativas de Home Assistant. Usa IDs de entidades de ejemplo: copia el YAML en un panel nuevo y asigna cada marcador a los IDs de tu propio registro de entidades. Sigue la [guía del panel](docs/dashboard-examples.md); no sustituyas la configuración de un panel existente.
 
+## Detectar un dispositivo con comportamiento anómalo con la tarjeta de actividad
+
+La integración incluye una tarjeta de Lovelace, que se carga sola, con la actividad DNS por dispositivo y los picos inusuales resaltados. Añádela en cualquier panel con **Editar panel → Añadir tarjeta → Manual**:
+
+```yaml
+type: custom:phe-activity-card
+```
+
+Elige desde la propia tarjeta uno o varios dispositivos, el tamaño de bloque (de 5 min a 1 día) y el rango (de 6 horas a 30 días); tu elección se recuerda en el navegador. Claves opcionales: `title`, `entities` (dispositivos iniciales), `names` (`{entity_id: etiqueta}`), `bucket` y `span`.
+
+Un dispositivo se marca como **inusual** cuando se mantiene muy por encima de su propio patrón reciente: varias veces su nivel habitual, por encima de su pico diario típico y de una tasa mínima, durante al menos 15 minutos. Los dispositivos tranquilos o con ráfagas regulares no se marcan por su comportamiento normal. La tarjeta usa las estadísticas a largo plazo del contador **Consultas DNS**, así que el eje de tiempo es el momento en que Home Assistant recibió el dato, los bloques de 5/15/30 minutos solo existen para rangos de hasta 10 días (valor por defecto del Recorder) y un dispositivo nuevo necesita aproximadamente un día de historial para tener referencia. Solo se leen recuentos agregados; nunca dominios.
+
 ## Solución de problemas
 
 - **Los contadores no aumentan:** revisa el estado de comunicación, host, puerto, ajustes TLS, contraseña, intervalo de sondeo y si Pi-hole aún expone la consulta en su historial en memoria.

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import re
 import math
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -16,10 +19,13 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
+from homeassistant.loader import async_get_integration
 from homeassistant.util import slugify
 
 from .api import PiHoleClient
 from .const import (
+    CARD_FILENAME,
+    CARD_URL_BASE,
     CONF_SOURCE_GENERATION,
     CONF_SOURCE_ID,
     DOMAIN,
@@ -30,6 +36,7 @@ from .const import (
     STORAGE_VERSION,
 )
 from .coordinator import PiHoleQueryCoordinator
+from .websocket import async_register as websocket_api_register
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -708,7 +715,20 @@ def _identity_storage_key(source_id: str, generation: str) -> str:
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration domain."""
     hass.data.setdefault(DOMAIN, {})
+    websocket_api_register(hass)
+    await _async_register_frontend(hass)
     return True
+
+
+async def _async_register_frontend(hass: HomeAssistant) -> None:
+    """Serve the activity card and load it in every dashboard."""
+    if getattr(hass, "http", None) is None or "frontend" not in hass.config.components:
+        return
+    version = (await async_get_integration(hass, DOMAIN)).version
+    path = Path(__file__).parent / "frontend" / CARD_FILENAME
+    url = f"{CARD_URL_BASE}/{CARD_FILENAME}"
+    await hass.http.async_register_static_paths([StaticPathConfig(url, str(path), False)])
+    add_extra_js_url(hass, f"{url}?v={version}")
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

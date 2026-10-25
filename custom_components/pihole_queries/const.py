@@ -41,3 +41,6 @@ LEGACY_SOURCE_GENERATION = "legacy"
 RECONFIGURE_SAME_SOURCE = "same_source"
 RECONFIGURE_NEW_SOURCE = "new_source"
 
+
+CARD_URL_BASE = f"/{DOMAIN}_static"
+CARD_FILENAME = "phe-activity-card.js"

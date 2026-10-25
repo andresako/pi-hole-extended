@@ -77,6 +77,18 @@ See [technical details and limits](docs/DETAILS.md) for retention behavior and h
 
 The [starter dashboard YAML](examples/dashboards/pihole-extended.yaml) contains four views built from Home Assistant's native cards. It uses placeholder entity IDs: copy the YAML into a new dashboard and map each placeholder to the entity IDs in your own entity registry. Follow the [dashboard guide](docs/dashboard-examples.md); do not replace an existing dashboard's configuration.
 
+## Spot a misbehaving device with the activity card
+
+The integration ships a Lovelace card, loaded automatically, that charts per-device DNS activity and highlights unusual spikes. Add it to any dashboard in **Edit dashboard → Add card → Manual**:
+
+```yaml
+type: custom:phe-activity-card
+```
+
+Pick one or more devices, a block size (5 min to 1 day) and a range (6 hours to 30 days) from the card itself; the choice is remembered in your browser. Optional keys: `title`, `entities` (devices to show first), `names` (`{entity_id: label}`), `bucket` and `span`.
+
+A device is marked **unusual** when it stays well above its own recent pattern: several times its usual level, above its typical daily peak, and above a minimum rate, for at least 15 minutes. Quiet or regularly bursty devices are not flagged for normal behavior. Charts use Home Assistant's long-term statistics of the **DNS queries** counter, so the time axis is when Home Assistant received the data, 5/15/30-minute blocks are only available for ranges up to 10 days (Recorder default), and a new device needs about a day of history before it has a baseline. Only aggregate counts are read; no domains.
+
 ## Troubleshooting
 
 - **Counters do not increase:** check communication status, host, port, TLS settings, password, poll interval, and whether Pi-hole still exposes the query in its in-memory history.
