@@ -20,28 +20,21 @@ const PHE_MAX_DEVICES = 12;
 const PHE_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#b07aa1", "#76b7b2", "#edc948", "#9c755f", "#7f7f7f", "#af7aa1", "#86bcb6", "#d4a6c8", "#8cd17d"];
 const PHE_ALERT = "#e15759";
 
-const PHE_TEXT = {
-  en: {
-    title: "Device activity", devices: "Devices", add: "Add device…", bucket: "Block", span: "Range",
-    scale: "Scale", linear: "Linear", log: "Log", unusual: "unusual", noDevices: "No Pi-hole Extended devices found.",
-    noSelection: "Pick one or more devices.", loading: "Loading…", error: "Could not load data",
-    unusualNow: "Unusual activity", none: "None", rate: "queries/min", base: "usual", noBase: "not enough history for a baseline",
-    unavailable: "Not available: 5/15/30 min blocks need a range of 10 days or less.", tooMany: "Too many blocks for this range.",
-    biggerThanRange: "The block is larger than the range.",
-    times: "x usual", hide: "Hide from chart", show: "Show in chart", history: "Open history",
-    editTitle: "Title", editDevices: "Devices", editBucket: "Block size", editSpan: "Range", editLog: "Logarithmic scale", editChartType: "Chart type", editLine: "Lines", editBar: "Bars", editOverview: "Warn about unusual activity", editOverviewHelp: "Lists any device (even if not in the chart) that has been unusually active in the last two hours, and shows a red counter. Nothing is shown while all devices are normal.", editDevicesHelp: "Up to 12. Leave empty to show the three busiest.", editInvalid: "That block size is not available for this range; the card will use a larger one.",
-  },
-  es: {
-    title: "Actividad por dispositivo", devices: "Dispositivos", add: "Añadir dispositivo…", bucket: "Bloque", span: "Rango",
-    scale: "Escala", linear: "Lineal", log: "Log", unusual: "inusual", noDevices: "No se han encontrado dispositivos de Pi-hole Extended.",
-    noSelection: "Elige uno o más dispositivos.", loading: "Cargando…", error: "No se pudieron cargar los datos",
-    unusualNow: "Actividad inusual", none: "Ninguna", rate: "consultas/min", base: "habitual", noBase: "sin historial suficiente para una referencia",
-    unavailable: "No disponible: los bloques de 5/15/30 min requieren un rango de 10 días o menos.", tooMany: "Demasiados bloques para este rango.",
-    biggerThanRange: "El bloque es mayor que el rango.",
-    times: "x lo habitual", hide: "Ocultar de la gráfica", show: "Mostrar en la gráfica", history: "Abrir historial",
-    editTitle: "Título", editDevices: "Dispositivos", editBucket: "Tamaño de bloque", editSpan: "Rango", editLog: "Escala logarítmica", editChartType: "Tipo de gráfica", editLine: "Líneas", editBar: "Barras", editOverview: "Avisar de actividad inusual", editOverviewHelp: "Lista cualquier dispositivo (aunque no esté en la gráfica) con actividad inusual en las últimas dos horas y muestra un contador rojo. No se muestra nada mientras todos estén normales.", editDevicesHelp: "Hasta 12. Vacío muestra los tres más activos.", editInvalid: "Ese bloque no está disponible para este rango; la tarjeta usará uno mayor.",
-  },
-};
+const PHE_LANGUAGES = ["en", "es"];
+const PHE_TRANSLATIONS_URL = "/pihole_queries_static/translations/";
+const PHE_NO_STRINGS = new Proxy({}, { get: () => "" });
+const pheStringCache = {};
+
+/** Load frontend/translations/<language>.json (English fills any gap). */
+function pheLoadStrings(language) {
+  const short = String(language || "en").slice(0, 2);
+  const lang = PHE_LANGUAGES.includes(short) ? short : "en";
+  if (!pheStringCache[lang]) {
+    const read = (code) => fetch(`${PHE_TRANSLATIONS_URL}${code}.json`).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    pheStringCache[lang] = Promise.all([read("en"), lang === "en" ? {} : read(lang)]).then(([en, own]) => ({ ...en, ...own }));
+  }
+  return pheStringCache[lang];
+}
 
 /** Return an i18n key explaining why the pair is unsupported, or null. */
 function pheValidate(bucket, span) {
@@ -122,6 +115,7 @@ class PheActivityCard extends HTMLElement {
   set hass(hass) {
     const first = !this._hass;
     this._hass = hass;
+    this._ensureStrings();
     const devices = pheDiscover(hass.states, this._cfg.names);
     const sig = devices.map((d) => d.id + d.label).join("|");
     if (sig !== this._sig) {
@@ -137,6 +131,17 @@ class PheActivityCard extends HTMLElement {
     }
   }
 
+  _ensureStrings() {
+    const language = this._hass && this._hass.language;
+    if (language === this._language) return;
+    this._language = language;
+    pheLoadStrings(language).then((strings) => {
+      if (language !== this._language) return;
+      this._strings = strings;
+      this._render();
+    });
+  }
+
   connectedCallback() {
     this._timer = setInterval(() => { this._load(); }, 60000);
     this._overviewTimer = setInterval(() => { this._loadOverview(); }, 300000);
@@ -147,7 +152,7 @@ class PheActivityCard extends HTMLElement {
     clearInterval(this._overviewTimer);
   }
 
-  get _t() { return PHE_TEXT[(this._hass && this._hass.language || "en").slice(0, 2)] || PHE_TEXT.en; }
+  get _t() { return this._strings || PHE_NO_STRINGS; }
   _applyConfig() {
     const cfg = this._cfg;
     const bucket = PHE_BUCKETS.includes(cfg.bucket) ? cfg.bucket : "30m";
@@ -429,7 +434,7 @@ function pheEditorSchema(devices, t) {
         { name: "span", selector: { select: { mode: "dropdown", options: PHE_SPANS.map((v) => ({ value: v, label: v })) } } },
       ],
     },
-    { name: "chart_type", selector: { select: { mode: "box", options: [{ value: "line", label: (t && t.editLine) || "Lines" }, { value: "bar", label: (t && t.editBar) || "Bars" }] } } },
+    { name: "chart_type", selector: { select: { mode: "box", options: [{ value: "line", label: t.editLine }, { value: "bar", label: t.editBar }] } } },
     { name: "log_scale", selector: { boolean: {} } },
     { name: "show_overview", selector: { boolean: {} } },
   ];
@@ -443,10 +448,19 @@ class PheActivityCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    const language = hass && hass.language;
+    if (language !== this._language) {
+      this._language = language;
+      pheLoadStrings(language).then((strings) => {
+        if (language !== this._language) return;
+        this._strings = strings;
+        this._render();
+      });
+    }
     this._render();
   }
 
-  get _t() { return PHE_TEXT[(this._hass && this._hass.language || "en").slice(0, 2)] || PHE_TEXT.en; }
+  get _t() { return this._strings || PHE_NO_STRINGS; }
 
   _render() {
     if (!this._config || !this._hass) return;
@@ -483,7 +497,9 @@ if (typeof customElements !== "undefined" && !customElements.get("phe-activity-c
 if (typeof customElements !== "undefined" && !customElements.get("phe-activity-card")) {
   customElements.define("phe-activity-card", PheActivityCard);
   window.customCards = window.customCards || [];
-  window.customCards.push({ type: "phe-activity-card", name: "Pi-hole Extended activity", description: "Per-device DNS activity with unusual-activity detection", preview: false });
+  pheLoadStrings(document.documentElement.lang || navigator.language).then((t) => {
+    window.customCards.push({ type: "phe-activity-card", name: t.cardName, description: t.cardDescription, preview: false });
+  });
 }
 
 if (typeof module !== "undefined") {

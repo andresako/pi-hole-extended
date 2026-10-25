@@ -725,9 +725,11 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     if getattr(hass, "http", None) is None or "frontend" not in hass.config.components:
         return
     version = (await async_get_integration(hass, DOMAIN)).version
-    path = Path(__file__).parent / "frontend" / CARD_FILENAME
+    # Serve the whole folder: the card script plus its translations/*.json files.
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(CARD_URL_BASE, str(Path(__file__).parent / "frontend"), False)]
+    )
     url = f"{CARD_URL_BASE}/{CARD_FILENAME}"
-    await hass.http.async_register_static_paths([StaticPathConfig(url, str(path), False)])
     add_extra_js_url(hass, f"{url}?v={version}")
 
 
