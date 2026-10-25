@@ -60,11 +60,13 @@
         "data": {
           "scan_interval": "Polling interval (seconds)",
           "retention_mode": "Activity policy",
-          "activity_mode": "Activity events"
+          "activity_mode": "Activity events",
+          "unusual_activity": "Unusual activity alert"
         },
         "data_description": {
           "retention_mode": "Activity enabled sends entries according to the Activity setting. Totals only suppresses new Activity entries.",
-          "activity_mode": "Choose all events, blocked events only, or none. Totals only always disables Activity entries."
+          "activity_mode": "Choose all events, blocked events only, or none. Totals only always disables Activity entries.",
+          "unusual_activity": "Creates a binary sensor per device that turns on when it stays far above its own usual activity. Evaluated every 5 minutes from Recorder statistics."
         }
       }
     }
@@ -115,6 +117,11 @@
       "provisional_v1": {
         "name": "Provisional queries"
       }
+    },
+    "binary_sensor": {
+      "unusual_activity": {
+        "name": "Unusual activity"
+      }
     }
   },
   "selector": {
@@ -135,6 +142,14 @@
       "options": {
         "same_source": "Same Pi-hole; keep its cursor and identity",
         "new_source": "Replacement Pi-hole; start a new generation"
+      }
+    },
+    "unusual_activity": {
+      "options": {
+        "off": "Off (no sensors)",
+        "low": "Low (extreme cases only)",
+        "medium": "Medium (recommended)",
+        "high": "High (detects sooner)"
       }
     }
   },

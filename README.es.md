@@ -89,6 +89,10 @@ Todo se configura desde el editor de la tarjeta (**Editar tarjeta**): uno o vari
 
 Un dispositivo se marca como **inusual** cuando se mantiene muy por encima de su propio patrón reciente: varias veces su nivel habitual, por encima de su pico diario típico y de una tasa mínima, durante al menos 15 minutos. Los dispositivos tranquilos o con ráfagas regulares no se marcan por su comportamiento normal. La tarjeta usa las estadísticas a largo plazo del contador **Consultas DNS**, así que el eje de tiempo es el momento en que Home Assistant recibió el dato, los bloques de 5/15/30 minutos solo existen para rangos de hasta 10 días (valor por defecto del Recorder) y un dispositivo nuevo necesita aproximadamente un día de historial para tener referencia. Solo se leen recuentos agregados; nunca dominios.
 
+### Sensores de actividad inusual
+
+Para automatizaciones, cada dispositivo tiene además un sensor binario **Actividad inusual** (`binary_sensor.phe_<dispositivo>_actividad_inusual`) que se activa mientras el dispositivo se mantiene muy por encima de su tasa habitual. Usa la misma detección que la tarjeta, evaluada cada 5 minutos con las estadísticas del Recorder, así que reacciona en unos 10–20 minutos y permanece *desconocido* hasta que el dispositivo tiene aproximadamente un día de historial. Sus atributos muestran la tasa actual, la habitual, el umbral, cuántas veces la habitual es y cuándo empezó el episodio. Elige sensibilidad **Desactivado**, **Baja**, **Media** (predeterminada) o **Alta** en las opciones de la integración; *Desactivado* no crea sensores. La tarjeta usa la misma sensibilidad.
+
 ## Solución de problemas
 
 - **Los contadores no aumentan:** revisa el estado de comunicación, host, puerto, ajustes TLS, contraseña, intervalo de sondeo y si Pi-hole aún expone la consulta en su historial en memoria.

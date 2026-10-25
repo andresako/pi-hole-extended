@@ -52,6 +52,24 @@ class DetectionParams:
     peak_factor: float = 1.5
 
 
+SENSITIVITY_PARAMS: dict[str, DetectionParams] = {
+    "low": DetectionParams(
+        deviations=10.0, ratio=8.0, min_rate=20.0, min_run_seconds=1800, peak_factor=2.0
+    ),
+    "medium": DetectionParams(),
+    "high": DetectionParams(
+        deviations=6.0, ratio=3.0, min_rate=5.0, min_run_seconds=600, peak_factor=1.2
+    ),
+}
+
+
+def params_for(level: object) -> DetectionParams:
+    """Map a sensitivity option to thresholds; unknown values mean medium."""
+    if isinstance(level, str):
+        return SENSITIVITY_PARAMS.get(level, SENSITIVITY_PARAMS["medium"])
+    return SENSITIVITY_PARAMS["medium"]
+
+
 def validate_selection(bucket: str, span: str) -> str | None:
     """Return why a bucket/span pair cannot be served, or None when valid."""
     if bucket not in BUCKET_SECONDS or span not in SPAN_SECONDS:

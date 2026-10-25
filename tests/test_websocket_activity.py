@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.pihole_queries import activity_data as data
 from custom_components.pihole_queries import websocket as ws
 from custom_components.pihole_queries.const import DOMAIN
 
@@ -27,8 +28,8 @@ async def _run(msg, entries, stats=None):
         async_add_executor_job=AsyncMock(return_value=stats or {})
     )
     with (
-        patch.object(ws.er, "async_get", return_value=_registry(entries)),
-        patch.object(ws, "get_instance", return_value=recorder),
+        patch.object(data.er, "async_get", return_value=_registry(entries)),
+        patch.object(data, "get_instance", return_value=recorder),
     ):
         return await ws.async_client_activity(MagicMock(), msg), recorder
 

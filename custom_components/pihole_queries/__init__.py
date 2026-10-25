@@ -873,7 +873,7 @@ def _available_entity_id(registry: er.EntityRegistry, entity_id: str) -> str:
 
 def _canonical_entity_id(entry: ConfigEntry, entity: er.RegistryEntry) -> str | None:
     """Build the stable recorder-friendly ID for a Pi-hole client metric."""
-    if entity.domain != "sensor":
+    if entity.domain not in ("sensor", "binary_sensor"):
         return None
     versioned_classes = {
         "allowed": "permitidas",
@@ -887,6 +887,7 @@ def _canonical_entity_id(entry: ConfigEntry, entity: er.RegistryEntry) -> str | 
         "_allowed": "permitidas",
         "_blocked": "bloqueadas",
         "_queries_last_minute": "consultas_en_el_ultimo_minuto",
+        "_unusual_activity": "actividad_inusual",
         "_allowed_last_minute": "permitidas_en_el_ultimo_minuto",
         "_blocked_last_minute": "bloqueadas_en_el_ultimo_minuto",
         "": "consultas_dns",
@@ -911,7 +912,7 @@ def _canonical_entity_id(entry: ConfigEntry, entity: er.RegistryEntry) -> str | 
         == LEGACY_SOURCE_GENERATION
         else f"{entry.data[CONF_SOURCE_GENERATION]}_{client_key}"
     )
-    return f"sensor.phe_{slugify(entity_client)}_{metric_name}"
+    return f"{entity.domain}.phe_{slugify(entity_client)}_{metric_name}"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

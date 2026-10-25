@@ -24,6 +24,7 @@ from .api import (
 from .const import (
     CONF_HOST,
     CONF_ACTIVITY_MODE,
+    CONF_UNUSUAL_ACTIVITY,
     CONF_PASSWORD,
     CONF_PORT,
     CONF_RECONFIGURE_SOURCE_ACTION,
@@ -35,6 +36,7 @@ from .const import (
     CONF_VERIFY_SSL,
     DEFAULT_PORT,
     DEFAULT_ACTIVITY_MODE,
+    DEFAULT_UNUSUAL_ACTIVITY,
     DEFAULT_RETENTION_MODE,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -43,6 +45,10 @@ from .const import (
     ACTIVITY_ALL,
     ACTIVITY_BLOCKED,
     ACTIVITY_NONE,
+    UNUSUAL_HIGH,
+    UNUSUAL_LOW,
+    UNUSUAL_MEDIUM,
+    UNUSUAL_OFF,
     RETENTION_AGGREGATE,
     RETENTION_DETAIL,
     LEGACY_SOURCE_GENERATION,
@@ -74,6 +80,16 @@ def _schema(
                     selector.SelectSelectorConfig(
                         options=[RETENTION_DETAIL, RETENTION_AGGREGATE],
                         translation_key="retention_mode",
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_UNUSUAL_ACTIVITY,
+                    default=defaults.get(CONF_UNUSUAL_ACTIVITY, DEFAULT_UNUSUAL_ACTIVITY),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[UNUSUAL_OFF, UNUSUAL_LOW, UNUSUAL_MEDIUM, UNUSUAL_HIGH],
+                        translation_key="unusual_activity",
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),

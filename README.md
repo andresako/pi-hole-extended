@@ -89,6 +89,10 @@ Everything is configured from the card editor (**Edit card**): choose one or mor
 
 A device is marked **unusual** when it stays well above its own recent pattern: several times its usual level, above its typical daily peak, and above a minimum rate, for at least 15 minutes. Quiet or regularly bursty devices are not flagged for normal behavior. Charts use Home Assistant's long-term statistics of the **DNS queries** counter, so the time axis is when Home Assistant received the data, 5/15/30-minute blocks are only available for ranges up to 10 days (Recorder default), and a new device needs about a day of history before it has a baseline. Only aggregate counts are read; no domains.
 
+### Unusual-activity sensors
+
+For automations, each device also gets an **Unusual activity** binary sensor (`binary_sensor.phe_<device>_actividad_inusual`) that turns on while the device stays well above its own usual rate. It uses the same detection as the card, evaluated every 5 minutes from Recorder statistics, so it reacts within roughly 10–20 minutes and stays *unknown* until the device has about a day of history. Its attributes show the current rate, the usual rate, the threshold, how many times the usual rate it is and when the episode started. Choose **Off**, **Low**, **Medium** (default) or **High** sensitivity in the integration's options; *Off* creates no sensors. The card uses the same sensitivity.
+
 ## Troubleshooting
 
 - **Counters do not increase:** check communication status, host, port, TLS settings, password, poll interval, and whether Pi-hole still exposes the query in its in-memory history.

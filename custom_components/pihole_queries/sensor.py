@@ -139,6 +139,29 @@ def _client_device_identifier(entry: ConfigEntry, client_key: str) -> tuple[str,
     )
     return DOMAIN, identifier
 
+def client_device_info(
+    coordinator: PiHoleQueryCoordinator, entry: ConfigEntry, client_key: str
+) -> DeviceInfo:
+    """Describe the per-client device shared by every entity of that client."""
+    data = coordinator.client_data.get(client_key, {})
+    client_name = str(data.get("client_name") or "Cliente desconocido")
+    client_ip = str(data.get("client_ip") or "")
+    if client_name == "Cliente desconocido":
+        language = coordinator.hass.config.language.split("-")[0]
+        client_name = "Unknown client" if language == "en" else "Cliente desconocido"
+    name = (
+        f"{client_name} ({client_ip})"
+        if client_ip and client_ip != "Desconocida"
+        else client_name
+    )
+    return DeviceInfo(
+        identifiers={_client_device_identifier(entry, client_key)},
+        translation_key="client_device",
+        translation_placeholders={"client_name": name},
+        manufacturer="Pi-hole",
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -198,23 +221,7 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
     @property
     def device_info(self) -> DeviceInfo:
         """Group the client's query sensors under one Home Assistant device."""
-        data = self._client_data
-        client_name = str(data.get("client_name") or "Cliente desconocido")
-        client_ip = str(data.get("client_ip") or "")
-        if client_name == "Cliente desconocido":
-            language = self.coordinator.hass.config.language.split("-")[0]
-            client_name = "Unknown client" if language == "en" else "Cliente desconocido"
-        name = (
-            f"{client_name} ({client_ip})"
-            if client_ip and client_ip != "Desconocida"
-            else client_name
-        )
-        return DeviceInfo(
-            identifiers={_client_device_identifier(self._entry, self._client_key)},
-            translation_key="client_device",
-            translation_placeholders={"client_name": name},
-            manufacturer="Pi-hole",
-        )
+        return client_device_info(self.coordinator, self._entry, self._client_key)
 
     @property
     def native_value(self) -> int | float | None:
