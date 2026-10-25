@@ -67,7 +67,7 @@ recorder:
       - sensor.phe_*
 ```
 
-Keep in mind that `recorder.include` makes Recorder save only included entities. Version 0.6.0 normalizes per-client entity IDs under the `phe_` prefix and removes obsolete per-second rate entities. Custom entity IDs may be changed to the normalized format. Recorder history is preserved. Update any dashboard or automation references that used an old ID after the migration.
+Keep in mind that `recorder.include` makes Recorder save only included entities. The activity card and the unusual-activity sensors read Recorder statistics, so the client sensors must be recorded.
 
 The first setup stores a baseline ID and does not backfill older Pi-hole queries. The integration reads the in-memory query history exposed by Pi-hole. Queries no longer available there cannot be recovered after a long outage or an FTL history reset. If Pi-hole's database is recreated and query IDs fall below the saved cursor, the integration pauses ingestion to avoid mixing incompatible histories. Use **Reconfigure** and explicitly choose **Replacement Pi-hole** to resume with a new source generation and baseline; old client sensors are disabled and their Recorder history is retained. Pagination fetches backlogs in 1,000-row pages. A very large backlog can extend a polling cycle. If Home Assistant stops after writing a Logbook entry but before persisting its cursor, the last entry may be replayed on restart because Recorder and integration storage do not share an atomic transaction.
 
@@ -83,9 +83,27 @@ If the total rises but no Activity entry appears, verify **Activity enabled** is
 
 Update through HACS and restart Home Assistant when prompted, or replace `custom_components/pihole_queries` with the new files for a manual installation. Keep the config entry to retain its cursor and counters. Before removal, record that entry's `entry_id` and, if present, its `source_id`; then delete the entry from **Settings → Devices & services**, uninstall it from HACS or delete its folder, and restart Home Assistant. Deleting the entry does not automatically remove its Store files under Home Assistant's `.storage` directory. The Store keeps the cursor and numeric client summaries. There is no integration action to purge this Store. If you also want to erase these files, make a restorable Home Assistant backup, stop Home Assistant, list files whose names start with `pihole_queries_cursor_<source_id>_` for that entry, then remove only those exact files and its legacy `pihole_queries_cursor_<entry_id>` file when present. This also covers earlier replacement generations for that source. Do not remove files belonging to other source IDs or entries. A recreated entry has a new source identity and will not resume the old Store. Previously recorded Activity/Recorder data and external backups follow Home Assistant's retention and backup policies.
 
+## Activity card and unusual-activity detection
+
+The card (`frontend/phe-activity-card.js`, translations in `frontend/translations/`) is served from `/pihole_queries_static/` and added to every dashboard with `add_extra_js_url`. It calls the `pihole_queries/client_activity` websocket command with up to 12 **DNS queries** counters, a block size and a range.
+
+The command reads the `change` statistic of each counter from Recorder (5-minute statistics for blocks under one hour, hourly otherwise), sums it into blocks and normalizes each block to queries per minute using the time actually covered, so gaps and partial blocks are not read as drops. Counter resets and negative changes count as zero. The baseline uses up to seven days before the visible range (limited to ten days for 5-minute statistics).
+
+A block is over threshold when its rate exceeds the highest of: the device's median plus a multiple of its median absolute deviation, a multiple of its median, a multiple of the median of its daily peaks, and a minimum rate. When there are at least three days of history and blocks are one hour or shorter, the median and deviation are taken per hour of the day. A run is **unusual** when blocks stay over threshold for a minimum duration. Sensitivity sets these multiples, the minimum rate and the minimum duration:
+
+| Sensitivity | Median multiple | Minimum rate | Minimum duration |
+|---|---|---|---|
+| Low | 8× | 20 queries/min | 30 min |
+| Medium | 5× | 10 queries/min | 15 min |
+| High | 3× | 5 queries/min | 10 min |
+
+A device needs at least 24 blocks of history to have a baseline. Only aggregate counts are read; domains are never involved.
+
+The binary sensors run the same code every five minutes over 5-minute blocks of the last six hours (plus the baseline lookback), in one Recorder read per twelve clients, and stay *unknown* without a baseline. A failed read keeps the previous result.
+
 ## Development and publication
 
-The repository includes HACS validation and Hassfest workflows. Version `0.10.0` adds per-client unusual-activity binary sensors with a sensitivity option, the `phe-activity-card` Lovelace card and a websocket command that read Recorder statistics of the per-client DNS queries counter to chart activity by block and range and flag sustained unusual activity. Version `0.9.0` retires detailed query history: the integration no longer keeps individual query rows or recent-query attributes, removes those fields from its Store when it loads, and renames the options to **Activity enabled** and **Totals only**. Version `0.8.0` retires the older unversioned allowed/blocked counters while preserving their entity-registry entries and Recorder history, and documents measured high-volume behavior. Version `0.7.0` reduces memory use when publishing query summaries and improves handling of retained client data, with migration and regression coverage. Version `0.6.0` adds rolling one-minute query counters as total-sensor attributes, readable entity names, stable prefixed IDs, and a query-pagination fix. Version `0.5.2` distinguishes API and Logbook errors in the logs for easier troubleshooting. Version `0.5.1` prefixes per-client sensor IDs with `phe` for easier Recorder filtering. Version `0.4.1` allows a 1-second API polling interval. Version `0.4.0` added per-client per-second query-rate sensors, later replaced by rolling one-minute counters in the total sensor's attributes. The repository also includes the API session cleanup fix from `0.3.2`. It is available through this repository as a HACS custom integration; it is not in HACS's default catalog. The request for default-list inclusion at [hacs/default#12355](https://github.com/hacs/default/pull/12355) remains closed while the integration is tested in Home Assistant.
+The repository includes HACS validation and Hassfest workflows. Release notes are in [CHANGELOG.md](../CHANGELOG.md). The integration is available through this repository as a HACS custom integration; it is not in HACS's default catalog.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) and [SECURITY.md](../SECURITY.md). Spanish installation and lifecycle instructions are in [README.es.md](../README.es.md).
 

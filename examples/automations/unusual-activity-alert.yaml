@@ -1,0 +1,20 @@
+alias: Pi-hole · unusual device activity
+description: Notify when a device keeps making far more DNS queries than usual.
+mode: single
+triggers:
+  - trigger: state
+    entity_id:
+      - binary_sensor.phe_192_0_2_21_actividad_inusual
+      - binary_sensor.phe_192_0_2_34_actividad_inusual
+      - binary_sensor.phe_192_0_2_47_actividad_inusual
+    to: "on"
+    for: "00:10:00"
+actions:
+  - action: notify.notify
+    data:
+      title: Unusual DNS activity
+      message: >-
+        {{ trigger.to_state.name }} is making
+        {{ trigger.to_state.attributes.current_rate }} queries/min,
+        {{ trigger.to_state.attributes.times_usual }}× its usual
+        ({{ trigger.to_state.attributes.usual_rate }}/min).

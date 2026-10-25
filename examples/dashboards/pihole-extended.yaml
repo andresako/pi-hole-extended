@@ -1,131 +1,46 @@
-title: Pi-hole Extended Dashboard
+title: Pi-hole Extended
 views:
-  - title: Summary
-    path: summary
-    icon: mdi:view-dashboard
+  - title: Activity
+    path: activity
+    icon: mdi:chart-timeline-variant
     cards:
-      - type: markdown
-        content: |
-          ## Pi-hole Extended
-
-          Show one instance per view. Query totals accumulate from setup onward;
-          the graph uses HA's recording time, not Pi-hole's original event time.
-      - type: entities
-        title: Cumulative queries
+      # Everything below the type is optional: leave it out and choose the devices
+      # in the card editor instead.
+      - type: custom:phe-activity-card
         entities:
-          # Replace each ID with the current entity ID from Settings → Entities.
-          - entity: sensor.replace_with_client_1_queries
-            name: Client 1
-          - entity: sensor.replace_with_client_2_queries
-            name: Client 2
-          - entity: sensor.replace_with_client_3_queries
-            name: Client 3
-      - type: markdown
-        content: |
-          ### Queries · last minute
-
-          Rolling count by Pi-hole's original query time when available. In aggregate
-          mode, one-second buckets can differ at the window boundary. The sensor stays
-          unavailable when coverage is unknown or a fresh sample is unavailable.
-
-          - Client 1: {{ states('sensor.replace_with_client_1_queries_last_minute') }}
-          - Client 2: {{ states('sensor.replace_with_client_2_queries_last_minute') }}
-          - Client 3: {{ states('sensor.replace_with_client_3_queries_last_minute') }}
+          - sensor.phe_192_0_2_21_consultas_dns
+          - sensor.phe_192_0_2_34_consultas_dns
+          - sensor.phe_192_0_2_47_consultas_dns
+        bucket: 30m
+        span: 1d
+        chart_type: line
       - type: entities
-        title: Blocked queries · cumulative
+        title: Unusual activity
         entities:
-          # Static comparison of up to five clients from the same instance.
-          - entity: sensor.replace_with_client_1_blocked_v1
-            name: Client 1
-          - entity: sensor.replace_with_client_2_blocked_v1
-            name: Client 2
-          - entity: sensor.replace_with_client_3_blocked_v1
-            name: Client 3
+          - binary_sensor.phe_192_0_2_21_actividad_inusual
+          - binary_sensor.phe_192_0_2_34_actividad_inusual
+          - binary_sensor.phe_192_0_2_47_actividad_inusual
       - type: history-graph
-        title: Cumulative queries · last 24 hours
-        hours_to_show: 24
-        refresh_interval: 60
+        title: Queries per minute · last 6 hours
+        hours_to_show: 6
         entities:
-          - entity: sensor.replace_with_client_1_queries
-            name: Client 1
-          - entity: sensor.replace_with_client_2_queries
-            name: Client 2
-          - entity: sensor.replace_with_client_3_queries
-            name: Client 3
-  - title: Clients
-    path: clients
-    icon: mdi:devices
-    cards:
-      - type: markdown
-        content: >
-          Replace the example entities with your clients' entities. Add or remove rows
-          manually to keep access to inactive and unknown clients.
-      - type: entities
-        title: Clients · cumulative queries
-        entities:
-          - entity: sensor.replace_with_client_1_queries
-            name: Client 1 · observed queries
-          - entity: sensor.replace_with_client_2_queries
-            name: Client 2 · observed queries
-          - entity: sensor.replace_with_client_3_queries
-            name: Client 3 · observed queries
-          - entity: sensor.replace_with_client_4_queries
-            name: Client 4 · observed queries
-          - entity: sensor.replace_with_unknown_client_queries
-            name: Unknown · DNS
-  - title: Details
-    path: details
-    icon: mdi:magnify
-    cards:
-      - type: markdown
-        content: >
-          Select an entity to open Home Assistant's standard entity dialog and view its
-          available history and attributes. This view does not provide a complete DNS
-          query table, interactive search, or coordinated filters.
-      - type: entities
-        title: Client · observed counters
-        entities:
-          - entity: sensor.replace_with_client_1_queries
-            name: Client 1 · observed queries
-          - entity: sensor.replace_with_client_1_allowed_v1
-            name: Client 1 · allowed queries
-          - entity: sensor.replace_with_client_1_blocked_v1
-            name: Client 1 · blocked queries
-          - entity: sensor.replace_with_client_1_provisional_v1
-            name: Client 1 · provisional queries
-          - entity: sensor.replace_with_client_2_queries
-            name: Client 2 · observed queries
-          - entity: sensor.replace_with_client_2_allowed_v1
-            name: Client 2 · allowed queries
-          - entity: sensor.replace_with_client_2_blocked_v1
-            name: Client 2 · blocked queries
-          - entity: sensor.replace_with_client_2_provisional_v1
-            name: Client 2 · provisional queries
+          - sensor.phe_192_0_2_21_consultas_en_el_ultimo_minuto
+          - sensor.phe_192_0_2_34_consultas_en_el_ultimo_minuto
+          - sensor.phe_192_0_2_47_consultas_en_el_ultimo_minuto
   - title: Diagnostics
     path: diagnostics
     icon: mdi:heart-pulse
     cards:
-      - type: markdown
-        content: >
-          Replace these entities with the four diagnostic entities for one entry.
-          Communication status, freshness, coverage, and persistence are separate signals.
-          A successful read does not confirm that Recorder saved every event.
+      # Diagnostic entity IDs follow the language Home Assistant used when the
+      # entry was created: copy yours from Settings → Devices & services → Entities.
       - type: entities
         title: Integration status
         entities:
-          - entity: sensor.replace_with_entry_communication_status
+          - entity: sensor.pi_hole_192_0_2_2_diagnostico_estado_de_comunicacion
             name: Communication status
-          - entity: sensor.replace_with_entry_last_successful_read
+          - entity: sensor.pi_hole_192_0_2_2_diagnostico_ultima_lectura_correcta
             name: Last successful read
-          - entity: sensor.replace_with_entry_last_query_observed
+          - entity: sensor.pi_hole_192_0_2_2_diagnostico_ultima_consulta_observada
             name: Last query observed
-          - entity: sensor.replace_with_entry_ingestion_coverage
+          - entity: sensor.pi_hole_192_0_2_2_diagnostico_cobertura_de_ingesta
             name: Ingestion coverage
-      - type: history-graph
-        title: Status and coverage · last 24 hours
-        hours_to_show: 24
-        entities:
-          - entity: sensor.replace_with_entry_communication_status
-            name: Status
-          - entity: sensor.replace_with_entry_ingestion_coverage
-            name: Coverage

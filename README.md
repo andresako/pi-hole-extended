@@ -1,105 +1,179 @@
 # Pi-hole Extended
 
-**See the DNS activity Pi-hole v6 reports to Home Assistant, organized by client.** Pi-hole Extended provides per-client query counters and diagnostics for the integration's connection and query coverage.
-
-> A community-built Home Assistant custom integration. It is not affiliated with or endorsed by Home Assistant or Pi-hole.
+[![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Andresako&repository=pi-hole-extended&category=integration)
 
 [![Latest release](https://img.shields.io/github/v/release/Andresako/pi-hole-extended?label=release)](https://github.com/Andresako/pi-hole-extended/releases/latest) [![HACS validation](https://github.com/andresako/pi-hole-extended/actions/workflows/hacs.yaml/badge.svg)](https://github.com/andresako/pi-hole-extended/actions/workflows/hacs.yaml) [![Hassfest](https://github.com/andresako/pi-hole-extended/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/andresako/pi-hole-extended/actions/workflows/hassfest.yaml)
 
-## At a glance
+**See which device on your network is talking to Pi-hole, and when one goes crazy.** Pi-hole Extended turns the queries Pi-hole v6 reports into per-device counters, an activity chart for your dashboards and sensors you can automate on.
 
-- One Home Assistant device for each client found in Pi-hole's query history.
-- Five sensors per client: total observed queries, queries in Pi-hole's last-minute window, allowed queries, blocked queries, and provisional queries.
-- Four integration diagnostics: communication status, last successful read, last observed query, and ingestion coverage.
-- Choose whether Home Assistant Activity records all new queries, blocked queries only, or none. Query details are not retained in sensor attributes or the integration Store.
-- A starter dashboard with four native Home Assistant views: **Summary**, **Clients**, **Details**, and **Diagnostics**.
+![Activity card showing three devices, one of them flagged as unusual](docs/images/activity-card-lines-en.png)
 
-The integration counts new queries it observes while polling Pi-hole. It does not recreate all traffic Pi-hole has ever handled. Entity totals are 29 for 5 clients, 129 for 25 clients, and 504 for 100 clients (five per client plus four integration diagnostics).
+> A community-built Home Assistant custom integration. It is not affiliated with or endorsed by Home Assistant or Pi-hole.
 
-## Dashboard previews
+## Features
 
-The screenshots below show a customized four-view Home Assistant example. Its 24-hour chart uses synthetic observations imported into a disposable Recorder for demonstration; Pi-hole Extended begins counting after setup and does not restore historical Pi-hole queries.
-
-![Pi-hole Extended overview with synthetic client totals and a 24-hour query chart](docs/images/overview.png)
-
-*Demonstration data — simulated Home Assistant observations. Client totals and chart history are synthetic and demonstrate the dashboard layout.*
-
-![Pi-hole Extended diagnostics with synthetic query history and integration health entities](docs/images/diagnostics.png)
-
-*Demonstration data — simulated Home Assistant observations. The chart is example Recorder history; connection and ingestion values reflect the isolated demo instance.*
+- **One Home Assistant device per client** that Pi-hole sees, with DNS query counters and allowed, blocked and provisional breakdowns.
+- **Activity card** to chart one or more devices by 5-minute to 1-day blocks over up to 30 days, as lines or bars. Everything is set from the card editor.
+- **Unusual-activity detection**: a device that stays far above its own usual rate is highlighted in the chart and turns on a binary sensor you can use in automations.
+- **Diagnostics** for the connection, the last read, the last query seen and ingestion coverage.
+- **Privacy-minded**: the integration keeps only counters, and the card and sensors use aggregate counts, never domains. Optional Activity entries do include the queried domain; choose *Totals only* to turn them off.
+- Independent of Home Assistant's built-in Pi-hole integration.
 
 ## Requirements
 
-- Home Assistant **2025.1 or newer**.
-- Pi-hole **v6**. The query API contract is checked against FTL **6.1.0–6.8.x**. Pi-hole also provides its API reference at `/api/docs`.
+- Home Assistant **2025.1 or newer**, with the Recorder enabled (the default).
+- Pi-hole **v6**. The query API contract is checked against FTL **6.1.0–6.8.x**; each Pi-hole serves its API reference at `/api/docs`.
 
-## Install with HACS
+## Installation
 
-Pi-hole Extended is available by adding its repository as a custom HACS repository.
+### HACS (recommended)
 
-1. In Home Assistant, open **HACS → Integrations → ⋮ → Custom repositories**.
-2. Add `https://github.com/Andresako/pi-hole-extended` and select **Integration**.
-3. Install **Pi-hole Extended**, then restart Home Assistant.
-4. Open **Settings → Devices & services → Add integration**, search for **Pi-hole Extended**, and follow the setup form.
+1. Select the button at the top of this page, or in HACS open **⋮ → Custom repositories**, add `https://github.com/Andresako/pi-hole-extended` and choose **Integration**.
+2. Install **Pi-hole Extended** and restart Home Assistant.
+3. Open **Settings → Devices & services → Add integration**, search for **Pi-hole Extended** and follow the form.
 
-For a manual installation, download [`pihole_queries-0.9.0.zip`](https://github.com/Andresako/pi-hole-extended/releases/download/0.9.0/pihole_queries-0.9.0.zip), extract `custom_components/pihole_queries` into your Home Assistant configuration directory, and restart Home Assistant.
+### Manual
 
-## Configure Pi-hole
+Download the latest release from the [releases page](https://github.com/Andresako/pi-hole-extended/releases/latest), copy `custom_components/pihole_queries` into your Home Assistant configuration directory and restart Home Assistant.
 
-Create an application password in Pi-hole's web interface under **Settings**. Pi-hole displays the password only once; see the [Pi-hole authentication guide](https://docs.pi-hole.net/api/auth/).
+## Configuration
 
-During setup, provide:
+Create an application password in Pi-hole's web interface under **Settings**; Pi-hole shows it only once ([authentication guide](https://docs.pi-hole.net/api/auth/)). Then enter:
 
-- Pi-hole hostname or IP address, without protocol, port, or path.
-- Web/API port.
-- Whether to use HTTPS and whether to verify the TLS certificate.
-- The application password.
-- Poll interval, from **1 to 3600 seconds** (default: **15 seconds**).
+| Field | Description |
+|---|---|
+| Host or IP address | Without protocol, port or path. |
+| Web/API port | Used exactly as entered. |
+| Use HTTPS / Verify certificate | Turn verification off only for a self-signed certificate. |
+| Application password | Stored in the integration entry and never written to logs. |
+| Polling interval | 1–3600 seconds (default 15). Shorter intervals show new queries sooner and make more API requests. |
 
-The password is stored with the Home Assistant integration entry and is not included in integration logs. A shorter poll interval can show new observations sooner and makes more API requests.
+### Options
 
-## See your first observations
+Open the integration and choose **Configure**:
 
-After setup, wait for a successful poll and check **Communication status** and **Ingestion coverage** in the integration's diagnostic entities. The first read establishes a baseline and does not count queries already present in Pi-hole's current snapshot. Then make a fresh DNS request from a device that uses this Pi-hole and wait for the next poll.
+| Option | Values | Effect |
+|---|---|---|
+| Polling interval | 1–3600 s | How often Pi-hole is read. |
+| Activity policy | Activity enabled · Totals only | Whether new queries are sent to Home Assistant Activity. *Totals only* sends none. |
+| Activity events | All · Blocked only · None | Which new queries appear in Activity. Counters are never filtered. |
+| Unusual activity alert | Off · Low · Medium · High | Sensitivity of the card and the binary sensors. *Off* creates no sensors. Default: Medium. |
 
-The client's **DNS queries** counter increases when a new query is observed. Allowed and blocked queries update their classifier counters; unrecognized or incomplete results remain provisional and are excluded from the classified percentage. With Activity enabled, a new query can also appear in Home Assistant's **Activity** when the Activity option permits it. Activity and Recorder persistence depend on your Home Assistant configuration.
+Use **Reconfigure** to change the address or credentials; choose *Same Pi-hole* to keep counters and identity, or *Replacement Pi-hole* when the server itself was replaced.
 
-## Choose what to retain
+## Entities
 
-In the integration's options, choose a retention mode:
+For every client, grouped under its own device:
 
-- **Activity enabled** (default): sends new query events to Activity according to the selected Activity setting. Query details are not retained by the integration.
-- **Totals only**: keeps numeric totals and client identities and suppresses new Activity entries.
+| Entity | Description |
+|---|---|
+| `sensor.phe_<client>_consultas_dns` | **DNS queries**: cumulative queries observed. |
+| `sensor.phe_<client>_consultas_en_el_ultimo_minuto` | **Queries (last minute)**: rolling count by Pi-hole's query time. |
+| `sensor.phe_<client>_permitidas_v1` | **Allowed queries**, cumulative. |
+| `sensor.phe_<client>_bloqueadas_v1` | **Blocked queries**, cumulative. |
+| `sensor.phe_<client>_provisionales_v1` | **Provisional queries**: result not yet recognized. |
+| `binary_sensor.phe_<client>_actividad_inusual` | **Unusual activity**, see below. |
 
-See [technical details and limits](docs/DETAILS.md) for retention behavior and high-volume considerations.
+Per Pi-hole entry, four diagnostic sensors: **Communication status**, **Last successful read**, **Last query observed** and **Ingestion coverage**. `<client>` is the client's address with underscores, for example `192_0_2_21`; the entity registry shows the exact IDs.
 
-## Add the example dashboard
+The integration counts the queries it observes while polling. It does not backfill what Pi-hole handled before setup.
 
-The [starter dashboard YAML](examples/dashboards/pihole-extended.yaml) contains four views built from Home Assistant's native cards. It uses placeholder entity IDs: copy the YAML into a new dashboard and map each placeholder to the entity IDs in your own entity registry. Follow the [dashboard guide](docs/dashboard-examples.md); do not replace an existing dashboard's configuration.
+## Activity card
 
-## Spot a misbehaving device with the activity card
-
-The integration ships a Lovelace card, loaded automatically, that charts per-device DNS activity and highlights unusual spikes. Add it to any dashboard in **Edit dashboard → Add card → Manual**:
+The card is loaded automatically. Add it to a dashboard with **Edit dashboard → Add card → Pi-hole Extended activity**, or paste it as a manual card:
 
 ```yaml
 type: custom:phe-activity-card
 ```
 
-Everything is configured from the card editor (**Edit card**): choose one or more devices (up to 12), the block size (5 min to 1 day), the range (6 hours to 30 days), lines or bars, a logarithmic scale, and whether to warn about devices with unusual activity (a red counter and a list, also for devices not in the chart; nothing is shown while all are normal). The settings are saved in the dashboard, so every viewer sees the same chart. In the legend, click a device's colored dot to hide or show it in the chart, and click its name to open Home Assistant's history for that sensor. Without devices selected the card shows the three busiest. YAML keys: `title`, `entities`, `bucket`, `span`, `chart_type` (`line` or `bar`), `log_scale`, `show_overview` and `names` (`{entity_id: label}`).
+![Activity card with two devices as bars over three days](docs/images/activity-card-bars-en.png)
 
-A device is marked **unusual** when it stays well above its own recent pattern: several times its usual level, above its typical daily peak, and above a minimum rate, for at least 15 minutes. Quiet or regularly bursty devices are not flagged for normal behavior. Charts use Home Assistant's long-term statistics of the **DNS queries** counter, so the time axis is when Home Assistant received the data, 5/15/30-minute blocks are only available for ranges up to 10 days (Recorder default), and a new device needs about a day of history before it has a baseline. Only aggregate counts are read; no domains.
+Choose the devices, block size, range, chart type and other settings in the card editor. They are saved in the dashboard, so everyone sees the same chart. With no devices selected the card shows the three busiest. You can also write the options in YAML:
 
-### Unusual-activity sensors
+```yaml
+type: custom:phe-activity-card
+title: Network activity
+entities:
+  - sensor.phe_192_0_2_21_consultas_dns
+  - sensor.phe_192_0_2_34_consultas_dns
+bucket: 30m
+span: 1d
+chart_type: bar
+log_scale: false
+show_overview: true
+names:
+  sensor.phe_192_0_2_21_consultas_dns: Living-room TV
+```
 
-For automations, each device also gets an **Unusual activity** binary sensor (`binary_sensor.phe_<device>_actividad_inusual`) that turns on while the device stays well above its own usual rate. It uses the same detection as the card, evaluated every 5 minutes from Recorder statistics, so it reacts within roughly 10–20 minutes and stays *unknown* until the device has about a day of history. Its attributes show the current rate, the usual rate, the threshold, how many times the usual rate it is and when the episode started. Choose **Off**, **Low**, **Medium** (default) or **High** sensitivity in the integration's options; *Off* creates no sensors. The card uses the same sensitivity.
+| Option | Values | Default |
+|---|---|---|
+| `entities` | Up to 12 **DNS queries** counters | The three busiest |
+| `bucket` | `5m` `15m` `30m` `1h` `3h` `6h` `1d` | `30m` |
+| `span` | `6h` `12h` `1d` `3d` `7d` `14d` `30d` | `1d` |
+| `chart_type` | `line` · `bar` | `line` |
+| `log_scale` | `true` · `false` | `false` |
+| `show_overview` | Warn about unusual devices, including ones not in the chart | `true` |
+| `title` | Optional heading | none |
+| `names` | `{entity_id: label}` | the client's name |
+
+In the legend, select a device's colored dot to hide or show it, or its name to open Home Assistant's history for that sensor. Hover the chart for a cursor and a tooltip with each device's rate and how it compares with its usual level.
+
+The card reads Home Assistant's long-term statistics, so the time axis is when Home Assistant received the data. Blocks under one hour are available for ranges up to 10 days, the Recorder's default for 5-minute statistics.
+
+## Unusual activity
+
+A device is **unusual** when it stays well above its own recent pattern: several times its usual level, above its typical daily peak and above a minimum rate, for at least 15 minutes. Quiet devices and devices that burst regularly are not flagged for normal behavior, and a new device has no baseline until 24 blocks of history exist (two hours for the sensors).
+
+Each device gets a **Unusual activity** binary sensor that is *on* while that happens, *off* otherwise and *unknown* until it has enough history (24 five-minute blocks). It is evaluated every 5 minutes, so it reacts within 10 to 20 minutes. Its attributes are `current_rate`, `usual_rate`, `threshold`, `times_usual`, `since` and `evaluated_at`.
+
+```yaml
+automation:
+  - alias: Pi-hole · unusual device activity
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.phe_192_0_2_47_actividad_inusual
+        to: "on"
+        for: "00:10:00"
+    actions:
+      - action: notify.notify
+        data:
+          title: Unusual DNS activity
+          message: >-
+            {{ trigger.to_state.name }} is making
+            {{ trigger.to_state.attributes.current_rate }} queries/min,
+            {{ trigger.to_state.attributes.times_usual }}× its usual.
+```
+
+Ready-to-import [dashboard](examples/dashboards/pihole-extended.yaml) and [automation](examples/automations/unusual-activity-alert.yaml) examples, and how to adapt them, are in the [examples guide](docs/dashboard-examples.md).
+
+## Good to know
+
+- The card and the sensors read Recorder statistics. If you restrict the Recorder with `include`, record the client sensors:
+
+  ```yaml
+  recorder:
+    include:
+      entity_globs:
+        - sensor.phe_*
+  ```
+
+- With Activity enabled, each new query is written to Home Assistant's **Activity** (logbook) with its client, domain and result. Whether it is kept depends on your Recorder and Activity filters. Choose *Totals only* if you do not want domains in the logbook.
+- At very short polling intervals, or with hundreds of clients, see [technical details](docs/DETAILS.md) for the measured limits.
 
 ## Troubleshooting
 
-- **Counters do not increase:** check communication status, host, port, TLS settings, password, poll interval, and whether Pi-hole still exposes the query in its in-memory history.
-- **Counters increase but Activity is empty:** confirm Activity enabled is selected, Activity is set to All or Blocked only as desired, and Home Assistant's Activity filters allow the event. The integration does not verify persistence.
+- **Counters do not increase:** check **Communication status**, host, port, TLS settings, the password and whether Pi-hole still holds the query in its in-memory history.
+- **Counters increase but Activity is empty:** confirm *Activity enabled* is selected, that the events setting allows the result and that Home Assistant's Activity filters allow it.
+- **The card is not listed or shows "Custom element doesn't exist":** restart Home Assistant after installing or updating and refresh the browser without cache.
+- **The chart is empty:** the client needs recorded statistics; wait a few minutes after setup and check the Recorder includes `sensor.phe_*`.
+- **Unusual-activity sensors stay unknown:** a device needs at least 24 blocks of recorded history (two hours for the sensors) before it has a baseline.
 
-## Links
+## Support
 
-- [Dashboard guide](docs/dashboard-examples.md) · [Technical details and limitations](docs/DETAILS.md)
-- [Report a problem](https://github.com/Andresako/pi-hole-extended/issues) · [Security policy](SECURITY.md) · [MIT license](LICENSE)
-- [Read this guide in Spanish](README.es.md)
+- [Report a problem or request a feature](https://github.com/Andresako/pi-hole-extended/issues)
+- [Changelog](CHANGELOG.md) · [Technical details](docs/DETAILS.md) · [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md)
+- [Leer en español](README.es.md)
+
+## License
+
+[MIT](LICENSE)

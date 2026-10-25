@@ -21,7 +21,7 @@ recorder:
       - sensor.phe_*
 ```
 
-Ten en cuenta que `recorder.include` hace que Recorder guarde solo las entidades incluidas. La versión 0.6.0 normaliza los IDs de los sensores por cliente bajo el prefijo `phe_` y retira las antiguas entidades de tasas por segundo. Si habías personalizado un ID, la migración lo puede cambiar al formato normalizado. La migración no borra el historial ya guardado en Recorder. Los nombres que se muestran son descriptivos y no repiten el ID técnico. Si una automatización o un panel usaba el ID anterior, actualiza esa referencia después de la migración.
+Ten en cuenta que `recorder.include` hace que Recorder guarde solo las entidades incluidas. La tarjeta de actividad y los sensores de actividad inusual leen estadísticas del Recorder, así que los sensores de cliente deben registrarse.
 
 ## Requisito de persistencia
 
@@ -95,6 +95,10 @@ custom_components/pihole_queries/
   __init__.py       # ciclo de vida de la entrada
   api.py            # autenticación SID y GET /api/queries
   config_flow.py    # configuración y opciones desde la interfaz
+  activity*.py      # series de actividad, detección y evaluación periódica
+  binary_sensor.py  # sensor de actividad inusual por cliente
+  websocket.py      # comando para la tarjeta
+  frontend/         # tarjeta de Lovelace y sus traducciones
   const.py
   coordinator.py    # sondeo, cursor, resumen por cliente y eventos Activity
   sensor.py         # dispositivo y entidades sencillas por cliente DNS
@@ -102,4 +106,20 @@ custom_components/pihole_queries/
   strings.json
 ```
 
-La versión 0.10.0 añade sensores binarios de actividad inusual por cliente con una opción de sensibilidad, la tarjeta de Lovelace `phe-activity-card` y un comando websocket que leen las estadísticas del Recorder del contador de consultas DNS por cliente para mostrar la actividad por bloque y rango y marcar actividad inusual sostenida. La versión 0.9.0 retira el historial detallado de consultas: la integración ya no conserva filas de consultas individuales ni atributos de consultas recientes, elimina esos campos de su Store al cargarlo y renombra las opciones a **Activity habilitada** y **Solo totales**. La versión 0.8.0 retira los contadores antiguos sin versión de permitidas/bloqueadas y conserva sus entradas del registro de entidades y su historial de Recorder; también documenta el comportamiento medido con volumen alto. La versión 0.7.0 reduce el uso de memoria al publicar resúmenes de consultas y mejora el manejo de los datos retenidos, con cobertura de migraciones y regresiones. La versión 0.6.0 añade contadores móviles de observación del último minuto como atributos del sensor total, nombres sencillos para las entidades, normalización de IDs y una corrección de paginación del cursor. La versión 0.5.2 distingue los errores de API y Logbook en los registros para facilitar el diagnóstico. La versión 0.5.1 antepone `phe` a los IDs de sensores por cliente para facilitar los filtros de Recorder. La versión 0.4.1 permite configurar un sondeo de 1 segundo; esa opción controla la frecuencia de consulta a la API, no la ventana de los sensores. La versión 0.4.0 añadió tasas por cliente que se reemplazaron en la versión 0.6.0 por contadores móviles del último minuto en los atributos del sensor total.
+## Tarjeta de actividad y detección de actividad inusual
+
+La tarjeta (`frontend/phe-activity-card.js`, con traducciones en `frontend/translations/`) se sirve desde `/pihole_queries_static/` y se añade a todos los paneles con `add_extra_js_url`. Llama al comando websocket `pihole_queries/client_activity` con hasta 12 contadores **Consultas DNS**, un tamaño de bloque y un rango.
+
+El comando lee del Recorder la estadística `change` de cada contador (estadísticas de 5 minutos para bloques de menos de una hora, horarias en el resto), la suma en bloques y normaliza cada bloque a consultas por minuto según el tiempo realmente cubierto, de modo que los huecos y los bloques parciales no se leen como caídas. Los reinicios del contador y los cambios negativos cuentan como cero. La referencia usa hasta siete días anteriores al rango visible (limitados a diez días para estadísticas de 5 minutos).
+
+Un bloque supera el umbral cuando su tasa excede el mayor de estos valores: la mediana del dispositivo más un múltiplo de su desviación absoluta mediana, un múltiplo de su mediana, un múltiplo de la mediana de sus picos diarios y una tasa mínima. Con al menos tres días de historial y bloques de una hora o menos, la mediana y la desviación se calculan por hora del día. Una racha es **inusual** cuando los bloques se mantienen sobre el umbral durante una duración mínima. La sensibilidad fija esos múltiplos, la tasa mínima y la duración mínima:
+
+| Sensibilidad | Múltiplo de la mediana | Tasa mínima | Duración mínima |
+|---|---|---|---|
+| Baja | 8× | 20 consultas/min | 30 min |
+| Media | 5× | 10 consultas/min | 15 min |
+| Alta | 3× | 5 consultas/min | 10 min |
+
+Un dispositivo necesita al menos 24 bloques de historial para tener referencia. Solo se leen recuentos agregados; nunca intervienen dominios.
+
+Los sensores binarios ejecutan el mismo código cada cinco minutos sobre bloques de 5 minutos de las últimas seis horas (más la referencia previa), con una lectura del Recorder por cada doce clientes, y permanecen *desconocidos* sin referencia. Si una lectura falla, conservan el resultado anterior.
