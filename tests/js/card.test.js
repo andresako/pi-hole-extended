@@ -44,3 +44,9 @@ test("editor schema offers only integration devices and all supported options", 
   assert.ok(schema.some((f) => f.name === "log_scale"));
   assert.ok(schema.some((f) => f.name === "show_overview"));
 });
+
+test("editor offers lines and bars", () => {
+  const schema = c.pheEditorSchema([], { editLine: "Líneas", editBar: "Barras" });
+  const type = schema.find((f) => f.name === "chart_type").selector.select.options;
+  assert.deepStrictEqual(type, [{ value: "line", label: "Líneas" }, { value: "bar", label: "Barras" }]);
+});

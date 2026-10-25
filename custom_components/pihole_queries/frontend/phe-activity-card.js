@@ -5,7 +5,7 @@
  *
  * Everything is configured from the card editor in the dashboard UI (YAML keys:
  * title, entities, bucket 5m|15m|30m|1h|3h|6h|1d, span 6h|12h|1d|3d|7d|14d|30d,
- * log_scale, show_overview, names {entity_id: label}).
+ * chart_type line|bar, log_scale, show_overview, names {entity_id: label}).
  * No external dependencies. Data comes from the integration websocket command
  * `pihole_queries/client_activity` (recorder statistics, aggregate counts only).
  */
@@ -29,7 +29,7 @@ const PHE_TEXT = {
     unavailable: "Not available: 5/15/30 min blocks need a range of 10 days or less.", tooMany: "Too many blocks for this range.",
     biggerThanRange: "The block is larger than the range.", ingest: "Time is when Home Assistant received the data.",
     times: "x usual", configHint: "Choose the devices in the card editor.",
-    editTitle: "Title", editDevices: "Devices", editBucket: "Block size", editSpan: "Range", editLog: "Logarithmic scale", editOverview: "Show devices with unusual activity", editDevicesHelp: "Up to 12. Leave empty to show the three busiest.", editInvalid: "That block size is not available for this range; the card will use a larger one.",
+    editTitle: "Title", editDevices: "Devices", editBucket: "Block size", editSpan: "Range", editLog: "Logarithmic scale", editChartType: "Chart type", editLine: "Lines", editBar: "Bars", editOverview: "Show devices with unusual activity", editDevicesHelp: "Up to 12. Leave empty to show the three busiest.", editInvalid: "That block size is not available for this range; the card will use a larger one.",
   },
   es: {
     title: "Actividad por dispositivo", devices: "Dispositivos", add: "Añadir dispositivo…", bucket: "Bloque", span: "Rango",
@@ -39,7 +39,7 @@ const PHE_TEXT = {
     unavailable: "No disponible: los bloques de 5/15/30 min requieren un rango de 10 días o menos.", tooMany: "Demasiados bloques para este rango.",
     biggerThanRange: "El bloque es mayor que el rango.", ingest: "La hora es la de recepción del dato en Home Assistant.",
     times: "x lo habitual", configHint: "Elige los dispositivos en el editor de la tarjeta.",
-    editTitle: "Título", editDevices: "Dispositivos", editBucket: "Tamaño de bloque", editSpan: "Rango", editLog: "Escala logarítmica", editOverview: "Mostrar dispositivos con actividad inusual", editDevicesHelp: "Hasta 12. Vacío muestra los tres más activos.", editInvalid: "Ese bloque no está disponible para este rango; la tarjeta usará uno mayor.",
+    editTitle: "Título", editDevices: "Dispositivos", editBucket: "Tamaño de bloque", editSpan: "Rango", editLog: "Escala logarítmica", editChartType: "Tipo de gráfica", editLine: "Líneas", editBar: "Barras", editOverview: "Mostrar dispositivos con actividad inusual", editDevicesHelp: "Hasta 12. Vacío muestra los tres más activos.", editInvalid: "Ese bloque no está disponible para este rango; la tarjeta usará uno mayor.",
   },
 };
 
@@ -94,11 +94,11 @@ class PheActivityCard extends HTMLElement {
     this._cfg = {};
     this._devices = [];
     this._sig = "";
-    this._state = { selected: [], bucket: "30m", span: "1d", log: false, overview: true };
+    this._state = { selected: [], bucket: "30m", span: "1d", log: false, overview: true, type: "line" };
     this._data = null;
     this._status = "loading";
     this._overview = {};
-    this._hover = null;
+    this._scale = null;
     this._timer = null;
     this._seq = 0;
   }
@@ -157,6 +157,7 @@ class PheActivityCard extends HTMLElement {
       span,
       log: cfg.log_scale === true,
       overview: cfg.show_overview !== false,
+      type: cfg.chart_type === "bar" ? "bar" : "line",
     };
   }
 
@@ -256,17 +257,27 @@ class PheActivityCard extends HTMLElement {
       const pts = d.series[ids[0]].points.filter((p) => p.threshold != null);
       if (pts.length > 1) svg += `<polyline points="${pts.map((p) => `${x(p.t + d.bucket_seconds / 2)},${y(p.threshold)}`).join(" ")}" class="threshold"/>`;
     }
-    ids.forEach((id) => {
+    const bar = this._state.type === "bar";
+    const bucketPx = ((W - L - R) * d.bucket_seconds) / (d.to - d.from);
+    const groupW = Math.max(1, bucketPx * 0.8);
+    const barW = Math.max(1, groupW / Math.max(1, ids.length));
+    ids.forEach((id, index) => {
       const color = PHE_COLORS[this._state.selected.indexOf(id) % PHE_COLORS.length];
       const pts = d.series[id].points;
       if (!pts.length) return;
+      if (bar) {
+        for (const p of pts) {
+          const top = y(p.rate), base = y(0);
+          const bx = x(p.t) + (bucketPx - groupW) / 2 + index * barW;
+          svg += `<rect x="${bx}" y="${top}" width="${Math.max(0.6, barW - (barW > 3 ? 1 : 0))}" height="${Math.max(0, base - top)}" fill="${color}"${p.unusual ? ` stroke="${PHE_ALERT}" stroke-width="1.4"` : ""}/>`;
+        }
+        return;
+      }
       svg += `<polyline points="${pts.map((p) => `${x(p.t + d.bucket_seconds / 2)},${y(p.rate)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/>`;
       for (const p of pts) if (p.unusual) svg += `<circle cx="${x(p.t + d.bucket_seconds / 2)}" cy="${y(p.rate)}" r="3.2" fill="${PHE_ALERT}" stroke="var(--card-background-color, #fff)" stroke-width="1"/>`;
     });
-    if (this._hover != null) {
-      const hx = x(this._hover.t + d.bucket_seconds / 2);
-      svg += `<line x1="${hx}" x2="${hx}" y1="${T}" y2="${H - B}" class="cursor"/>`;
-    }
+    this._scale = { x, y, T, B, H };
+    svg += `<line class="cursor" y1="${T}" y2="${H - B}" visibility="hidden"/><g class="dots"></g>`;
     svg += `<rect class="hit" x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}"/></svg>`;
     return `<div class="chart">${svg}<div class="tip" hidden></div></div>`;
   }
@@ -313,7 +324,8 @@ class PheActivityCard extends HTMLElement {
         .axis { fill:var(--secondary-text-color,#666); font-size:13px; }
         .alert-band { fill:${PHE_ALERT}; opacity:.14; }
         .threshold { fill:none; stroke:var(--secondary-text-color,#888); stroke-dasharray:4 4; stroke-width:1; }
-        .cursor { stroke:var(--secondary-text-color,#888); stroke-width:1; }
+        .cursor { stroke:var(--secondary-text-color,#888); stroke-width:1; pointer-events:none; }
+        .dots { pointer-events:none; }
         .hit { fill:transparent; }
         .tip { position:absolute; top:6px; pointer-events:none; background:var(--card-background-color,#fff); color:var(--primary-text-color); border:1px solid var(--divider-color,#ccc); border-radius:8px; padding:6px 8px; font-size:.78rem; box-shadow:0 2px 8px rgba(0,0,0,.2); white-space:nowrap; z-index:2; }
         .note { padding:36px 8px; text-align:center; color:var(--secondary-text-color); }
@@ -342,7 +354,14 @@ class PheActivityCard extends HTMLElement {
     const hit = r.querySelector(".hit");
     if (hit && this._data) {
       hit.onpointermove = (e) => this._showTip(e);
-      hit.onpointerleave = () => { const tip = r.querySelector(".tip"); if (tip) tip.hidden = true; };
+      hit.onpointerleave = () => {
+        const tip = r.querySelector(".tip");
+        if (tip) tip.hidden = true;
+        const cursor = r.querySelector(".cursor");
+        if (cursor) cursor.setAttribute("visibility", "hidden");
+        const dots = r.querySelector(".dots");
+        if (dots) dots.innerHTML = "";
+      };
     }
   }
 
@@ -356,15 +375,24 @@ class PheActivityCard extends HTMLElement {
     const t = this._t;
     const slot = Math.floor(ts / d.bucket_seconds) * d.bucket_seconds;
     const lines = [];
+    const points = [];
     for (const id of this._state.selected) {
       const s = d.series[id];
       const p = s && s.points.find((q) => q.t === slot);
       if (!p) continue;
+      points.push({ id, p });
       const mult = p.base > 0 ? ` · ${pheFmt(p.rate / p.base)}${t.times}` : "";
       lines.push(`<div style="color:${p.unusual ? PHE_ALERT : "inherit"}">${this._esc(this._label(id))}: <b>${pheFmt(p.rate)}</b> ${t.rate}${p.base != null ? mult : ""}</div>`);
     }
     const tip = this.shadowRoot.querySelector(".tip");
-    if (!lines.length) { tip.hidden = true; return; }
+    const cursor = this.shadowRoot.querySelector(".cursor");
+    const dots = this.shadowRoot.querySelector(".dots");
+    if (!lines.length) { tip.hidden = true; cursor.setAttribute("visibility", "hidden"); dots.innerHTML = ""; return; }
+    const cx = this._scale.x(slot + d.bucket_seconds / 2);
+    cursor.setAttribute("x1", cx);
+    cursor.setAttribute("x2", cx);
+    cursor.setAttribute("visibility", "visible");
+    dots.innerHTML = this._state.type === "bar" ? "" : points.map(({ id, p }) => `<circle cx="${cx}" cy="${this._scale.y(p.rate)}" r="4" fill="${PHE_COLORS[this._state.selected.indexOf(id) % PHE_COLORS.length]}" stroke="var(--card-background-color, #fff)" stroke-width="1.5"/>`).join("");
     const when = new Intl.DateTimeFormat(this._hass.language, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(slot * 1000));
     tip.innerHTML = `<div class="muted">${when}</div>${lines.join("")}`;
     tip.hidden = false;
@@ -385,6 +413,7 @@ function pheEditorSchema(devices, t) {
         { name: "span", selector: { select: { mode: "dropdown", options: PHE_SPANS.map((v) => ({ value: v, label: v })) } } },
       ],
     },
+    { name: "chart_type", selector: { select: { mode: "box", options: [{ value: "line", label: (t && t.editLine) || "Lines" }, { value: "bar", label: (t && t.editBar) || "Bars" }] } } },
     { name: "log_scale", selector: { boolean: {} } },
     { name: "show_overview", selector: { boolean: {} } },
   ];
@@ -392,7 +421,7 @@ function pheEditorSchema(devices, t) {
 
 class PheActivityCardEditor extends HTMLElement {
   setConfig(config) {
-    this._config = { bucket: "30m", span: "1d", show_overview: true, log_scale: false, ...config };
+    this._config = { bucket: "30m", span: "1d", show_overview: true, log_scale: false, chart_type: "line", ...config };
     this._render();
   }
 
@@ -420,7 +449,7 @@ class PheActivityCardEditor extends HTMLElement {
       });
       this.append(this._form, this._note);
     }
-    const labels = { title: t.editTitle, entities: t.editDevices, bucket: t.editBucket, span: t.editSpan, log_scale: t.editLog, show_overview: t.editOverview };
+    const labels = { title: t.editTitle, entities: t.editDevices, bucket: t.editBucket, span: t.editSpan, chart_type: t.editChartType, log_scale: t.editLog, show_overview: t.editOverview };
     const helpers = { entities: t.editDevicesHelp };
     this._form.hass = this._hass;
     this._form.data = this._config;
