@@ -3,8 +3,9 @@
  *
  *   type: custom:phe-activity-card
  *
- * Optional: title, entities (preselection), names ({entity_id: label}),
- * bucket (5m|15m|30m|1h|3h|6h|1d), span (6h|12h|1d|3d|7d|14d|30d).
+ * Everything is configured from the card editor in the dashboard UI (YAML keys:
+ * title, entities, bucket 5m|15m|30m|1h|3h|6h|1d, span 6h|12h|1d|3d|7d|14d|30d,
+ * log_scale, show_overview, names {entity_id: label}).
  * No external dependencies. Data comes from the integration websocket command
  * `pihole_queries/client_activity` (recorder statistics, aggregate counts only).
  */
@@ -27,7 +28,8 @@ const PHE_TEXT = {
     unusualNow: "Unusual activity", none: "None", rate: "queries/min", base: "usual", noBase: "not enough history for a baseline",
     unavailable: "Not available: 5/15/30 min blocks need a range of 10 days or less.", tooMany: "Too many blocks for this range.",
     biggerThanRange: "The block is larger than the range.", ingest: "Time is when Home Assistant received the data.",
-    times: "x usual", remove: "Remove", search: "Search",
+    times: "x usual", configHint: "Choose the devices in the card editor.",
+    editTitle: "Title", editDevices: "Devices", editBucket: "Block size", editSpan: "Range", editLog: "Logarithmic scale", editOverview: "Show devices with unusual activity", editDevicesHelp: "Up to 12. Leave empty to show the three busiest.", editInvalid: "That block size is not available for this range; the card will use a larger one.",
   },
   es: {
     title: "Actividad por dispositivo", devices: "Dispositivos", add: "Añadir dispositivo…", bucket: "Bloque", span: "Rango",
@@ -36,7 +38,8 @@ const PHE_TEXT = {
     unusualNow: "Actividad inusual", none: "Ninguna", rate: "consultas/min", base: "habitual", noBase: "sin historial suficiente para una referencia",
     unavailable: "No disponible: los bloques de 5/15/30 min requieren un rango de 10 días o menos.", tooMany: "Demasiados bloques para este rango.",
     biggerThanRange: "El bloque es mayor que el rango.", ingest: "La hora es la de recepción del dato en Home Assistant.",
-    times: "x lo habitual", remove: "Quitar", search: "Buscar",
+    times: "x lo habitual", configHint: "Elige los dispositivos en el editor de la tarjeta.",
+    editTitle: "Título", editDevices: "Dispositivos", editBucket: "Tamaño de bloque", editSpan: "Rango", editLog: "Escala logarítmica", editOverview: "Mostrar dispositivos con actividad inusual", editDevicesHelp: "Hasta 12. Vacío muestra los tres más activos.", editInvalid: "Ese bloque no está disponible para este rango; la tarjeta usará uno mayor.",
   },
 };
 
@@ -91,22 +94,26 @@ class PheActivityCard extends HTMLElement {
     this._cfg = {};
     this._devices = [];
     this._sig = "";
-    this._state = { selected: [], bucket: "30m", span: "1d", log: false };
+    this._state = { selected: [], bucket: "30m", span: "1d", log: false, overview: true };
     this._data = null;
     this._status = "loading";
     this._overview = {};
     this._hover = null;
     this._timer = null;
     this._seq = 0;
-    this._filter = "";
   }
 
-  static getStubConfig() { return {}; }
+  static getStubConfig(hass) {
+    const devices = pheDiscover(hass && hass.states);
+    return { entities: devices.sort((a, b) => b.rate - a.rate).slice(0, 3).map((d) => d.id), bucket: "30m", span: "1d" };
+  }
+
+  static getConfigElement() { return document.createElement("phe-activity-card-editor"); }
   getCardSize() { return 8; }
 
   setConfig(config) {
     this._cfg = config || {};
-    this._restore();
+    this._applyConfig();
     this._render();
     if (this._hass) this._load();
   }
@@ -119,8 +126,8 @@ class PheActivityCard extends HTMLElement {
     if (sig !== this._sig) {
       this._sig = sig;
       this._devices = devices;
-      if (!this._state.selected.length) this._state.selected = this._defaultSelection();
       this._state.selected = this._state.selected.filter((id) => devices.some((d) => d.id === id));
+      if (!this._state.selected.length) this._state.selected = this._defaultSelection();
       this._render();
       this._load();
       this._loadOverview();
@@ -140,36 +147,21 @@ class PheActivityCard extends HTMLElement {
   }
 
   get _t() { return PHE_TEXT[(this._hass && this._hass.language || "en").slice(0, 2)] || PHE_TEXT.en; }
-  get _key() { return "phe-activity-card:" + (this._cfg.title || "default"); }
-
-  _restore() {
-    const base = { selected: [...(this._cfg.entities || [])], bucket: this._cfg.bucket || "30m", span: this._cfg.span || "1d", log: false };
-    let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(this._key) || "{}"); } catch (e) { saved = {}; }
-    const state = { ...base, ...saved };
-    if (!PHE_BUCKETS.includes(state.bucket)) state.bucket = base.bucket;
-    if (!PHE_SPANS.includes(state.span)) state.span = base.span;
-    if (!Array.isArray(state.selected)) state.selected = base.selected;
-    state.selected = state.selected.slice(0, PHE_MAX_DEVICES);
-    this._state = state;
-  }
-
-  _persist() {
-    try { localStorage.setItem(this._key, JSON.stringify(this._state)); } catch (e) { /* storage may be unavailable */ }
+  _applyConfig() {
+    const cfg = this._cfg;
+    const bucket = PHE_BUCKETS.includes(cfg.bucket) ? cfg.bucket : "30m";
+    const span = PHE_SPANS.includes(cfg.span) ? cfg.span : "1d";
+    this._state = {
+      selected: (Array.isArray(cfg.entities) ? cfg.entities : []).slice(0, PHE_MAX_DEVICES),
+      bucket: pheNearestValidBucket(bucket, span),
+      span,
+      log: cfg.log_scale === true,
+      overview: cfg.show_overview !== false,
+    };
   }
 
   _defaultSelection() {
     return [...this._devices].sort((a, b) => b.rate - a.rate).slice(0, 3).map((d) => d.id);
-  }
-
-  _update(patch) {
-    this._state = { ...this._state, ...patch };
-    if (pheValidate(this._state.bucket, this._state.span)) {
-      this._state.bucket = pheNearestValidBucket(this._state.bucket, this._state.span);
-    }
-    this._persist();
-    this._render();
-    this._load();
   }
 
   async _load() {
@@ -290,21 +282,19 @@ class PheActivityCard extends HTMLElement {
       const detail = !s ? "" : !s.has_baseline ? t.noBase : latest ? `${pheFmt(latest.rate)} ${t.rate} · ${t.base} ${pheFmt(latest.base)}` : "";
       return { id, color, unusual, score: s ? s.score : 0, label: this._label(id), detail };
     }).sort((a, b) => b.score - a.score);
-    return rows.map((r) => `<div class="row${r.unusual ? " alert" : ""}"><span class="dot" style="background:${r.color}"></span><span class="name">${this._esc(r.label)}</span><span class="detail">${this._esc(r.detail)}</span>${r.unusual ? `<span class="pill">${t.unusual}</span>` : ""}<button class="rm" data-rm="${r.id}" title="${t.remove}" aria-label="${t.remove}">×</button></div>`).join("");
+    return rows.map((r) => `<div class="row${r.unusual ? " alert" : ""}"><span class="dot" style="background:${r.color}"></span><span class="name">${this._esc(r.label)}</span><span class="detail">${this._esc(r.detail)}</span>${r.unusual ? `<span class="pill">${t.unusual}</span>` : ""}</div>`).join("");
   }
 
   _esc(v) { return String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   _render() {
     const t = this._t;
-    const { bucket, span, selected, log } = this._state;
+    const { bucket, span } = this._state;
     const unusual = this._unusualNow();
-    const available = this._devices.filter((d) => !selected.includes(d.id) && (!this._filter || (d.label + d.ip).toLowerCase().includes(this._filter.toLowerCase())));
-    const opt = (list, cur) => list.map((v) => `<option value="${v}"${v === cur ? " selected" : ""}>${v}</option>`).join("");
-    const bucketOpts = PHE_BUCKETS.map((v) => `<option value="${v}"${v === bucket ? " selected" : ""}${pheValidate(v, span) ? " disabled" : ""}>${v}</option>`).join("");
     const overview = unusual.length
-      ? unusual.map((u) => `<button class="chip alert" data-add="${u.device.id}">${this._esc(u.device.label)} · ${u.multiple ? pheFmt(u.multiple) + "×" : pheFmt(u.rate) + " " + t.rate}</button>`).join("")
+      ? unusual.map((u) => `<span class="chip alert">${this._esc(u.device.label)} · ${u.multiple ? pheFmt(u.multiple) + "×" : pheFmt(u.rate) + " " + t.rate}</span>`).join("")
       : `<span class="muted">${t.none}</span>`;
+    const configured = Array.isArray(this._cfg.entities) && this._cfg.entities.length > 0;
     this.shadowRoot.innerHTML = `
       <style>
         :host { display:block; }
@@ -312,13 +302,10 @@ class PheActivityCard extends HTMLElement {
         .head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
         h2 { font-size:1.1rem; font-weight:500; margin:0; flex:1 1 auto; color:var(--primary-text-color); }
         .badge { background:${unusual.length ? PHE_ALERT : "var(--divider-color,#ddd)"}; color:${unusual.length ? "#fff" : "var(--secondary-text-color)"}; border-radius:12px; padding:2px 10px; font-size:.8rem; }
-        .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-bottom:8px; }
-        label { display:flex; flex-direction:column; font-size:.72rem; color:var(--secondary-text-color); gap:2px; }
-        select, input { font:inherit; font-size:.9rem; padding:5px 8px; border-radius:8px; border:1px solid var(--divider-color,#ccc); background:var(--card-background-color,#fff); color:var(--primary-text-color); min-height:34px; }
-        .toggle { font-size:.85rem; padding:5px 10px; border-radius:8px; border:1px solid var(--divider-color,#ccc); background:transparent; color:var(--primary-text-color); cursor:pointer; min-height:34px; }
+        .sub { color:var(--secondary-text-color); font-size:.8rem; margin:-4px 0 6px; }
         .overview { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:4px 0 8px; font-size:.85rem; }
         .overview b { font-weight:500; color:var(--secondary-text-color); }
-        .chip { border:1px solid var(--divider-color,#ccc); background:transparent; border-radius:14px; padding:3px 10px; color:var(--primary-text-color); cursor:pointer; font-size:.8rem; }
+        .chip { border:1px solid var(--divider-color,#ccc); border-radius:14px; padding:3px 10px; color:var(--primary-text-color); font-size:.8rem; }
         .chip.alert { border-color:${PHE_ALERT}; color:${PHE_ALERT}; }
         .muted { color:var(--secondary-text-color); }
         .chart { position:relative; }
@@ -338,40 +325,22 @@ class PheActivityCard extends HTMLElement {
         .name { flex:1 1 120px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--primary-text-color); }
         .detail { color:var(--secondary-text-color); font-size:.78rem; text-align:right; }
         .pill { background:${PHE_ALERT}; color:#fff; border-radius:10px; padding:1px 8px; font-size:.72rem; }
-        .rm { border:none; background:transparent; color:var(--secondary-text-color); font-size:1.2rem; cursor:pointer; padding:0 6px; min-height:28px; }
         .foot { margin-top:6px; font-size:.72rem; color:var(--secondary-text-color); }
       </style>
       <ha-card>
         <div class="head"><h2>${this._esc(this._cfg.title || t.title)}</h2><span class="badge">${unusual.length ? unusual.length + " " + t.unusual : "OK"}</span></div>
-        <div class="controls">
-          <label>${t.bucket}<select id="bucket">${bucketOpts}</select></label>
-          <label>${t.span}<select id="span">${opt(PHE_SPANS, span)}</select></label>
-          <label>${t.scale}<button class="toggle" id="scale" aria-pressed="${log}">${log ? t.log : t.linear}</button></label>
-          <label style="flex:1 1 160px">${t.devices}
-            <select id="add" ${selected.length >= PHE_MAX_DEVICES || !available.length ? "disabled" : ""}><option value="">${t.add}</option>${available.map((d) => `<option value="${d.id}">${this._esc(d.label)} (${this._esc(d.ip)})</option>`).join("")}</select>
-          </label>
-        </div>
+        <div class="sub">${t.bucket} ${bucket} · ${t.span} ${span}</div>
         ${this._devices.length ? "" : `<div class="note">${t.noDevices}</div>`}
-        <div class="overview"><b>${t.unusualNow}:</b> ${overview}</div>
+        ${this._state.overview ? `<div class="overview"><b>${t.unusualNow}:</b> ${overview}</div>` : ""}
         ${this._chart()}
         <div class="legend">${this._legend()}</div>
-        <div class="foot">${t.ingest}</div>
+        <div class="foot">${t.ingest}${configured ? "" : " " + t.configHint}</div>
       </ha-card>`;
     this._bind();
   }
 
   _bind() {
     const r = this.shadowRoot;
-    r.getElementById("bucket").onchange = (e) => this._update({ bucket: e.target.value });
-    r.getElementById("span").onchange = (e) => this._update({ span: e.target.value });
-    r.getElementById("scale").onclick = () => this._update({ log: !this._state.log });
-    r.getElementById("add").onchange = (e) => {
-      if (e.target.value) this._update({ selected: [...this._state.selected, e.target.value] });
-    };
-    r.querySelectorAll("[data-rm]").forEach((b) => { b.onclick = () => this._update({ selected: this._state.selected.filter((id) => id !== b.dataset.rm) }); });
-    r.querySelectorAll("[data-add]").forEach((b) => {
-      b.onclick = () => { if (!this._state.selected.includes(b.dataset.add) && this._state.selected.length < PHE_MAX_DEVICES) this._update({ selected: [...this._state.selected, b.dataset.add] }); };
-    });
     const hit = r.querySelector(".hit");
     if (hit && this._data) {
       hit.onpointermove = (e) => this._showTip(e);
@@ -407,6 +376,67 @@ class PheActivityCard extends HTMLElement {
   }
 }
 
+/** ha-form schema for the card editor; `devices` come from pheDiscover. */
+function pheEditorSchema(devices, t) {
+  return [
+    { name: "title", selector: { text: {} } },
+    { name: "entities", selector: { entity: { multiple: true, include_entities: devices.map((d) => d.id) } } },
+    {
+      type: "grid", name: "", schema: [
+        { name: "bucket", selector: { select: { mode: "dropdown", options: PHE_BUCKETS.map((v) => ({ value: v, label: v })) } } },
+        { name: "span", selector: { select: { mode: "dropdown", options: PHE_SPANS.map((v) => ({ value: v, label: v })) } } },
+      ],
+    },
+    { name: "log_scale", selector: { boolean: {} } },
+    { name: "show_overview", selector: { boolean: {} } },
+  ];
+}
+
+class PheActivityCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = { bucket: "30m", span: "1d", show_overview: true, log_scale: false, ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  get _t() { return PHE_TEXT[(this._hass && this._hass.language || "en").slice(0, 2)] || PHE_TEXT.en; }
+
+  _render() {
+    if (!this._config || !this._hass) return;
+    const t = this._t;
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._note = document.createElement("div");
+      this._note.style.cssText = "color:var(--error-color,#db4437);font-size:.85rem;padding:4px 16px 0";
+      this._form.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        const value = { ...ev.detail.value };
+        value.entities = (value.entities || []).slice(0, PHE_MAX_DEVICES);
+        this._config = value;
+        this._render();
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: value }, bubbles: true, composed: true }));
+      });
+      this.append(this._form, this._note);
+    }
+    const labels = { title: t.editTitle, entities: t.editDevices, bucket: t.editBucket, span: t.editSpan, log_scale: t.editLog, show_overview: t.editOverview };
+    const helpers = { entities: t.editDevicesHelp };
+    this._form.hass = this._hass;
+    this._form.data = this._config;
+    this._form.schema = pheEditorSchema(pheDiscover(this._hass.states, this._config.names), t);
+    this._form.computeLabel = (item) => labels[item.name] || item.name;
+    this._form.computeHelper = (item) => helpers[item.name] || "";
+    this._note.textContent = pheValidate(this._config.bucket, this._config.span) ? t.editInvalid : "";
+  }
+}
+
+if (typeof customElements !== "undefined" && !customElements.get("phe-activity-card-editor")) {
+  customElements.define("phe-activity-card-editor", PheActivityCardEditor);
+}
+
 if (typeof customElements !== "undefined" && !customElements.get("phe-activity-card")) {
   customElements.define("phe-activity-card", PheActivityCard);
   window.customCards = window.customCards || [];
@@ -414,5 +444,5 @@ if (typeof customElements !== "undefined" && !customElements.get("phe-activity-c
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt };
+  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema };
 }

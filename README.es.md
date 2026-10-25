@@ -85,7 +85,7 @@ La integración incluye una tarjeta de Lovelace, que se carga sola, con la activ
 type: custom:phe-activity-card
 ```
 
-Elige desde la propia tarjeta uno o varios dispositivos, el tamaño de bloque (de 5 min a 1 día) y el rango (de 6 horas a 30 días); tu elección se recuerda en el navegador. Claves opcionales: `title`, `entities` (dispositivos iniciales), `names` (`{entity_id: etiqueta}`), `bucket` y `span`.
+Todo se configura desde el editor de la tarjeta (**Editar tarjeta**): uno o varios dispositivos (hasta 12), el tamaño de bloque (de 5 min a 1 día), el rango (de 6 horas a 30 días), escala logarítmica y si se listan los dispositivos con actividad inusual. Los ajustes se guardan en el panel, así que todos ven la misma gráfica. Sin dispositivos elegidos, la tarjeta muestra los tres más activos. Claves YAML: `title`, `entities`, `bucket`, `span`, `log_scale`, `show_overview` y `names` (`{entity_id: etiqueta}`).
 
 Un dispositivo se marca como **inusual** cuando se mantiene muy por encima de su propio patrón reciente: varias veces su nivel habitual, por encima de su pico diario típico y de una tasa mínima, durante al menos 15 minutos. Los dispositivos tranquilos o con ráfagas regulares no se marcan por su comportamiento normal. La tarjeta usa las estadísticas a largo plazo del contador **Consultas DNS**, así que el eje de tiempo es el momento en que Home Assistant recibió el dato, los bloques de 5/15/30 minutos solo existen para rangos de hasta 10 días (valor por defecto del Recorder) y un dispositivo nuevo necesita aproximadamente un día de historial para tener referencia. Solo se leen recuentos agregados; nunca dominios.
 

@@ -85,7 +85,7 @@ The integration ships a Lovelace card, loaded automatically, that charts per-dev
 type: custom:phe-activity-card
 ```
 
-Pick one or more devices, a block size (5 min to 1 day) and a range (6 hours to 30 days) from the card itself; the choice is remembered in your browser. Optional keys: `title`, `entities` (devices to show first), `names` (`{entity_id: label}`), `bucket` and `span`.
+Everything is configured from the card editor (**Edit card**): choose one or more devices (up to 12), the block size (5 min to 1 day), the range (6 hours to 30 days), a logarithmic scale, and whether to list devices with unusual activity. The settings are saved in the dashboard, so every viewer sees the same chart. Without devices selected the card shows the three busiest. YAML keys: `title`, `entities`, `bucket`, `span`, `log_scale`, `show_overview` and `names` (`{entity_id: label}`).
 
 A device is marked **unusual** when it stays well above its own recent pattern: several times its usual level, above its typical daily peak, and above a minimum rate, for at least 15 minutes. Quiet or regularly bursty devices are not flagged for normal behavior. Charts use Home Assistant's long-term statistics of the **DNS queries** counter, so the time axis is when Home Assistant received the data, 5/15/30-minute blocks are only available for ranges up to 10 days (Recorder default), and a new device needs about a day of history before it has a baseline. Only aggregate counts are read; no domains.
 

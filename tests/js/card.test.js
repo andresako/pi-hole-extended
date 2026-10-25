@@ -30,3 +30,17 @@ test("nice max rounds up", () => {
   assert.strictEqual(c.pheNiceMax(37), 50);
   assert.strictEqual(c.pheNiceMax(0), 1);
 });
+
+test("editor schema offers only integration devices and all supported options", () => {
+  const schema = c.pheEditorSchema([{ id: "sensor.a" }, { id: "sensor.b" }], {});
+  const entities = schema.find((f) => f.name === "entities");
+  assert.deepStrictEqual(entities.selector.entity.include_entities, ["sensor.a", "sensor.b"]);
+  assert.strictEqual(entities.selector.entity.multiple, true);
+  const grid = schema.find((f) => f.type === "grid");
+  const bucket = grid.schema.find((f) => f.name === "bucket").selector.select.options;
+  const span = grid.schema.find((f) => f.name === "span").selector.select.options;
+  assert.deepStrictEqual(bucket.map((o) => o.value), ["5m", "15m", "30m", "1h", "3h", "6h", "1d"]);
+  assert.deepStrictEqual(span.map((o) => o.value), ["6h", "12h", "1d", "3d", "7d", "14d", "30d"]);
+  assert.ok(schema.some((f) => f.name === "log_scale"));
+  assert.ok(schema.some((f) => f.name === "show_overview"));
+});
