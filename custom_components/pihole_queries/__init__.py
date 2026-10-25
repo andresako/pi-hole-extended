@@ -873,7 +873,12 @@ def _available_entity_id(registry: er.EntityRegistry, entity_id: str) -> str:
 
 def _canonical_entity_id(entry: ConfigEntry, entity: er.RegistryEntry) -> str | None:
     """Build the stable recorder-friendly ID for a Pi-hole client metric."""
-    if entity.domain not in ("sensor", "binary_sensor"):
+    return canonical_entity_id(entry, entity.domain, entity.unique_id)
+
+
+def canonical_entity_id(entry: ConfigEntry, domain: str, unique_id: str) -> str | None:
+    """Return the `phe_` entity ID for a client entity, or None if not one of ours."""
+    if domain not in ("sensor", "binary_sensor"):
         return None
     versioned_classes = {
         "allowed": "permitidas",
@@ -881,7 +886,7 @@ def _canonical_entity_id(entry: ConfigEntry, entity: er.RegistryEntry) -> str | 
         "provisional": "provisionales",
     }
     versioned_match = re.search(
-        r"_(allowed|blocked|provisional)_v(\d+)$", entity.unique_id
+        r"_(allowed|blocked|provisional)_v(\d+)$", unique_id
     )
     metric_suffixes = {
         "_allowed": "permitidas",
@@ -898,21 +903,21 @@ def _canonical_entity_id(entry: ConfigEntry, entity: er.RegistryEntry) -> str | 
         metric_name = f"{versioned_classes[classifier]}_v{version}"
     else:
         suffix = next(
-            (suffix for suffix in metric_suffixes if entity.unique_id.endswith(suffix)),
+            (suffix for suffix in metric_suffixes if unique_id.endswith(suffix)),
             None,
         )
         metric_name = metric_suffixes.get(suffix) if suffix is not None else None
     unique_prefix = f"{_entity_unique_prefix(entry)}_"
-    if metric_name is None or not entity.unique_id.startswith(unique_prefix):
+    if metric_name is None or not unique_id.startswith(unique_prefix):
         return None
-    client_key = entity.unique_id.removeprefix(unique_prefix).removesuffix(suffix)
+    client_key = unique_id.removeprefix(unique_prefix).removesuffix(suffix)
     entity_client = (
         client_key
         if entry.data.get(CONF_SOURCE_GENERATION, LEGACY_SOURCE_GENERATION)
         == LEGACY_SOURCE_GENERATION
         else f"{entry.data[CONF_SOURCE_GENERATION]}_{client_key}"
     )
-    return f"{entity.domain}.phe_{slugify(entity_client)}_{metric_name}"
+    return f"{domain}.phe_{slugify(entity_client)}_{metric_name}"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

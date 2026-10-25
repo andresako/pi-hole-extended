@@ -144,6 +144,10 @@ def test_sensor_exposes_rates_and_start() -> None:
     assert sensor.entity_description.translation_key == "unusual_activity"
 
 
+def test_sensor_requests_its_phe_entity_id_up_front() -> None:
+    assert _sensor({}).entity_id == "binary_sensor.phe_192_0_2_10_actividad_inusual"
+
+
 def test_sensor_id_is_normalised_under_phe() -> None:
     entity = SimpleNamespace(domain="binary_sensor", unique_id="pi-hole.test_192.0.2.10_unusual_activity")
     assert (
