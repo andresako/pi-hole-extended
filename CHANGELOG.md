@@ -2,19 +2,27 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.11.0] - 2026-10-26
 
 ### Added
 - Downloadable diagnostics with host, password and client identities redacted.
-- Client devices Pi-hole no longer reports can be deleted from Home Assistant.
-- Architecture notes in `docs/architecture.md`; issue and pull request templates.
+- Client devices that Pi-hole no longer reports can be deleted from Home Assistant.
+- Architecture notes (`docs/architecture.md`), issue and pull request templates, and instructions for testing against newer Home Assistant versions.
+- Ruff configuration and a Dependabot configuration for GitHub Actions and Python dependencies.
+- More activity card tests.
 
 ### Changed
 - Sensor names now come from the translation files, so English installations show English names.
-- A persistent unusual-activity evaluation failure is now logged once as a warning.
+- A persistent unusual-activity evaluation failure is logged once as a warning instead of at debug level.
 - Device names from Pi-hole are limited to 100 characters.
-- The HTTPS options explain that HTTP sends the password unencrypted.
-- Internal refactors: entity ID helpers, the Store and shared validators moved to their own modules; persisted coverage reasons are an enum.
+- The HTTPS options explain that plain HTTP sends the password unencrypted.
+- Workflow actions are pinned to commit SHAs.
+- `SECURITY.md`, `CONTRIBUTING.md` and `docs/development.md` brought up to date.
+- Internal refactors: entity ID helpers (`entity_ids.py`), the Store (`store.py`) and shared validators (`validation.py`) moved out of `__init__.py` and the coordinator; persisted coverage reasons are an enum; the coordinator rolls back through a single checkpoint object.
+- Verified with Home Assistant 2026.2.3 on Python 3.13 in addition to the 2025.1.0 baseline.
+
+### Removed
+- Unused code: an unused lock in the API client and unused imports.
 
 ## [0.10.0] - 2026-10-25
 
