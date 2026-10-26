@@ -9,7 +9,7 @@ dependencies = ["homeassistant==2025.1.0"]
 dev = [
   "pytest==8.3.4",
   "pytest-asyncio==0.24.0",
-  "pytest-aiohttp==1.0.5",
+  "pytest-aiohttp==1.1.1",
   "pytest-freezer==0.4.8",
   "pytest-socket==0.7.0",
   "trustme==1.2.1",
