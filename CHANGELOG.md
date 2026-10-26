@@ -2,6 +2,12 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.11.1] - 2026-10-26
+
+### Changed
+- New integration icon with a transparent background and a 512 px `icon@2x.png`.
+- Development dependencies and the checkout workflow action updated.
+
 ## [0.11.0] - 2026-10-26
 
 ### Added
