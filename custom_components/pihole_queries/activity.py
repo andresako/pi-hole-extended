@@ -176,7 +176,7 @@ def score_series(
     points: Sequence[Mapping[str, float]],
     bucket_seconds: int,
     visible_from: float,
-    params: DetectionParams = DetectionParams(),
+    params: DetectionParams = DetectionParams(),  # noqa: B008 - frozen
 ) -> dict[str, Any]:
     """Annotate a series with baseline, threshold and unusual runs.
 

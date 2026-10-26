@@ -32,14 +32,12 @@ from .coordinator import PiHoleQueryCoordinator
 SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="queries",
-        name="Consultas DNS",
         translation_key="queries",
         icon="mdi:dns",
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     SensorEntityDescription(
         key="queries_last_minute",
-        name="Consultas (último minuto)",
         translation_key="queries_last_minute",
         icon="mdi:speedometer",
         native_unit_of_measurement="consultas/min",
@@ -55,21 +53,18 @@ def _classifier_descriptions(version: int) -> tuple[SensorEntityDescription, ...
     return (
         SensorEntityDescription(
             key=f"allowed_{suffix}",
-            name="Consultas permitidas",
             translation_key=f"allowed_{suffix}",
             icon="mdi:check-circle-outline",
             state_class=SensorStateClass.TOTAL_INCREASING,
         ),
         SensorEntityDescription(
             key=f"blocked_{suffix}",
-            name="Consultas bloqueadas",
             translation_key=f"blocked_{suffix}",
             icon="mdi:cancel",
             state_class=SensorStateClass.TOTAL_INCREASING,
         ),
         SensorEntityDescription(
             key=f"provisional_{suffix}",
-            name="Consultas provisionales",
             translation_key=f"provisional_{suffix}",
             icon="mdi:help-circle-outline",
             state_class=SensorStateClass.TOTAL_INCREASING,
@@ -111,6 +106,7 @@ _COUNT_KEYS = {
     "queries_last_minute": "queries_last_minute",
 }
 
+MAX_DEVICE_NAME_LENGTH = 100
 _EPOCH_CLASS_KEYS = {"allowed", "blocked", "provisional"}
 
 
@@ -143,7 +139,7 @@ def client_device_info(
 ) -> DeviceInfo:
     """Describe the per-client device shared by every entity of that client."""
     data = coordinator.client_data.get(client_key, {})
-    client_name = str(data.get("client_name") or "Cliente desconocido")
+    client_name = str(data.get("client_name") or "Cliente desconocido")[:MAX_DEVICE_NAME_LENGTH]
     client_ip = str(data.get("client_ip") or "")
     if client_name == "Cliente desconocido":
         language = coordinator.hass.config.language.split("-")[0]

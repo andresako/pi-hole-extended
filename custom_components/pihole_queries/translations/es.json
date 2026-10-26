@@ -15,6 +15,8 @@
         "data_description": {
           "host": "Solo nombre de host o dirección IP; no pegues una URL ni incluyas puerto o ruta.",
           "port": "Puerto web/API usado literalmente (por ejemplo, 80 para HTTP o 443 para HTTPS).",
+          "use_https": "Sin HTTPS, la contraseña viaja sin cifrar por tu red.",
+          "verify_ssl": "Desactívalo solo para certificados autofirmados de confianza.",
           "password": "Crea una contraseña de aplicación desde Pi-hole."
         }
       },

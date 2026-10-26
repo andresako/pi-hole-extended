@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.util import dt as dt_util
 
 from .activity import BUCKET_SECONDS, params_for
 from .activity_data import async_client_series
@@ -61,6 +62,7 @@ class UnusualActivityMonitor:
         self._listeners: list[Callable[[], None]] = []
         self.results: dict[str, dict[str, Any]] = {}
         self.evaluated_at: datetime | None = None
+        self._failing = False
 
     @callback
     def async_add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
@@ -121,9 +123,15 @@ class UnusualActivityMonitor:
                 for entity_id, series in data["series"].items():
                     results[by_entity[entity_id]] = summarize(series)
         except Exception:  # noqa: BLE001 - keep the previous result on any Recorder failure
-            _LOGGER.debug("Unusual-activity evaluation failed", exc_info=True)
+            if not self._failing:
+                _LOGGER.warning(
+                    "Unusual-activity evaluation failed; keeping the previous result",
+                    exc_info=True,
+                )
+            self._failing = True
             return
+        self._failing = False
         self.results = results
-        self.evaluated_at = datetime.now().astimezone()
+        self.evaluated_at = dt_util.now()
         for listener in list(self._listeners):
             listener()
