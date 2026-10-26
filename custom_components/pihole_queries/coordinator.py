@@ -35,6 +35,7 @@ from .const import (
     QUERY_BATCH_SIZE,
     RETENTION_AGGREGATE,
     RETENTION_DETAIL,
+    CoverageReason,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -256,7 +257,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.aggregate_pending_time: float | None = None
         self._bootstrapped = False
         self.coverage = "unknown"
-        self.coverage_reason: str | None = "no_baseline"
+        self.coverage_reason: str | None = CoverageReason.NO_BASELINE
         self.last_query_time: float | None = None
         # This is deliberately session-local: Store records ingestion state,
         # but does not prove Recorder persistence or retain a last-read claim.
@@ -290,7 +291,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             return
         if not isinstance(saved, dict):
             self.coverage = "unknown"
-            self.coverage_reason = "invalid_legacy_store"
+            self.coverage_reason = CoverageReason.INVALID_LEGACY_STORE
             _LOGGER.warning("Se ignoró un Store local de Pi-hole con formato no válido")
             return
         pending = saved.get("aggregate_pending", {})
@@ -388,8 +389,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self.coverage_reason = (
                 saved_reason
                 if isinstance(saved_reason, str)
-                and saved_reason in {"invalid_legacy_store", "invalid_store_state"}
-                else "invalid_legacy_cursor"
+                and saved_reason in {CoverageReason.INVALID_LEGACY_STORE, CoverageReason.INVALID_STORE_STATE}
+                else CoverageReason.INVALID_LEGACY_CURSOR
             )
             _LOGGER.warning("Se ignoró un cursor local de Pi-hole no válido")
         coverage = saved.get("coverage")
@@ -399,14 +400,14 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         ):
             self._store_state_invalid = True
             self.coverage = "unknown"
-            self.coverage_reason = "invalid_store_state"
+            self.coverage_reason = CoverageReason.INVALID_STORE_STATE
         elif cursor_valid and coverage in {"unknown", "complete", "partial"}:
             self.coverage = coverage
             saved_reason = saved.get("coverage_reason")
             if saved_reason is not None and not isinstance(saved_reason, str):
                 self._store_state_invalid = True
                 self.coverage = "unknown"
-                self.coverage_reason = "invalid_store_state"
+                self.coverage_reason = CoverageReason.INVALID_STORE_STATE
             else:
                 self.coverage_reason = saved_reason
         elif "coverage_reason" in saved and saved.get("coverage_reason") is not None and not isinstance(
@@ -414,12 +415,12 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         ):
             self._store_state_invalid = True
             self.coverage = "unknown"
-            self.coverage_reason = "invalid_store_state"
+            self.coverage_reason = CoverageReason.INVALID_STORE_STATE
         awaiting_generation = saved.get("awaiting_generation", False)
         if "awaiting_generation" in saved and not isinstance(awaiting_generation, bool):
             self._store_state_invalid = True
             self.coverage = "unknown"
-            self.coverage_reason = "invalid_store_state"
+            self.coverage_reason = CoverageReason.INVALID_STORE_STATE
         self.awaiting_generation = awaiting_generation is True
         raw_recovery_cursor = saved.get("recovery_cursor")
         self.recovery_cursor = (
@@ -434,7 +435,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         ):
             self._store_state_invalid = True
             self.coverage = "unknown"
-            self.coverage_reason = "invalid_store_state"
+            self.coverage_reason = CoverageReason.INVALID_STORE_STATE
         if self.aggregate_pending and (
             self.recovery_cursor is None
             or self.aggregate_pending_cursor is None
@@ -462,7 +463,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             ):
                 self._store_state_invalid = True
                 self.coverage = "unknown"
-                self.coverage_reason = "invalid_store_state"
+                self.coverage_reason = CoverageReason.INVALID_STORE_STATE
                 self.last_query_time = None
             else:
                 self.last_query_time = float(last_query_time)
@@ -472,16 +473,16 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             clients = {}
             self.coverage = "unknown"
             if self.coverage_reason not in {
-                "invalid_legacy_cursor",
-                "invalid_legacy_store",
-                "invalid_store_state",
+                CoverageReason.INVALID_LEGACY_CURSOR,
+                CoverageReason.INVALID_LEGACY_STORE,
+                CoverageReason.INVALID_STORE_STATE,
             }:
-                self.coverage_reason = "missing_client_summaries"
+                self.coverage_reason = CoverageReason.MISSING_CLIENT_SUMMARIES
         if not isinstance(clients, dict):
             self._client_store_invalid = True
             self.client_data = {}
             self.coverage = "unknown"
-            self.coverage_reason = "invalid_client_summaries"
+            self.coverage_reason = CoverageReason.INVALID_CLIENT_SUMMARIES
             _LOGGER.warning("Se conservaron los contadores de Pi-hole porque los resúmenes locales no son válidos")
             return
         self.client_data = {}
@@ -596,9 +597,9 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         ):
             self.coverage = "unknown"
             self.coverage_reason = (
-                "invalid_store_state"
+                CoverageReason.INVALID_STORE_STATE
                 if getattr(self, "_store_state_invalid", False)
-                else "invalid_client_summaries"
+                else CoverageReason.INVALID_CLIENT_SUMMARIES
             )
             _LOGGER.warning("Se conservaron los contadores de Pi-hole porque hay agregados locales no válidos")
         for summary in self.client_data.values():
@@ -644,7 +645,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     async def _async_update_data_snapshot(self) -> dict[str, dict[str, Any]]:
         """Fetch new queries and return a snapshot of per-client summaries."""
         self.coverage = getattr(self, "coverage", "unknown")
-        self.coverage_reason = getattr(self, "coverage_reason", "legacy_cursor")
+        self.coverage_reason = getattr(self, "coverage_reason", CoverageReason.LEGACY_CURSOR)
         self.last_query_time = getattr(self, "last_query_time", None)
         self.awaiting_generation = getattr(self, "awaiting_generation", False)
         self.recovery_cursor = getattr(self, "recovery_cursor", None)
@@ -676,9 +677,9 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             ):
                 self.coverage = "unknown"
                 self.coverage_reason = (
-                    "invalid_store_state"
+                    CoverageReason.INVALID_STORE_STATE
                     if getattr(self, "_store_state_invalid", False)
-                    else "invalid_client_summaries"
+                    else CoverageReason.INVALID_CLIENT_SUMMARIES
                 )
                 raise UpdateFailed(
                     "No se pueden actualizar los contadores porque los datos locales no son válidos"
@@ -698,17 +699,17 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if not ids:
                     self.coverage = "unknown"
                     if self.coverage_reason not in {
-                        "invalid_legacy_cursor",
-                        "invalid_legacy_store",
+                        CoverageReason.INVALID_LEGACY_CURSOR,
+                        CoverageReason.INVALID_LEGACY_STORE,
                     }:
-                        self.coverage_reason = "baseline_unverified"
+                        self.coverage_reason = CoverageReason.BASELINE_UNVERIFIED
                     return self._data_snapshot()
                 self.cursor = max((query_id for query_id, _ in ids), default=0)
                 self._bootstrapped = True
                 self.recovery_cursor = None
                 invalid_legacy_cursor = self.coverage_reason in {
-                    "invalid_legacy_cursor",
-                    "invalid_legacy_store",
+                    CoverageReason.INVALID_LEGACY_CURSOR,
+                    CoverageReason.INVALID_LEGACY_STORE,
                 }
                 self.coverage = (
                     "unknown"
@@ -718,7 +719,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 self.coverage_reason = (
                     None
                     if self.coverage == "complete"
-                    else self.coverage_reason if invalid_legacy_cursor else "baseline_unverified"
+                    else self.coverage_reason if invalid_legacy_cursor else CoverageReason.BASELINE_UNVERIFIED
                 )
                 newest = max(ids, default=(None, None), key=lambda item: item[0])[1]
                 self.last_query_time = _timestamp_number(newest.get("time")) if newest else None
@@ -751,7 +752,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                         if next_recovery_cursor != self.recovery_cursor:
                             self.recovery_cursor = next_recovery_cursor
                     self.coverage = "unknown"
-                    self.coverage_reason = "cursor_not_reached"
+                    self.coverage_reason = CoverageReason.CURSOR_NOT_REACHED
                     self._update_minute_query_counts(time.time())
                     await self._commit_or_rollback(
                         original_cursor, original_clients, original_coverage,
@@ -826,10 +827,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 self._update_minute_query_counts(time.time())
                 if malformed_rows:
                     self.coverage = "partial"
-                    self.coverage_reason = "invalid_query_ids"
+                    self.coverage_reason = CoverageReason.INVALID_QUERY_IDS
                 elif not pages[0].get("queries"):
                     self.coverage = "unknown"
-                    self.coverage_reason = "empty_history"
+                    self.coverage_reason = CoverageReason.EMPTY_HISTORY
                 await self._commit_or_rollback(
                     original_cursor, original_clients, original_coverage,
                     original_coverage_reason, original_last_query_time, original_bootstrapped,
@@ -846,7 +847,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 )
                 self.cursor = newest_id
                 self.coverage = "unknown"
-                self.coverage_reason = "query_id_reset"
+                self.coverage_reason = CoverageReason.QUERY_ID_RESET
                 self.awaiting_generation = True
                 self.recovery_cursor = None
                 self.last_query_time = None
@@ -873,24 +874,24 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             )
             if retention_truncated:
                 self.coverage = "partial"
-                self.coverage_reason = "retention_truncation"
+                self.coverage_reason = CoverageReason.RETENTION_TRUNCATION
                 self.recovery_cursor = None
             elif pagination_stalled:
                 self.coverage = "partial"
-                self.coverage_reason = "pagination_stalled"
+                self.coverage_reason = CoverageReason.PAGINATION_STALLED
                 self.recovery_cursor = last_requested_cursor
             elif malformed_rows and not reached_cursor:
                 self.coverage = "partial"
-                self.coverage_reason = "invalid_query_ids"
+                self.coverage_reason = CoverageReason.INVALID_QUERY_IDS
                 self.recovery_cursor = last_requested_cursor
             elif malformed_rows:
                 self.coverage = "partial"
-                self.coverage_reason = "invalid_query_ids"
+                self.coverage_reason = CoverageReason.INVALID_QUERY_IDS
             elif (
                 reached_cursor
                 and self.coverage != "partial"
                 and self.coverage_reason
-                not in {"invalid_client_summaries", "missing_client_summaries"}
+                not in {CoverageReason.INVALID_CLIENT_SUMMARIES, CoverageReason.MISSING_CLIENT_SUMMARIES}
             ):
                 # A prior unknown legacy cursor becomes a baseline only once
                 # this API walk demonstrably reaches it.
@@ -901,7 +902,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 # without reaching it. Retain a retry point so transient empty
                 # pages cannot turn a recoverable gap into permanent loss.
                 self.coverage = "unknown"
-                self.coverage_reason = "cursor_not_reached"
+                self.coverage_reason = CoverageReason.CURSOR_NOT_REACHED
                 self.recovery_cursor = last_requested_cursor
 
             if not reached_cursor and not retention_truncated:
@@ -935,7 +936,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 # confirmed prefix when possible, then propagate cancellation.
                 if self.coverage != "partial":
                     self.coverage = "unknown"
-                    self.coverage_reason = "batch_interrupted"
+                    self.coverage_reason = CoverageReason.BATCH_INTERRUPTED
                 await self._commit_or_rollback(
                     original_cursor, original_clients, original_coverage,
                     original_coverage_reason, original_last_query_time, original_bootstrapped,
@@ -945,7 +946,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             except HomeAssistantError:
                 if self.coverage != "partial":
                     self.coverage = "unknown"
-                    self.coverage_reason = "batch_interrupted"
+                    self.coverage_reason = CoverageReason.BATCH_INTERRUPTED
                 await self._commit_or_rollback(
                     original_cursor, original_clients, original_coverage,
                     original_coverage_reason, original_last_query_time, original_bootstrapped,
@@ -955,7 +956,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
             self.cursor = max(self.cursor or 0, newest_id)
             self._update_minute_query_counts(time.time())
-            if reached_cursor and self.coverage_reason == "batch_interrupted":
+            if reached_cursor and self.coverage_reason == CoverageReason.BATCH_INTERRUPTED:
                 self.coverage = "complete"
                 self.coverage_reason = None
             await self._commit_or_rollback(
@@ -1074,14 +1075,14 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self, "_store_state_invalid", False
         ):
             self.coverage = "unknown"
-            self.coverage_reason = "invalid_store_state" if self._store_state_invalid else "invalid_client_summaries"
+            self.coverage_reason = CoverageReason.INVALID_STORE_STATE if self._store_state_invalid else CoverageReason.INVALID_CLIENT_SUMMARIES
             raise UpdateFailed("No se pueden actualizar los contadores porque los datos locales no son válidos")
 
         latest = await self._async_get_queries(length=1)
         latest_rows = latest.get("queries", []) if isinstance(latest, dict) else None
         if not isinstance(latest_rows, list):
             self.coverage = "partial"
-            self.coverage_reason = "invalid_query_ids"
+            self.coverage_reason = CoverageReason.INVALID_QUERY_IDS
             await commit()
             return self._data_snapshot()
         latest_identified = [
@@ -1091,19 +1092,19 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         ]
         if len(latest_identified) != len(latest_rows) or len(latest_rows) > 1:
             self.coverage = "partial"
-            self.coverage_reason = "invalid_query_ids"
+            self.coverage_reason = CoverageReason.INVALID_QUERY_IDS
             await commit()
             return self._data_snapshot()
         if not latest_identified:
             if not self._bootstrapped:
                 self.coverage = "unknown"
-                self.coverage_reason = "baseline_unverified"
+                self.coverage_reason = CoverageReason.BASELINE_UNVERIFIED
             elif pending:
                 self.coverage = "unknown"
-                self.coverage_reason = "cursor_not_reached"
+                self.coverage_reason = CoverageReason.CURSOR_NOT_REACHED
             else:
                 self.coverage = "unknown"
-                self.coverage_reason = "empty_history"
+                self.coverage_reason = CoverageReason.EMPTY_HISTORY
             await commit()
             return self._data_snapshot()
 
@@ -1129,7 +1130,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             _LOGGER.warning("El identificador de consultas de Pi-hole se reinició; se establece un cursor nuevo")
             self.cursor = latest_id
             self.coverage = "unknown"
-            self.coverage_reason = "query_id_reset"
+            self.coverage_reason = CoverageReason.QUERY_ID_RESET
             self.awaiting_generation = True
             self.recovery_cursor = None
             pending = {}
@@ -1151,7 +1152,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         )
         if truncated:
             self.coverage = "partial"
-            self.coverage_reason = "retention_truncation"
+            self.coverage_reason = CoverageReason.RETENTION_TRUNCATION
 
         request_cursor = self.recovery_cursor
         response = None if request_cursor is not None else latest
@@ -1169,7 +1170,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 except (PiHoleAuthenticationError, PiHoleConnectionError):
                     self.recovery_cursor = request_cursor
                     self.coverage = "unknown"
-                    self.coverage_reason = "cursor_not_reached"
+                    self.coverage_reason = CoverageReason.CURSOR_NOT_REACHED
                     await commit()
                     raise
             rows = response.get("queries", []) if isinstance(response, dict) else None
@@ -1247,18 +1248,18 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
         if malformed:
             self.coverage = "partial"
-            self.coverage_reason = "pagination_stalled"
+            self.coverage_reason = CoverageReason.PAGINATION_STALLED
         if not reached_cursor and (not truncated or not exhausted or malformed):
             self.recovery_cursor = request_cursor
             if malformed:
                 self.coverage = "partial"
-                self.coverage_reason = "pagination_stalled"
+                self.coverage_reason = CoverageReason.PAGINATION_STALLED
             elif truncated:
                 self.coverage = "partial"
-                self.coverage_reason = "retention_truncation"
+                self.coverage_reason = CoverageReason.RETENTION_TRUNCATION
             else:
                 self.coverage = "unknown"
-                self.coverage_reason = "cursor_not_reached"
+                self.coverage_reason = CoverageReason.CURSOR_NOT_REACHED
             await commit()
             return self._data_snapshot()
 

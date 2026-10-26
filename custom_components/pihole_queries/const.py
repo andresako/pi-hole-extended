@@ -1,6 +1,7 @@
 """Constants for the Pi-hole DNS query integration."""
 
 from datetime import timedelta
+from enum import StrEnum
 
 from homeassistant.const import Platform
 
@@ -50,3 +51,31 @@ RECONFIGURE_NEW_SOURCE = "new_source"
 
 CARD_URL_BASE = f"/{DOMAIN}_static"
 CARD_FILENAME = "phe-activity-card.js"
+
+
+class Coverage(StrEnum):
+    """Whether ingestion can prove it has seen every query since the cursor."""
+
+    UNKNOWN = "unknown"
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+
+
+class CoverageReason(StrEnum):
+    """Why coverage is not complete; values are persisted in the Store."""
+
+    BASELINE_UNVERIFIED = "baseline_unverified"
+    BATCH_INTERRUPTED = "batch_interrupted"
+    CURSOR_NOT_REACHED = "cursor_not_reached"
+    EMPTY_HISTORY = "empty_history"
+    INVALID_CLIENT_SUMMARIES = "invalid_client_summaries"
+    INVALID_LEGACY_CURSOR = "invalid_legacy_cursor"
+    INVALID_LEGACY_STORE = "invalid_legacy_store"
+    INVALID_QUERY_IDS = "invalid_query_ids"
+    INVALID_STORE_STATE = "invalid_store_state"
+    LEGACY_CURSOR = "legacy_cursor"
+    MISSING_CLIENT_SUMMARIES = "missing_client_summaries"
+    NO_BASELINE = "no_baseline"
+    PAGINATION_STALLED = "pagination_stalled"
+    QUERY_ID_RESET = "query_id_reset"
+    RETENTION_TRUNCATION = "retention_truncation"

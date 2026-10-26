@@ -34,6 +34,7 @@ from .const import (
     PLATFORMS,
     STORAGE_KEY_PREFIX,
     STORAGE_VERSION,
+    CoverageReason,
 )
 from .coordinator import PiHoleQueryCoordinator
 from .entity_ids import (
@@ -126,21 +127,21 @@ class _IdentityStore:
                 data.pop(field)
                 changed = True
         coverage_reasons = {
-            "baseline_unverified",
-            "batch_interrupted",
-            "cursor_not_reached",
-            "empty_history",
-            "invalid_client_summaries",
-            "invalid_legacy_cursor",
-            "invalid_legacy_store",
-            "invalid_query_ids",
-            "invalid_store_state",
-            "legacy_cursor",
-            "missing_client_summaries",
-            "no_baseline",
-            "pagination_stalled",
-            "query_id_reset",
-            "retention_truncation",
+            CoverageReason.BASELINE_UNVERIFIED,
+            CoverageReason.BATCH_INTERRUPTED,
+            CoverageReason.CURSOR_NOT_REACHED,
+            CoverageReason.EMPTY_HISTORY,
+            CoverageReason.INVALID_CLIENT_SUMMARIES,
+            CoverageReason.INVALID_LEGACY_CURSOR,
+            CoverageReason.INVALID_LEGACY_STORE,
+            CoverageReason.INVALID_QUERY_IDS,
+            CoverageReason.INVALID_STORE_STATE,
+            CoverageReason.LEGACY_CURSOR,
+            CoverageReason.MISSING_CLIENT_SUMMARIES,
+            CoverageReason.NO_BASELINE,
+            CoverageReason.PAGINATION_STALLED,
+            CoverageReason.QUERY_ID_RESET,
+            CoverageReason.RETENTION_TRUNCATION,
         }
         for field, valid in (
             ("cursor", _valid_query_id(data.get("cursor"))),
@@ -382,7 +383,7 @@ class _IdentityStore:
                     data.pop(field)
                     changed = True
             data["coverage"] = "unknown"
-            data["coverage_reason"] = "invalid_store_state"
+            data["coverage_reason"] = CoverageReason.INVALID_STORE_STATE
             changed = True
         return changed
 
@@ -393,14 +394,14 @@ class _IdentityStore:
             # The root cannot be inspected safely. Replace it with a small
             # diagnostic marker so opaque query payloads are not retained.
             await self.legacy.async_save(
-                {"coverage": "unknown", "coverage_reason": "invalid_legacy_store"}
+                {"coverage": "unknown", "coverage_reason": CoverageReason.INVALID_LEGACY_STORE}
             )
             return
         if self._sanitize_store_data(legacy):
             await self.legacy.async_save(legacy)
 
     @staticmethod
-    def _prepare_legacy_data(value: Any, *, invalid_reason: str = "invalid_legacy_store") -> Any:
+    def _prepare_legacy_data(value: Any, *, invalid_reason: str = CoverageReason.INVALID_LEGACY_STORE) -> Any:
         """Keep usable v1 aggregates while excluding malformed optional fields."""
         if not isinstance(value, dict):
             # Let the coordinator's fail-closed root-type guard record invalid
@@ -577,7 +578,7 @@ class _IdentityStore:
                     "El Store v2 no coincide con la identidad o el esquema de esta entrada"
                 )
             prepared = self._prepare_legacy_data(
-                current["data"], invalid_reason="invalid_store_state"
+                current["data"], invalid_reason=CoverageReason.INVALID_STORE_STATE
             )
             changed = prepared != current["data"]
             changed = self._sanitize_store_data(prepared) or changed
