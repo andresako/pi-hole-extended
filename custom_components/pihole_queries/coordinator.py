@@ -37,6 +37,7 @@ from .const import (
     RETENTION_DETAIL,
     CoverageReason,
 )
+from .validation import valid_classifier_epoch, valid_query_time_buckets
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,26 +124,6 @@ def _add_query_time_bucket(summary: dict[str, Any], query_time: float, observed_
     ][-61:]
 
 
-def _valid_query_time_buckets(value: Any) -> bool:
-    """Validate bounded, anonymous per-second source-time totals."""
-    if not isinstance(value, list) or len(value) > 61:
-        return False
-    seen: set[int] = set()
-    for bucket in value:
-        if (
-            not isinstance(bucket, dict)
-            or set(bucket) != {"second", "count"}
-            or isinstance(bucket.get("second"), bool)
-            or not isinstance(bucket.get("second"), int)
-            or bucket["second"] < 0
-            or isinstance(bucket.get("count"), bool)
-            or not isinstance(bucket.get("count"), int)
-            or bucket["count"] < 0
-            or bucket["second"] in seen
-        ):
-            return False
-        seen.add(bucket["second"])
-    return True
 
 
 def _blocked(status: Any) -> bool:
@@ -193,17 +174,6 @@ def _normalize_client_name(value: Any) -> str:
     return " ".join(str(value or "").casefold().split())
 
 
-def _valid_classifier_epoch(epoch: Any) -> bool:
-    """Accept only canonical, bounded numeric classifier versions."""
-    if (
-        not isinstance(epoch, str)
-        or not 1 <= len(epoch) <= 10
-        or not epoch.isascii()
-        or not epoch.isdecimal()
-    ):
-        return False
-    version = int(epoch)
-    return 1 <= version <= 2**31 - 1 and str(version) == epoch
 
 
 def _client_key(
@@ -308,7 +278,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     or set(item) - {
                         "client_name", "client_ip", "counts", "buckets", "query_time_buckets"
                     }
-                    or not _valid_query_time_buckets(item.get("query_time_buckets", []))
+                    or not valid_query_time_buckets(item.get("query_time_buckets", []))
                 ):
                     self._store_state_invalid = True
                     break
@@ -511,7 +481,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     clean_counts = {}
                     for epoch, epoch_counts in classifier_counts.items():
                         if (
-                            not _valid_classifier_epoch(epoch)
+                            not valid_classifier_epoch(epoch)
                             or not isinstance(epoch_counts, dict)
                             or set(epoch_counts) != {"allowed", "blocked", "provisional"}
                             or any(
@@ -535,7 +505,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     clean_rates = {}
                     for epoch, epoch_rates in classifier_rates.items():
                         if (
-                            not _valid_classifier_epoch(epoch)
+                            not valid_classifier_epoch(epoch)
                             or not isinstance(epoch_rates, dict)
                             or set(epoch_rates) != {"allowed", "blocked", "provisional"}
                             or any(
@@ -550,7 +520,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                         clean_rates[epoch] = epoch_rates
                     if len(clean_rates) != len(classifier_rates):
                         summary["classifier_rates"] = clean_rates
-            if "query_time_buckets" in summary and not _valid_query_time_buckets(
+            if "query_time_buckets" in summary and not valid_query_time_buckets(
                 summary["query_time_buckets"]
             ):
                 self._client_store_invalid = True
