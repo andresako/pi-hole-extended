@@ -12,9 +12,9 @@ from homeassistant.helpers import device_registry as device_registry_module
 from homeassistant.helpers import entity_registry as entity_registry_module
 
 from custom_components.pihole_queries import (
-    _IdentityStore,
     _canonical_entity_id,
     _identity_storage_key,
+    _IdentityStore,
     async_migrate_entry,
 )
 from custom_components.pihole_queries.const import (

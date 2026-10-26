@@ -17,7 +17,6 @@ from custom_components.pihole_queries.const import (
     CONF_VERIFY_SSL,
 )
 
-
 TEST_PASSWORD = "synthetic-test-password"
 QUERY_FIXTURE = [
     {

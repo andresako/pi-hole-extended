@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import ipaddress
 import re
 from typing import Any
@@ -104,7 +103,6 @@ class PiHoleClient:
         self._verify_ssl = bool(data.get(CONF_VERIFY_SSL, True))
         self._session = session
         self._sid: str | None = None
-        self._lock = asyncio.Lock()
 
     async def async_authenticate(self) -> None:
         """Obtain a short-lived SID using the configured application password."""
@@ -130,7 +128,7 @@ class PiHoleClient:
             raise PiHoleCertificateError(
                 "No se pudo verificar el certificado HTTPS de Pi-hole"
             ) from err
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             raise PiHoleConnectionError("tiempo de espera agotado al llamar a /api/auth") from err
         except aiohttp.ClientError as err:
             raise PiHoleConnectionError(
@@ -189,7 +187,7 @@ class PiHoleClient:
                 raise PiHoleCertificateError(
                     "No se pudo verificar el certificado HTTPS de Pi-hole"
                 ) from err
-            except asyncio.TimeoutError as err:
+            except TimeoutError as err:
                 raise PiHoleConnectionError(
                     "tiempo de espera agotado al llamar a /api/queries"
                 ) from err
@@ -219,6 +217,6 @@ class PiHoleClient:
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
             ):
                 pass
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+        except (TimeoutError, aiohttp.ClientError):
             # Logout is best effort; Pi-hole expires idle sessions on its own.
             return

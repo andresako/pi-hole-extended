@@ -11,15 +11,16 @@ from homeassistant.components.sensor import SensorEntityDescription, SensorState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityPlatformState
 
-from custom_components.pihole_queries import classification, coordinator as coordinator_module
+from custom_components.pihole_queries import classification
+from custom_components.pihole_queries import coordinator as coordinator_module
 from custom_components.pihole_queries.classification import classify_status
 from custom_components.pihole_queries.coordinator import (
     PiHoleQueryCoordinator,
     _query_description,
 )
 from custom_components.pihole_queries.sensor import (
-    PiHoleClientSensor,
     SENSOR_DESCRIPTIONS,
+    PiHoleClientSensor,
 )
 
 

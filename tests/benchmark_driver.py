@@ -27,11 +27,10 @@ import psutil
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.storage import Store
 
-from custom_components.pihole_queries.api import PiHoleClient
 from custom_components.pihole_queries import const
+from custom_components.pihole_queries.api import PiHoleClient
 from custom_components.pihole_queries.coordinator import PiHoleQueryCoordinator
 from custom_components.pihole_queries.sensor import async_setup_entry as async_setup_sensors
-
 
 PASSWORD = "synthetic-password"
 SOURCE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"

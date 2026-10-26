@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
 from custom_components.pihole_queries import async_setup_entry
@@ -20,6 +21,8 @@ from custom_components.pihole_queries.const import (
 from custom_components.pihole_queries.sensor import (
     DIAGNOSTIC_DESCRIPTIONS,
     SENSOR_DESCRIPTIONS,
+)
+from custom_components.pihole_queries.sensor import (
     async_setup_entry as async_setup_sensor_entry,
 )
 

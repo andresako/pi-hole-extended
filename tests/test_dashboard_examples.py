@@ -1,7 +1,7 @@
 """Contract checks for the distributable dashboard and automation examples."""
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 import yaml
 

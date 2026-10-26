@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from statistics import median
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 BUCKET_SECONDS: dict[str, int] = {
     "5m": 300,

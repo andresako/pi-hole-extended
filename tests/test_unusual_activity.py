@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.pihole_queries import _canonical_entity_id
 from custom_components.pihole_queries import activity_monitor as monitor_module
 from custom_components.pihole_queries.activity import params_for
 from custom_components.pihole_queries.activity_monitor import (
@@ -21,7 +22,6 @@ from custom_components.pihole_queries.const import (
     CONF_UNUSUAL_ACTIVITY,
     LEGACY_SOURCE_GENERATION,
 )
-from custom_components.pihole_queries import _canonical_entity_id
 
 
 def _series(unusual: bool, runs=None, baseline: bool = True):

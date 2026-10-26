@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
-from datetime import UTC, datetime
-from datetime import timedelta
 
 import pytest
 from homeassistant.components.sensor import SensorStateClass
+from homeassistant.util import dt as dt_util
 
 from custom_components.pihole_queries.coordinator import (
     PiHoleQueryCoordinator,
 )
-from custom_components.pihole_queries.sensor import PiHoleClientSensor, SENSOR_DESCRIPTIONS
-from homeassistant.util import dt as dt_util
+from custom_components.pihole_queries.sensor import SENSOR_DESCRIPTIONS, PiHoleClientSensor
 
 
 def _coordinator_with_client(client_data: dict[str, Any]) -> PiHoleQueryCoordinator:

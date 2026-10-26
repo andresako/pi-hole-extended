@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
-from pathlib import Path
 
 import pytest
 import voluptuous as vol

@@ -33,10 +33,8 @@ from .const import (
     DEFAULT_RETENTION_MODE,
     DOMAIN,
     QUERY_BATCH_SIZE,
-    RETENTION_DETAIL,
     RETENTION_AGGREGATE,
-    STORAGE_KEY_PREFIX,
-    STORAGE_VERSION,
+    RETENTION_DETAIL,
 )
 
 _LOGGER = logging.getLogger(__name__)

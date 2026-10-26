@@ -14,7 +14,6 @@ from custom_components.pihole_queries.sensor import (
     _client_entity_unique_id,
 )
 
-
 COMPONENT = Path(__file__).parents[1] / "custom_components" / DOMAIN
 
 

@@ -9,16 +9,16 @@ import pytest
 import trustme
 from aiohttp import web
 
-from custom_components.pihole_queries.const import (
-    CONF_HOST,
-    CONF_PORT,
-    CONF_USE_HTTPS,
-)
 from custom_components.pihole_queries.api import (
     PiHoleAuthenticationError,
     PiHoleCertificateError,
     PiHoleClient,
     PiHoleConnectionError,
+)
+from custom_components.pihole_queries.const import (
+    CONF_HOST,
+    CONF_PORT,
+    CONF_USE_HTTPS,
 )
 
 

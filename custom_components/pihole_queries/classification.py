@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 CLASSIFIER_VERSION = 1
 
 STATUS_CLASSIFIERS: dict[int, dict[str, str]] = {

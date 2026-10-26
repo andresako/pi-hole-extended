@@ -6,12 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
 from custom_components.pihole_queries import (
-    _IdentityStore,
     _identity_storage_key,
+    _IdentityStore,
     async_migrate_entry,
 )
 from custom_components.pihole_queries.const import (

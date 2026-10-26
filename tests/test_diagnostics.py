@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock
 import pytest
 from homeassistant.const import EntityCategory
 
+from custom_components.pihole_queries import sensor as sensor_module
 from custom_components.pihole_queries.const import DOMAIN
 from custom_components.pihole_queries.coordinator import PiHoleQueryCoordinator
-from custom_components.pihole_queries import sensor as sensor_module
 from custom_components.pihole_queries.sensor import (
     DIAGNOSTIC_DESCRIPTIONS,
     PiHoleDiagnosticSensor,

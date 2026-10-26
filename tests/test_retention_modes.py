@@ -10,9 +10,9 @@ import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.pihole_queries.__init__ import _IdentityStore
-from custom_components.pihole_queries.coordinator import PiHoleQueryCoordinator
 from custom_components.pihole_queries.const import RETENTION_AGGREGATE
-from custom_components.pihole_queries.sensor import PiHoleClientSensor, SENSOR_DESCRIPTIONS
+from custom_components.pihole_queries.coordinator import PiHoleQueryCoordinator
+from custom_components.pihole_queries.sensor import SENSOR_DESCRIPTIONS, PiHoleClientSensor
 
 
 class MemoryStore:
@@ -773,7 +773,6 @@ async def test_activity_filter_does_not_change_accounting(activity_mode: str, ex
 
 
 def test_aggregate_sensor_attributes_omit_query_rows() -> None:
-    from custom_components.pihole_queries.sensor import PiHoleClientSensor
 
     coordinator = SimpleNamespace(
         client_data={"192.0.2.10": _summary()},

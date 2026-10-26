@@ -8,10 +8,10 @@ from uuid import uuid4
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers import selector
-from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import selector
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
 from .api import (
     PiHoleAuthenticationError,
@@ -22,38 +22,38 @@ from .api import (
     normalize_host,
 )
 from .const import (
-    CONF_HOST,
+    ACTIVITY_ALL,
+    ACTIVITY_BLOCKED,
+    ACTIVITY_NONE,
     CONF_ACTIVITY_MODE,
-    CONF_UNUSUAL_ACTIVITY,
+    CONF_HOST,
     CONF_PASSWORD,
     CONF_PORT,
     CONF_RECONFIGURE_SOURCE_ACTION,
     CONF_RETENTION_MODE,
+    CONF_SCAN_INTERVAL,
     CONF_SOURCE_GENERATION,
     CONF_SOURCE_ID,
-    CONF_SCAN_INTERVAL,
+    CONF_UNUSUAL_ACTIVITY,
     CONF_USE_HTTPS,
     CONF_VERIFY_SSL,
-    DEFAULT_PORT,
     DEFAULT_ACTIVITY_MODE,
-    DEFAULT_UNUSUAL_ACTIVITY,
+    DEFAULT_PORT,
     DEFAULT_RETENTION_MODE,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_UNUSUAL_ACTIVITY,
     DOMAIN,
+    LEGACY_SOURCE_GENERATION,
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
-    ACTIVITY_ALL,
-    ACTIVITY_BLOCKED,
-    ACTIVITY_NONE,
+    RECONFIGURE_NEW_SOURCE,
+    RECONFIGURE_SAME_SOURCE,
+    RETENTION_AGGREGATE,
+    RETENTION_DETAIL,
     UNUSUAL_HIGH,
     UNUSUAL_LOW,
     UNUSUAL_MEDIUM,
     UNUSUAL_OFF,
-    RETENTION_AGGREGATE,
-    RETENTION_DETAIL,
-    LEGACY_SOURCE_GENERATION,
-    RECONFIGURE_NEW_SOURCE,
-    RECONFIGURE_SAME_SOURCE,
 )
 
 
@@ -359,7 +359,7 @@ class PiHoleQueriesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     @staticmethod
-    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> "PiHoleQueriesOptionsFlow":
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> PiHoleQueriesOptionsFlow:
         """Return interval options flow."""
         return PiHoleQueriesOptionsFlow()
 

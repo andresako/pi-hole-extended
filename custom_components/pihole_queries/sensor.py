@@ -6,7 +6,6 @@ import math
 from datetime import UTC, datetime
 from typing import Any
 
-from homeassistant.const import EntityCategory
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -14,12 +13,14 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from .classification import CLASSIFIER_VERSION
 from .const import (
     CONF_SOURCE_GENERATION,
     CONF_SOURCE_ID,
@@ -27,8 +28,6 @@ from .const import (
     LEGACY_SOURCE_GENERATION,
 )
 from .coordinator import PiHoleQueryCoordinator
-from .classification import CLASSIFIER_VERSION
-
 
 SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(

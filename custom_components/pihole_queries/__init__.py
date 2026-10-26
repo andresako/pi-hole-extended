@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 import math
+import re
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -16,8 +16,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
 from homeassistant.util import slugify
@@ -315,7 +315,6 @@ class _IdentityStore:
                     "allowed_last_minute",
                     "blocked_last_minute",
                     "queries_observed_last_minute",
-                    "queries_last_minute",
                 }:
                     valid = isinstance(value, int) and not isinstance(value, bool) and value >= 0
                 elif field == "classifier_version":
