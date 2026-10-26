@@ -22,12 +22,11 @@ from homeassistant.util import dt as dt_util
 
 from .classification import CLASSIFIER_VERSION
 from .const import (
-    CONF_SOURCE_GENERATION,
-    CONF_SOURCE_ID,
     DOMAIN,
-    LEGACY_SOURCE_GENERATION,
 )
 from .coordinator import PiHoleQueryCoordinator
+from .entity_ids import client_device_identifier as _client_device_identifier
+from .entity_ids import client_entity_unique_id as _client_entity_unique_id
 
 SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
@@ -110,29 +109,8 @@ MAX_DEVICE_NAME_LENGTH = 100
 _EPOCH_CLASS_KEYS = {"allowed", "blocked", "provisional"}
 
 
-def _client_entity_unique_id(entry: ConfigEntry, client_key: str, metric_key: str) -> str:
-    """Keep legacy IDs for the first source and scope replacement generations."""
-    entry_data = getattr(entry, "data", {})
-    generation = entry_data.get(CONF_SOURCE_GENERATION, LEGACY_SOURCE_GENERATION)
-    prefix = (
-        (entry.unique_id or entry.entry_id)
-        if generation == LEGACY_SOURCE_GENERATION
-        else f"{entry_data[CONF_SOURCE_ID]}_{generation}"
-    )
-    suffix = "" if metric_key == "queries" else f"_{metric_key}"
-    return f"{prefix}_{client_key}{suffix}"
 
 
-def _client_device_identifier(entry: ConfigEntry, client_key: str) -> tuple[str, str]:
-    """Return a per-entry legacy identifier or source-generation identifier."""
-    entry_data = getattr(entry, "data", {})
-    generation = entry_data.get(CONF_SOURCE_GENERATION, LEGACY_SOURCE_GENERATION)
-    identifier = (
-        f"{entry.entry_id}_{client_key}"
-        if generation == LEGACY_SOURCE_GENERATION
-        else f"{entry_data[CONF_SOURCE_ID]}_{generation}_{client_key}"
-    )
-    return DOMAIN, identifier
 
 def client_device_info(
     coordinator: PiHoleQueryCoordinator, entry: ConfigEntry, client_key: str

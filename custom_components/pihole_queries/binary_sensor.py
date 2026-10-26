@@ -15,7 +15,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import canonical_entity_id
 from .activity_monitor import UnusualActivityMonitor
 from .const import (
     CONF_UNUSUAL_ACTIVITY,
@@ -24,7 +23,8 @@ from .const import (
     UNUSUAL_OFF,
 )
 from .coordinator import PiHoleQueryCoordinator
-from .sensor import _client_entity_unique_id, client_device_info
+from .entity_ids import canonical_entity_id, client_entity_unique_id
+from .sensor import client_device_info
 
 UNUSUAL_ACTIVITY_DESCRIPTION = BinarySensorEntityDescription(
     key="unusual_activity",
@@ -79,7 +79,7 @@ class PiHoleUnusualActivitySensor(BinarySensorEntity):
         self._monitor = monitor
         self._entry = entry
         self._client_key = client_key
-        self._attr_unique_id = _client_entity_unique_id(entry, client_key, "unusual_activity")
+        self._attr_unique_id = client_entity_unique_id(entry, client_key, "unusual_activity")
         # Ask for the phe_ ID up front: renaming after creation can race the platform add.
         suggested = canonical_entity_id(entry, "binary_sensor", self._attr_unique_id)
         if suggested:

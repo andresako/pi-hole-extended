@@ -17,7 +17,7 @@ from .activity import BUCKET_SECONDS, params_for
 from .activity_data import async_client_series
 from .const import CONF_UNUSUAL_ACTIVITY, DEFAULT_UNUSUAL_ACTIVITY, DOMAIN
 from .coordinator import PiHoleQueryCoordinator
-from .sensor import _client_entity_unique_id
+from .entity_ids import client_entity_unique_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class UnusualActivityMonitor:
             entity_id = registry.async_get_entity_id(
                 "sensor",
                 DOMAIN,
-                _client_entity_unique_id(self._entry, client_key, "queries"),
+                client_entity_unique_id(self._entry, client_key, "queries"),
             )
             if entity_id:
                 mapping[client_key] = entity_id
