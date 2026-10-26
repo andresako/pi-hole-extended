@@ -167,6 +167,7 @@ Ready-to-import [dashboard](examples/dashboards/pihole-extended.yaml) and [autom
 - **The card is not listed or shows "Custom element doesn't exist":** restart Home Assistant after installing or updating and refresh the browser without cache.
 - **The chart is empty:** the client needs recorded statistics; wait a few minutes after setup and check the Recorder includes `sensor.phe_*`.
 - **Unusual-activity sensors stay unknown:** a device needs at least 24 blocks of recorded history (two hours for the sensors) before it has a baseline.
+- **Coverage shows Partial or Unknown:** the integration could not prove it saw every query (for example Pi-hole trimmed old history or its query IDs restarted). Counters stay valid but may be lower bounds; see [architecture](docs/architecture.md#cursor-coverage-and-recovery). Download the diagnostics from the integration page when reporting an issue.
 
 ## Support
 

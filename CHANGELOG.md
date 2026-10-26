@@ -2,6 +2,20 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Downloadable diagnostics with host, password and client identities redacted.
+- Client devices Pi-hole no longer reports can be deleted from Home Assistant.
+- Architecture notes in `docs/architecture.md`; issue and pull request templates.
+
+### Changed
+- Sensor names now come from the translation files, so English installations show English names.
+- A persistent unusual-activity evaluation failure is now logged once as a warning.
+- Device names from Pi-hole are limited to 100 characters.
+- The HTTPS options explain that HTTP sends the password unencrypted.
+- Internal refactors: entity ID helpers, the Store and shared validators moved to their own modules; persisted coverage reasons are an enum.
+
 ## [0.10.0] - 2026-10-25
 
 ### Added

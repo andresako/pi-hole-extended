@@ -12,7 +12,8 @@ For pull requests:
 - Update the README when configuration, supported API fields, or limitations change.
 - Include the Home Assistant and Pi-hole versions used for manual verification.
 
-Run the Python and JS tests before opening a pull request; see
+Read [docs/architecture.md](docs/architecture.md) for how the pieces fit together.
+Run the Python and JS tests, and `ruff check .`, before opening a pull request; see
 [docs/development.md](docs/development.md) for the commands.
 
 Before a release, run both repository checks: HACS validation and Hassfest.

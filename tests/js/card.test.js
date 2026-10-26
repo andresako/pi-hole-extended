@@ -50,3 +50,27 @@ test("editor offers lines and bars", () => {
   const type = schema.find((f) => f.name === "chart_type").selector.select.options;
   assert.deepStrictEqual(type, [{ value: "line", label: "Líneas" }, { value: "bar", label: "Barras" }]);
 });
+
+test("fmt shows a dash for missing or non-finite values", () => {
+  assert.strictEqual(c.pheFmt(null), "–");
+  assert.strictEqual(c.pheFmt(undefined), "–");
+  assert.strictEqual(c.pheFmt(NaN), "–");
+  assert.strictEqual(c.pheFmt(Infinity), "–");
+});
+
+test("fmt keeps one decimal below 100 and rounds above", () => {
+  assert.strictEqual(c.pheFmt(0), "0");
+  assert.strictEqual(c.pheFmt(9.94), "9.9");
+  assert.strictEqual(c.pheFmt(99.96), "100");
+  assert.strictEqual(c.pheFmt(150.4), "150");
+});
+
+test("validate rejects unknown options", () => {
+  assert.strictEqual(c.pheValidate("2h", "1d"), "unavailable");
+  assert.strictEqual(c.pheValidate("1h", "99d"), "unavailable");
+});
+
+test("nice max keeps round values and scales fractions", () => {
+  assert.strictEqual(c.pheNiceMax(200), 200);
+  assert.strictEqual(c.pheNiceMax(1.2), 2);
+});
