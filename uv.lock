@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = "==3.12.*"
 
 [[package]]
@@ -682,7 +682,7 @@ wheels = [
 
 [[package]]
 name = "homeassistant"
-version = "2025.1.0"
+version = "2025.1.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiodns" },
@@ -730,9 +730,9 @@ dependencies = [
     { name = "webrtc-models" },
     { name = "yarl" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/28/8206fbac54b2a7985db8282577c30ced832b5bdffe90d9b6e012f4965966/homeassistant-2025.1.0.tar.gz", hash = "sha256:c5a1c3f7772bcf8c26dc2c17e5dfd4c5eb8e43bebd1be667036ea213bcbb854e", size = 23148338, upload-time = "2025-01-03T19:40:12.522Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/9a/224f07021fc8e2fac21adfb71e33aed5fe25cef30eba5a49e3c7057b2a03/homeassistant-2025.1.4.tar.gz", hash = "sha256:cb35f85a0a38ebc3a7fd6b8adf65dd9743b77a7fd615177292f7ef1cd114d52d", size = 23344669, upload-time = "2025-01-24T09:08:45.383Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/02/ee2b4a9c365b09bd66edceb5f9fccffb17992b8b692afd192a70634f2fde/homeassistant-2025.1.0-py3-none-any.whl", hash = "sha256:5141d5e9e8ade12da7ce9c6e04cef66226e332cb2e94ab53d9943eb63913b036", size = 39666813, upload-time = "2025-01-03T19:40:04.296Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/e1/2a973ff9c8511c9dc04fe07384500396c55a18cb8c1b1859e274df7fe4df/homeassistant-2025.1.4-py3-none-any.whl", hash = "sha256:06f273ce6e3d1973d65d67de583f1cba7fcb445a85ce9c16f3618d8cf5048b6c", size = 40023710, upload-time = "2025-01-24T09:08:36.943Z" },
 ]
 
 [[package]]
@@ -959,15 +959,15 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "homeassistant", specifier = "==2025.1.0" }]
+requires-dist = [{ name = "homeassistant", specifier = "==2025.1.4" }]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "pytest", specifier = "==8.3.4" },
-    { name = "pytest-aiohttp", specifier = "==1.0.5" },
+    { name = "pytest-aiohttp", specifier = "==1.1.1" },
     { name = "pytest-asyncio", specifier = "==0.24.0" },
     { name = "pytest-freezer", specifier = "==0.4.9" },
-    { name = "pytest-socket", specifier = "==0.7.0" },
+    { name = "pytest-socket", specifier = "==0.8.1" },
     { name = "trustme", specifier = "==1.2.1" },
 ]
 
@@ -1206,16 +1206,16 @@ wheels = [
 
 [[package]]
 name = "pytest-aiohttp"
-version = "1.0.5"
+version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/28/ad/7915ae42ca364a66708755517c5d669a7a4921d70d1070d3b660ea716a3e/pytest-aiohttp-1.0.5.tar.gz", hash = "sha256:880262bc5951e934463b15e3af8bb298f11f7d4d3ebac970aab425aff10a780a", size = 12209, upload-time = "2023-09-06T14:18:19.718Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/4d/c6621fc79022f6c84a806e23d9b7eca24fae4f3ee779219bbe524339d666/pytest_aiohttp-1.1.1.tar.gz", hash = "sha256:3aa9c9fe26e543eaccc7eb0add381c685ba3ed3e2fed0af74540f63bcd31458d", size = 13704, upload-time = "2026-06-07T23:56:34.173Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/a7/6e50ba2c0a27a34859a952162e63362a13142ce3c646e925b76de440e102/pytest_aiohttp-1.0.5-py3-none-any.whl", hash = "sha256:63a5360fd2f34dda4ab8e6baee4c5f5be4cd186a403cabd498fced82ac9c561e", size = 8547, upload-time = "2023-09-06T14:18:17.729Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/b0/5056ed4c3f68a4db2b4a39fb0ec61b1e4cf1d89ee14effe5261cc587264c/pytest_aiohttp-1.1.1-py3-none-any.whl", hash = "sha256:f293441ad4f8446a1e12257130c26c7de03a615c2a5572a8cb046e5b3b4e5211", size = 9007, upload-time = "2026-06-07T23:56:33.333Z" },
 ]
 
 [[package]]
@@ -1245,14 +1245,14 @@ wheels = [
 
 [[package]]
 name = "pytest-socket"
-version = "0.7.0"
+version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytest" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/05/ff/90c7e1e746baf3d62ce864c479fd53410b534818b9437413903596f81580/pytest_socket-0.7.0.tar.gz", hash = "sha256:71ab048cbbcb085c15a4423b73b619a8b35d6a307f46f78ea46be51b1b7e11b3", size = 12389, upload-time = "2024-01-28T20:17:23.177Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/ce/4ef7b049852c95a8727b4a7e6496f762df1ac0b47bc0320d10293f5e95ec/pytest_socket-0.8.1.tar.gz", hash = "sha256:2f57787914ad2e1308d09ce141b95c3e55741fbb4fb7b7556593a6b063e0c9c7", size = 17313, upload-time = "2026-08-19T15:16:25.653Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/19/58/5d14cb5cb59409e491ebe816c47bf81423cd03098ea92281336320ae5681/pytest_socket-0.7.0-py3-none-any.whl", hash = "sha256:7e0f4642177d55d317bbd58fc68c6bd9048d6eadb2d46a89307fa9221336ce45", size = 6754, upload-time = "2024-01-28T20:17:22.105Z" },
+    { url = "https://files.pythonhosted.org/packages/87/ef/ab507f117b3d19b54e3c9c632a99c28c3b284562ec6e02e274581d530d92/pytest_socket-0.8.1-py3-none-any.whl", hash = "sha256:f9846bed1dcd96eed459e5e14795bbaf96715cf4e827891fe70773817ecb8ed4", size = 8751, upload-time = "2026-08-19T15:16:24.426Z" },
 ]
 
 [[package]]
