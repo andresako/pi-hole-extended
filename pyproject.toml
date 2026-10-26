@@ -3,7 +3,7 @@ name = "pihole-extended-dev"
 version = "0.0.0"
 description = "Development and test environment for Pi-hole Extended"
 requires-python = ">=3.12,<3.13"
-dependencies = ["homeassistant==2025.1.0"]
+dependencies = ["homeassistant==2025.1.4"]
 
 [dependency-groups]
 dev = [
