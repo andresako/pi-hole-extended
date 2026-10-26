@@ -624,7 +624,7 @@ async def test_same_ip_sources_keep_independent_store_payloads() -> None:
             source_id,
             generation,
         )
-        for (source_id, generation), cursor, count in zip(identities, (100, 900), (5, 9))
+        for (source_id, generation), cursor, count in zip(identities, (100, 900), (5, 9), strict=True)
     ]
 
     loaded = [await store.async_load() for store in stores]

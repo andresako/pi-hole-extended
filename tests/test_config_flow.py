@@ -538,7 +538,7 @@ async def test_concurrent_reconfigure_flows_cannot_claim_same_endpoint(monkeypat
 
     monkeypatch.setattr(config_flow, "_validate_connection", validate)
 
-    for flow, entry in zip(flows, entries.entries):
+    for flow, entry in zip(flows, entries.entries, strict=True):
         flow.hass = SimpleNamespace(config_entries=entries)
         flow.context = {"entry_id": entry.entry_id}
         monkeypatch.setattr(

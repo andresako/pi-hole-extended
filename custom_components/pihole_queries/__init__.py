@@ -40,6 +40,7 @@ from .entity_ids import (
 )
 from .entity_ids import (
     canonical_entity_id,
+    client_device_identifier,
 )
 from .entity_ids import (
     entity_unique_prefix as _entity_unique_prefix,
@@ -363,6 +364,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         finally:
             await client.async_close()
         raise
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow removing client devices that Pi-hole no longer reports."""
+    runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if runtime is None:
+        return True
+    active = {
+        client_device_identifier(entry, client_key)
+        for client_key in runtime["coordinator"].client_data
+    }
+    return not any(identifier in active for identifier in device_entry.identifiers)
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:

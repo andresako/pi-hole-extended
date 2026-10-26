@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import voluptuous as vol
 
 from custom_components.pihole_queries import _canonical_entity_id
 from custom_components.pihole_queries import activity_monitor as monitor_module
@@ -161,7 +162,7 @@ def test_options_default_to_medium_and_validate_levels() -> None:
     assert schema({"scan_interval": 15})[CONF_UNUSUAL_ACTIVITY] == "medium"
     for level in ("off", "low", "medium", "high"):
         assert schema({"scan_interval": 15, CONF_UNUSUAL_ACTIVITY: level})[CONF_UNUSUAL_ACTIVITY] == level
-    with pytest.raises(Exception):
+    with pytest.raises(vol.Invalid):
         schema({"scan_interval": 15, CONF_UNUSUAL_ACTIVITY: "extreme"})
 
 
