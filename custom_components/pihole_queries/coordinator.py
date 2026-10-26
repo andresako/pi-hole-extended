@@ -7,6 +7,7 @@ import logging
 import math
 import time
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -40,6 +41,20 @@ from .const import (
 from .validation import valid_classifier_epoch, valid_query_time_buckets
 
 _LOGGER = logging.getLogger(__name__)
+
+@dataclass
+class _Checkpoint:
+    """Coordinator state captured before a poll, used to roll back a failed commit."""
+
+    cursor: int | None
+    clients: dict[str, dict[str, Any]]
+    coverage: str
+    coverage_reason: str | None
+    last_query_time: float | None
+    bootstrapped: bool
+    recovery_cursor: int | None
+    awaiting_generation: bool
+
 
 def _classification(status: Any) -> str:
     """Classify using the active immutable status map."""
@@ -619,26 +634,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.last_query_time = getattr(self, "last_query_time", None)
         self.awaiting_generation = getattr(self, "awaiting_generation", False)
         self.recovery_cursor = getattr(self, "recovery_cursor", None)
-        original_cursor = self.cursor
-        original_clients = deepcopy(self.client_data)
-        original_coverage = self.coverage
-        original_coverage_reason = self.coverage_reason
-        original_last_query_time = self.last_query_time
-        original_bootstrapped = self._bootstrapped
-        original_recovery_cursor = self.recovery_cursor
-        original_awaiting_generation = self.awaiting_generation
+        checkpoint = self._checkpoint()
         try:
             if getattr(self, "retention_mode", RETENTION_DETAIL) == RETENTION_AGGREGATE:
-                return await self._async_update_aggregate_data(
-                    original_cursor=original_cursor,
-                    original_clients=original_clients,
-                    original_coverage=original_coverage,
-                    original_coverage_reason=original_coverage_reason,
-                    original_last_query_time=original_last_query_time,
-                    original_bootstrapped=original_bootstrapped,
-                    original_recovery_cursor=original_recovery_cursor,
-                    original_awaiting_generation=original_awaiting_generation,
-                )
+                return await self._async_update_aggregate_data(checkpoint=checkpoint)
             pages: list[dict[str, Any]] = [
                 await self._async_get_queries(length=QUERY_BATCH_SIZE)
             ]
@@ -694,12 +693,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 newest = max(ids, default=(None, None), key=lambda item: item[0])[1]
                 self.last_query_time = _timestamp_number(newest.get("time")) if newest else None
                 self._update_minute_query_counts(time.time())
-                await self._commit_or_rollback(
-                    original_cursor, original_clients, original_coverage,
-                    original_coverage_reason, original_last_query_time, original_bootstrapped,
-                    original_recovery_cursor,
-                    awaiting_generation=original_awaiting_generation
-                )
+                await self._commit_or_rollback(checkpoint, restore_awaiting=True)
                 _LOGGER.info("Pi-hole query tracking initialized at query ID %s", self.cursor)
                 return self._data_snapshot()
 
@@ -724,11 +718,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     self.coverage = "unknown"
                     self.coverage_reason = CoverageReason.CURSOR_NOT_REACHED
                     self._update_minute_query_counts(time.time())
-                    await self._commit_or_rollback(
-                        original_cursor, original_clients, original_coverage,
-                        original_coverage_reason, original_last_query_time,
-                        original_bootstrapped, original_recovery_cursor
-                    )
+                    await self._commit_or_rollback(checkpoint)
                     return self._data_snapshot()
                 self.recovery_cursor = None
 
@@ -801,11 +791,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 elif not pages[0].get("queries"):
                     self.coverage = "unknown"
                     self.coverage_reason = CoverageReason.EMPTY_HISTORY
-                await self._commit_or_rollback(
-                    original_cursor, original_clients, original_coverage,
-                    original_coverage_reason, original_last_query_time, original_bootstrapped,
-                    original_recovery_cursor
-                )
+                await self._commit_or_rollback(checkpoint)
                 return self._data_snapshot()
 
             newest_id = max(query_id for query_id, _ in identified)
@@ -822,12 +808,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 self.recovery_cursor = None
                 self.last_query_time = None
                 self._update_minute_query_counts(time.time())
-                await self._commit_or_rollback(
-                    original_cursor, original_clients, original_coverage,
-                    original_coverage_reason, original_last_query_time, original_bootstrapped,
-                    original_recovery_cursor,
-                    awaiting_generation=original_awaiting_generation
-                )
+                await self._commit_or_rollback(checkpoint, restore_awaiting=True)
                 return self._data_snapshot()
 
             if not self.client_data:
@@ -877,11 +858,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
             if not reached_cursor and not retention_truncated:
                 self._update_minute_query_counts(time.time())
-                await self._commit_or_rollback(
-                    original_cursor, original_clients, original_coverage,
-                    original_coverage_reason, original_last_query_time,
-                    original_bootstrapped, original_recovery_cursor
-                )
+                await self._commit_or_rollback(checkpoint)
                 return self._data_snapshot()
 
             new_rows = sorted(
@@ -907,21 +884,13 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if self.coverage != "partial":
                     self.coverage = "unknown"
                     self.coverage_reason = CoverageReason.BATCH_INTERRUPTED
-                await self._commit_or_rollback(
-                    original_cursor, original_clients, original_coverage,
-                    original_coverage_reason, original_last_query_time, original_bootstrapped,
-                    original_recovery_cursor
-                )
+                await self._commit_or_rollback(checkpoint)
                 raise
             except HomeAssistantError:
                 if self.coverage != "partial":
                     self.coverage = "unknown"
                     self.coverage_reason = CoverageReason.BATCH_INTERRUPTED
-                await self._commit_or_rollback(
-                    original_cursor, original_clients, original_coverage,
-                    original_coverage_reason, original_last_query_time, original_bootstrapped,
-                    original_recovery_cursor
-                )
+                await self._commit_or_rollback(checkpoint)
                 raise
 
             self.cursor = max(self.cursor or 0, newest_id)
@@ -929,11 +898,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             if reached_cursor and self.coverage_reason == CoverageReason.BATCH_INTERRUPTED:
                 self.coverage = "complete"
                 self.coverage_reason = None
-            await self._commit_or_rollback(
-                original_cursor, original_clients, original_coverage,
-                original_coverage_reason, original_last_query_time, original_bootstrapped,
-                original_recovery_cursor
-            )
+            await self._commit_or_rollback(checkpoint)
             return self._data_snapshot()
         except PiHoleAuthenticationError as err:
             raise ConfigEntryAuthFailed(
@@ -948,68 +913,67 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 f"No se pudo registrar una consulta en el Logbook de Home Assistant: {err}"
             ) from err
 
+    def _checkpoint(self) -> _Checkpoint:
+        """Capture the state to restore if the Store cannot confirm this poll."""
+        return _Checkpoint(
+            cursor=self.cursor,
+            clients=deepcopy(self.client_data),
+            coverage=self.coverage,
+            coverage_reason=self.coverage_reason,
+            last_query_time=self.last_query_time,
+            bootstrapped=self._bootstrapped,
+            recovery_cursor=self.recovery_cursor,
+            awaiting_generation=self.awaiting_generation,
+        )
+
+    def _restore(
+        self,
+        checkpoint: _Checkpoint,
+        *,
+        restore_awaiting: bool,
+        aggregate_state: tuple[dict[str, dict[str, Any]], int | None, float | None] | None,
+    ) -> None:
+        self.cursor = checkpoint.cursor
+        self.client_data = checkpoint.clients
+        self.coverage = checkpoint.coverage
+        self.coverage_reason = checkpoint.coverage_reason
+        self.last_query_time = checkpoint.last_query_time
+        self._bootstrapped = checkpoint.bootstrapped
+        self.recovery_cursor = checkpoint.recovery_cursor
+        if restore_awaiting:
+            self.awaiting_generation = checkpoint.awaiting_generation
+        if aggregate_state is not None:
+            (
+                self.aggregate_pending,
+                self.aggregate_pending_cursor,
+                self.aggregate_pending_time,
+            ) = aggregate_state
+
     async def _commit_or_rollback(
         self,
-        cursor: int | None,
-        clients: dict[str, dict[str, Any]],
-        coverage: str,
-        coverage_reason: str | None,
-        last_query_time: float | None,
-        bootstrapped: bool,
-        recovery_cursor: int | None,
+        checkpoint: _Checkpoint,
         *,
-        awaiting_generation: bool | None = None,
+        restore_awaiting: bool = False,
         aggregate_state: tuple[dict[str, dict[str, Any]], int | None, float | None] | None = None,
     ) -> None:
         """Commit the cursor and summaries together, restoring memory on Store failure."""
         try:
             await self._save_cursor()
         except asyncio.CancelledError:
-            self.cursor = cursor
-            self.client_data = clients
-            self.coverage = coverage
-            self.coverage_reason = coverage_reason
-            self.last_query_time = last_query_time
-            self._bootstrapped = bootstrapped
-            self.recovery_cursor = recovery_cursor
-            if awaiting_generation is not None:
-                self.awaiting_generation = awaiting_generation
-            if aggregate_state is not None:
-                (
-                    self.aggregate_pending,
-                    self.aggregate_pending_cursor,
-                    self.aggregate_pending_time,
-                ) = aggregate_state
+            self._restore(
+                checkpoint, restore_awaiting=restore_awaiting, aggregate_state=aggregate_state
+            )
             raise
         except Exception as err:
-            self.cursor = cursor
-            self.client_data = clients
-            self.coverage = coverage
-            self.coverage_reason = coverage_reason
-            self.last_query_time = last_query_time
-            self._bootstrapped = bootstrapped
-            self.recovery_cursor = recovery_cursor
-            if awaiting_generation is not None:
-                self.awaiting_generation = awaiting_generation
-            if aggregate_state is not None:
-                (
-                    self.aggregate_pending,
-                    self.aggregate_pending_cursor,
-                    self.aggregate_pending_time,
-                ) = aggregate_state
+            self._restore(
+                checkpoint, restore_awaiting=restore_awaiting, aggregate_state=aggregate_state
+            )
             raise UpdateFailed("No se pudo confirmar el progreso de consultas en el Store") from err
 
     async def _async_update_aggregate_data(
         self,
         *,
-        original_cursor: int | None,
-        original_clients: dict[str, dict[str, Any]],
-        original_coverage: str,
-        original_coverage_reason: str | None,
-        original_last_query_time: float | None,
-        original_bootstrapped: bool,
-        original_recovery_cursor: int | None,
-        original_awaiting_generation: bool,
+        checkpoint: _Checkpoint,
     ) -> dict[str, dict[str, Any]]:
         """Stream single rows and persist only aggregate deltas while recovering."""
         original_pending_state = (
@@ -1030,14 +994,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self.aggregate_pending_time = pending_time
             self._update_minute_query_counts(time.time())
             await self._commit_or_rollback(
-                original_cursor,
-                original_clients,
-                original_coverage,
-                original_coverage_reason,
-                original_last_query_time,
-                original_bootstrapped,
-                original_recovery_cursor,
-                awaiting_generation=awaiting_generation,
+                checkpoint,
+                restore_awaiting=awaiting_generation is not None,
                 aggregate_state=original_pending_state,
             )
 
@@ -1096,7 +1054,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             await commit()
             return self._data_snapshot()
 
-        if original_cursor is not None and latest_id < original_cursor:
+        if checkpoint.cursor is not None and latest_id < checkpoint.cursor:
             _LOGGER.warning("El identificador de consultas de Pi-hole se reinició; se establece un cursor nuevo")
             self.cursor = latest_id
             self.coverage = "unknown"
@@ -1106,10 +1064,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             pending = {}
             pending_cursor = None
             pending_time = None
-            await commit(awaiting_generation=original_awaiting_generation)
+            await commit(awaiting_generation=checkpoint.awaiting_generation)
             return self._data_snapshot()
 
-        if latest_id <= (original_cursor or 0) and not pending:
+        if latest_id <= (checkpoint.cursor or 0) and not pending:
             self.recovery_cursor = None
             await commit()
             return self._data_snapshot()
@@ -1117,8 +1075,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         earliest = _timestamp_number(latest.get("earliest_timestamp"))
         truncated = (
             earliest is not None
-            and original_last_query_time is not None
-            and earliest > original_last_query_time
+            and checkpoint.last_query_time is not None
+            and earliest > checkpoint.last_query_time
         )
         if truncated:
             self.coverage = "partial"
@@ -1155,7 +1113,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             if query_id is None:
                 malformed = True
                 break
-            if query_id <= (original_cursor or 0):
+            if query_id <= (checkpoint.cursor or 0):
                 reached_cursor = True
                 break
             if last_seen is not None and query_id >= last_seen:
