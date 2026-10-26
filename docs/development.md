@@ -33,3 +33,18 @@ Assistant installation, private DNS data, or credentials are needed.
 
 Backend tests do not validate the Home Assistant frontend; the JS tests cover
 the card logic only.
+
+## Newer Home Assistant versions
+
+The pinned baseline is the minimum supported version. To check a newer Home
+Assistant (which requires Python 3.13) without touching the lock file, use a
+throwaway environment:
+
+```sh
+uv venv --python 3.13 /tmp/ha-latest
+uv pip install --python /tmp/ha-latest/bin/python homeassistant pytest \
+  pytest-asyncio pytest-aiohttp pytest-freezer pytest-socket trustme
+/tmp/ha-latest/bin/python -m pytest
+```
+
+Last verified: Home Assistant 2026.2.3 on Python 3.13, all tests passing.
