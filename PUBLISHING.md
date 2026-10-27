@@ -7,5 +7,7 @@ through the custom HACS repository. See the README for the current version.
 
 The request to include the repository in the HACS default catalog,
 [`hacs/default#12355`](https://github.com/hacs/default/pull/12355), was closed
-while the integration is tested in Home Assistant. Do not submit another
-request until the user confirms it is ready for the HACS default catalog.
+while the integration was tested in Home Assistant. A new request,
+[`hacs/default#12376`](https://github.com/hacs/default/pull/12376), is open
+(checked 2026-10-27). Do not submit another request without the user's
+confirmation.
