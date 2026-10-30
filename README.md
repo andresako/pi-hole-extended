@@ -4,7 +4,7 @@
 
 [![Latest release](https://img.shields.io/github/v/release/Andresako/pi-hole-extended?label=release)](https://github.com/Andresako/pi-hole-extended/releases/latest) [![HACS validation](https://github.com/andresako/pi-hole-extended/actions/workflows/hacs.yaml/badge.svg)](https://github.com/andresako/pi-hole-extended/actions/workflows/hacs.yaml) [![Hassfest](https://github.com/andresako/pi-hole-extended/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/andresako/pi-hole-extended/actions/workflows/hassfest.yaml)
 
-**See which device on your network is talking to Pi-hole, and when one goes crazy.** Pi-hole Extended turns the queries Pi-hole v6 reports into per-device counters, an activity chart for your dashboards and sensors you can automate on.
+**See which device on your network is talking to Pi-hole, and when one goes crazy.** Pi-hole Extended turns the queries Pi-hole v6 reports into per-device counters, an activity chart and a live device card for your dashboards, and sensors you can automate on.
 
 ![Activity card showing three devices, one of them flagged as unusual](docs/images/activity-card-lines-en.png)
 
@@ -14,7 +14,7 @@
 
 - **One Home Assistant device per client** that Pi-hole sees, with DNS query counters and allowed, blocked and provisional breakdowns.
 - **Activity card** to chart one or more devices by 5-minute to 1-day blocks over up to 30 days, as lines or bars. Everything is set from the card editor.
-- **Live device card** (`custom:phe-live-card`) that shows one device live: rate gauge, usual range, allowed/blocked ring and 60-second bars, editable from the card editor. See [dashboard examples](docs/dashboard-examples.md#live-device-card).
+- **Live device card** (`custom:phe-live-card`) that shows one device live: rate gauge, usual range, allowed/blocked ring and 60-second bars, editable from the card editor. See [Live device card](#live-device-card).
 - **Unusual-activity detection**: a device that stays far above its own usual rate is highlighted in the chart and turns on a binary sensor you can use in automations.
 - **Diagnostics** for the connection, the last read, the last query seen and ingestion coverage.
 - **Privacy-minded**: the integration keeps only counters, and the card and sensors use aggregate counts, never domains. Optional Activity entries do include the queried domain; choose *Totals only* to turn them off.
@@ -120,6 +120,44 @@ names:
 In the legend, select a device's colored dot to hide or show it, or its name to open Home Assistant's history for that sensor. Hover the chart for a cursor and a tooltip with each device's rate and how it compares with its usual level.
 
 The card reads Home Assistant's long-term statistics, so the time axis is when Home Assistant received the data. Blocks under one hour are available for ranges up to 10 days, the Recorder's default for 5-minute statistics.
+
+## Live device card
+
+The card is loaded automatically. Add it to a dashboard with **Edit dashboard → Add card → Pi-hole Extended live device**, or paste it as a manual card:
+
+```yaml
+type: custom:phe-live-card
+entity: sensor.phe_192_0_2_21_consultas_dns
+```
+
+![Live device card showing one unusual device](docs/images/live-card-en.png)
+
+It shows one device right now: a gauge with the current queries per minute, the device's usual rate and alert threshold, a ring with the share of allowed, blocked and provisional queries, 60 one-second bars and a status dot with the age of the last query. The gauge turns red while the device is unusual. Choose the device and which parts to show in the card editor; it only writes the options you change, so the two lines above are all you need. Add one card per device, in a view of your own so you can arrange them. You can also write the options in YAML:
+
+```yaml
+type: custom:phe-live-card
+entity: sensor.phe_192_0_2_21_consultas_dns
+title: Smart camera
+show_legend: false
+animate: true
+```
+
+| Option | Values | Default |
+|---|---|---|
+| `entity` | The device's **DNS queries** counter; the card finds the device's other entities by itself | required |
+| `title` | Heading | the device's name |
+| `show_title` | Show the heading | `true` |
+| `show_badge` | Show *Normal*, or *Unusual activity* with how many times the usual rate | `true` |
+| `show_gauge` | Show the rate gauge with the usual rate and the alert threshold | `true` |
+| `show_ring` | Show the allowed, blocked and provisional ring | `true` |
+| `show_legend` | Show the totals of allowed, blocked and provisional queries | `true` |
+| `show_strip` | Show the 60 one-second bars | `true` |
+| `show_status` | Show the status dot and the age of the last query | `true` |
+| `animate` | Move the gauge and the ring smoothly | `false` |
+
+The status dot is green when the connection is fresh and the data complete, and amber or red when it may be stale or incomplete. The usual rate is the median of the device's own rates, so it can be 0 for a device that works in bursts; the card then shows only the alert threshold.
+
+Pi-hole is polled, so the bars spread the queries that arrived between two updates over that time. They show the rhythm, not the exact second of each query, and the real values change once per poll interval (15 seconds by default). Like the sensors, the card uses aggregate counts and never shows domains.
 
 ## Unusual activity
 

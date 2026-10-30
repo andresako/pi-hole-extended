@@ -4,7 +4,7 @@
 
 [![Última versión](https://img.shields.io/github/v/release/Andresako/pi-hole-extended?label=release)](https://github.com/Andresako/pi-hole-extended/releases/latest) [![Validación HACS](https://github.com/andresako/pi-hole-extended/actions/workflows/hacs.yaml/badge.svg)](https://github.com/andresako/pi-hole-extended/actions/workflows/hacs.yaml) [![Hassfest](https://github.com/andresako/pi-hole-extended/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/andresako/pi-hole-extended/actions/workflows/hassfest.yaml)
 
-**Descubre qué dispositivo de tu red habla con Pi-hole y cuándo uno se vuelve loco.** Pi-hole Extended convierte las consultas que informa Pi-hole v6 en contadores por dispositivo, una gráfica de actividad para tus paneles y sensores sobre los que puedes automatizar.
+**Descubre qué dispositivo de tu red habla con Pi-hole y cuándo uno se vuelve loco.** Pi-hole Extended convierte las consultas que informa Pi-hole v6 en contadores por dispositivo, una gráfica de actividad y una tarjeta en vivo de cada dispositivo para tus paneles, y sensores sobre los que puedes automatizar.
 
 ![Tarjeta de actividad con tres dispositivos, uno marcado como inusual](docs/images/activity-card-lines-es.png)
 
@@ -14,7 +14,7 @@
 
 - **Un dispositivo de Home Assistant por cliente** que ve Pi-hole, con contadores de consultas DNS y desglose en permitidas, bloqueadas y provisionales.
 - **Tarjeta de actividad** para graficar uno o varios dispositivos en bloques de 5 minutos a 1 día durante hasta 30 días, como líneas o barras. Todo se ajusta desde el editor de la tarjeta.
-- **Tarjeta en vivo** (`custom:phe-live-card`) que muestra un dispositivo en vivo: indicador de ritmo, rango habitual, anillo de permitidas y bloqueadas y barras de 60 segundos, editable desde el editor de la tarjeta. Ver [ejemplos de panel](docs/dashboard-examples.md#tarjeta-en-vivo-de-un-dispositivo).
+- **Tarjeta en vivo** (`custom:phe-live-card`) que muestra un dispositivo en vivo: indicador de ritmo, rango habitual, anillo de permitidas y bloqueadas y barras de 60 segundos, editable desde el editor de la tarjeta. Ver [Tarjeta en vivo](#tarjeta-en-vivo).
 - **Detección de actividad inusual**: un dispositivo que se mantiene muy por encima de su propia tasa habitual se resalta en la gráfica y activa un sensor binario que puedes usar en automatizaciones.
 - **Diagnóstico** de la conexión, la última lectura, la última consulta vista y la cobertura de ingesta.
 - **Respetuosa con la privacidad**: la integración solo conserva contadores, y la tarjeta y los sensores usan recuentos agregados, nunca dominios. Las entradas opcionales de Activity sí incluyen el dominio consultado; elige *Solo totales* para desactivarlas.
@@ -120,6 +120,44 @@ names:
 En la leyenda, pulsa el círculo de color de un dispositivo para ocultarlo o mostrarlo, o su nombre para abrir el historial de Home Assistant de ese sensor. Al pasar el ratón por la gráfica verás un cursor y un tooltip con la tasa de cada dispositivo y cómo se compara con su nivel habitual.
 
 La tarjeta lee las estadísticas a largo plazo de Home Assistant, así que el eje de tiempo es el momento en que Home Assistant recibió el dato. Los bloques de menos de una hora están disponibles para rangos de hasta 10 días, el valor por defecto del Recorder para estadísticas de 5 minutos.
+
+## Tarjeta en vivo
+
+La tarjeta se carga sola. Añádela a un panel con **Editar panel → Añadir tarjeta → Pi-hole Extended dispositivo en vivo**, o pégala como tarjeta manual:
+
+```yaml
+type: custom:phe-live-card
+entity: sensor.phe_192_0_2_21_consultas_dns
+```
+
+![Tarjeta en vivo con un dispositivo inusual](docs/images/live-card-es.png)
+
+Muestra un dispositivo ahora mismo: un indicador con las consultas por minuto actuales, el ritmo habitual y el umbral de aviso del dispositivo, un anillo con la proporción de consultas permitidas, bloqueadas y provisionales, 60 barras de un segundo y un punto de estado con la antigüedad de la última consulta. El indicador se pone rojo mientras el dispositivo es inusual. Elige el dispositivo y qué partes mostrar en el editor de la tarjeta; solo escribe las opciones que cambias, así que las dos líneas de arriba bastan. Añade una tarjeta por dispositivo, en una vista tuya para poder ordenarlas. También puedes escribir las opciones en YAML:
+
+```yaml
+type: custom:phe-live-card
+entity: sensor.phe_192_0_2_21_consultas_dns
+title: Cámara
+show_legend: false
+animate: true
+```
+
+| Opción | Valores | Por defecto |
+|---|---|---|
+| `entity` | El contador **Consultas DNS** del dispositivo; la tarjeta encuentra sola las demás entidades del dispositivo | obligatoria |
+| `title` | Encabezado | el nombre del dispositivo |
+| `show_title` | Mostrar el encabezado | `true` |
+| `show_badge` | Mostrar *Normal*, o *Actividad inusual* con cuántas veces el ritmo habitual | `true` |
+| `show_gauge` | Mostrar el indicador de ritmo con el ritmo habitual y el umbral de aviso | `true` |
+| `show_ring` | Mostrar el anillo de permitidas, bloqueadas y provisionales | `true` |
+| `show_legend` | Mostrar los totales de consultas permitidas, bloqueadas y provisionales | `true` |
+| `show_strip` | Mostrar las 60 barras de un segundo | `true` |
+| `show_status` | Mostrar el punto de estado y la antigüedad de la última consulta | `true` |
+| `animate` | Mover el indicador y el anillo con suavidad | `false` |
+
+El punto de estado es verde cuando la conexión está al día y los datos están completos, y ámbar o rojo cuando pueden estar atrasados o incompletos. El ritmo habitual es la mediana de los ritmos del propio dispositivo, así que puede ser 0 en un dispositivo que trabaja a ráfagas; entonces la tarjeta muestra solo el umbral de aviso.
+
+Pi-hole se consulta por sondeo, así que las barras reparten las consultas llegadas entre dos actualizaciones a lo largo de ese tiempo. Muestran el ritmo, no el segundo exacto de cada consulta, y los valores reales cambian una vez por intervalo de sondeo (15 segundos por defecto). Igual que los sensores, la tarjeta usa recuentos agregados y nunca muestra dominios.
 
 ## Actividad inusual
 
