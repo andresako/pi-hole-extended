@@ -969,14 +969,14 @@ function pheRegister() {
     customElements.define("phe-live-card", PheLiveCard);
     window.customCards = window.customCards || [];
     pheLoadStrings(document.documentElement.lang || navigator.language).then((t) => {
-      window.customCards.push({ type: "phe-live-card", name: t.cardLiveName, description: t.cardLiveDescription, preview: false });
+      window.customCards.push({ type: "phe-live-card", name: t.cardLiveName, description: t.cardLiveDescription, preview: true });
     });
   }
   if (!customElements.get("phe-activity-card")) {
     customElements.define("phe-activity-card", PheActivityCard);
     window.customCards = window.customCards || [];
     pheLoadStrings(document.documentElement.lang || navigator.language).then((t) => {
-      window.customCards.push({ type: "phe-activity-card", name: t.cardName, description: t.cardDescription, preview: false });
+      window.customCards.push({ type: "phe-activity-card", name: t.cardName, description: t.cardDescription, preview: true });
     });
   }
 }
