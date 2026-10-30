@@ -26,9 +26,9 @@ Import the automation from **Settings → Automations & scenes → ⋮ → Edit 
 
 ## One view per device
 
-A view with `strategy: type: custom:phe-device` shows one device as a live pulse (`custom:phe-live-card`): a gauge with the current queries per minute, the device's usual range and alert threshold, a ring with the allowed, blocked and provisional share, a 60-second strip that moves as queries arrive, and a status dot with the age of the last query. The gauge turns red when the device is unusual. It is generated from the device's own entities, so there are no IDs to copy.
+A view with `strategy: type: custom:phe-device` shows one device as a live card (`custom:phe-live-card`): a gauge with the current queries per minute, the device's usual range and alert threshold, a ring with the allowed, blocked and provisional share, a 60-second strip that moves as queries arrive, and a status dot with the age of the last query. The gauge turns red when the device is unusual. It is generated from the device's own entities, so there are no IDs to copy.
 
-Pi-hole is polled, so the pulse and the strip pace the queries that arrived between two updates; they do not show the exact second of each query. The poll interval (15 seconds by default) sets how often the real values change.
+Pi-hole is polled, so the strip spreads the queries that arrived between two updates over that time; it does not show the exact second of each query. The poll interval (15 seconds by default) sets how often the real values change.
 
 ```yaml
 views:
@@ -73,9 +73,9 @@ Importa la automatización desde **Ajustes → Automatizaciones y escenas → �
 
 ## Una vista por dispositivo
 
-Una vista con `strategy: type: custom:phe-device` muestra un dispositivo como un pulso en vivo (`custom:phe-live-card`): un indicador con las consultas por minuto actuales, el rango habitual y el umbral de aviso del dispositivo, un anillo con la proporción de permitidas, bloqueadas y provisionales, una cinta de 60 segundos que avanza al llegar consultas y un punto de estado con la antigüedad de la última consulta. El indicador se pone rojo cuando el dispositivo es inusual. Se genera a partir de las entidades del propio dispositivo, así que no hay ID que copiar.
+Una vista con `strategy: type: custom:phe-device` muestra un dispositivo como una tarjeta en vivo (`custom:phe-live-card`): un indicador con las consultas por minuto actuales, el rango habitual y el umbral de aviso del dispositivo, un anillo con la proporción de permitidas, bloqueadas y provisionales, una cinta de 60 segundos que avanza al llegar consultas y un punto de estado con la antigüedad de la última consulta. El indicador se pone rojo cuando el dispositivo es inusual. Se genera a partir de las entidades del propio dispositivo, así que no hay ID que copiar.
 
-Pi-hole se consulta por sondeo, así que el pulso y la cinta reparten las consultas llegadas entre dos actualizaciones; no muestran el segundo exacto de cada una. El intervalo de sondeo (15 segundos por defecto) marca cada cuánto cambian los valores reales.
+Pi-hole se consulta por sondeo, así que la cinta reparte las consultas llegadas entre dos actualizaciones a lo largo de ese tiempo; no muestra el segundo exacto de cada una. El intervalo de sondeo (15 segundos por defecto) marca cada cuánto cambian los valores reales.
 
 ```yaml
 views:

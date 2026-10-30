@@ -650,8 +650,6 @@ class PheLiveCard extends HTMLElement {
         .seg { fill:none; stroke-width:6; transition:stroke-dasharray .8s ease, stroke-dashoffset .8s ease; transform:rotate(-90deg); transform-origin:120px 120px; }
         .num { font-size:44px; font-weight:300; text-anchor:middle; fill:var(--primary-text-color); }
         .unit, .sub { font-size:11px; text-anchor:middle; fill:var(--secondary-text-color); }
-        .ripple { fill:none; stroke-width:2; transform-origin:120px 120px; animation:phe-ripple 1.4s ease-out forwards; }
-        @keyframes phe-ripple { from { transform:scale(.5); opacity:.6; } to { transform:scale(1.9); opacity:0; } }
         .strip { margin-top:8px; }
         .strip rect { transition:height .3s; }
         .foot { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:.85em; color:var(--secondary-text-color); }
@@ -663,7 +661,7 @@ class PheLiveCard extends HTMLElement {
         .legend { display:flex; justify-content:center; flex-wrap:wrap; gap:4px 16px; margin-top:4px; font-size:.85em; color:var(--secondary-text-color); }
         .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
         .dim .value, .dim .num { opacity:.4; }
-        @media (prefers-reduced-motion: reduce) { .ripple { display:none; } .seg, .strip rect { transition:none; } }
+        @media (prefers-reduced-motion: reduce) { .seg, .strip rect { transition:none; } }
       </style>
       <ha-card>
         <div class="head"><span class="name"></span><span class="badge"></span></div>
@@ -671,7 +669,6 @@ class PheLiveCard extends HTMLElement {
           <circle class="seg allowed" cx="120" cy="120" r="108" stroke="var(--primary-color)" opacity=".55"></circle>
           <circle class="seg blocked" cx="120" cy="120" r="108" stroke="var(--error-color)"></circle>
           <circle class="seg provisional" cx="120" cy="120" r="108" stroke="var(--warning-color)"></circle>
-          <g class="ripples"></g>
           <path class="track" d="${pheLiveArc(84, from, to)}"></path>
           <path class="band"></path>
           <path class="value"></path>
@@ -693,7 +690,7 @@ class PheLiveCard extends HTMLElement {
     const q = (selector) => this.shadowRoot.querySelector(selector);
     this._el = {
       card: q("ha-card"), name: q(".name"), badge: q(".badge"), band: q(".band"), value: q(".value"), limit: q(".limit"),
-      num: q(".num"), unit: q(".unit"), sub: q(".sub"), ripples: q(".ripples"), dot: q(".dot"), ago: q(".ago"), cov: q(".cov"),
+      num: q(".num"), unit: q(".unit"), sub: q(".sub"), dot: q(".dot"), ago: q(".ago"), cov: q(".cov"),
       legend: { allowed: q(".k-allowed"), blocked: q(".k-blocked"), provisional: q(".k-provisional") },
       seg: { allowed: q(".seg.allowed"), blocked: q(".seg.blocked"), provisional: q(".seg.provisional") },
       barsA: [...this.shadowRoot.querySelectorAll(".strip .a")], barsB: [...this.shadowRoot.querySelectorAll(".strip .b")],
@@ -798,14 +795,6 @@ class PheLiveCard extends HTMLElement {
     while (this._queue.length && this._queue[0].at <= now) {
       const beat = this._queue.shift();
       this._slots[PHE_LIVE_SLOTS - 1][beat.blocked ? "blocked" : "allowed"] += 1;
-      if (!this._el.ripples.childElementCount || this._el.ripples.childElementCount < 8) {
-        const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        ring.setAttribute("class", "ripple");
-        ring.setAttribute("cx", "120"); ring.setAttribute("cy", "120"); ring.setAttribute("r", "84");
-        ring.setAttribute("stroke", beat.blocked ? "var(--error-color)" : "var(--primary-color)");
-        ring.addEventListener("animationend", () => ring.remove());
-        this._el.ripples.appendChild(ring);
-      }
     }
     const second = Math.floor(now / 1000);
     if (second !== this._second) {

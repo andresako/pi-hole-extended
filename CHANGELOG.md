@@ -5,7 +5,7 @@ All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](h
 ## [Unreleased]
 
 ### Changed
-- The per-device view is now a live pulse (`custom:phe-live-card`) instead of a chart and entity rows: rate gauge with usual range and alert threshold, allowed/blocked/provisional ring, 60-second strip and status dot.
+- The per-device view is now a live card (`custom:phe-live-card`) instead of a chart and entity rows: rate gauge with usual range and alert threshold, allowed/blocked/provisional ring, 60-second strip and status dot.
 
 ## [0.12.0] - 2026-10-30
 
