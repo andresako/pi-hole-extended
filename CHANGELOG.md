@@ -2,7 +2,7 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.13.0] - 2026-10-30
 
 ### Added
 - `custom:phe-live-card`: a live card for one device with a rate gauge (usual range and alert threshold), an allowed/blocked/provisional ring, 60-second bars and a status dot. It is configured from the card editor, which can show or hide each part, and finds the device's other entities from its DNS queries counter.
