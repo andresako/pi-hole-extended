@@ -490,16 +490,31 @@ class PheActivityCardEditor extends HTMLElement {
   }
 }
 
-if (typeof customElements !== "undefined" && !customElements.get("phe-activity-card-editor")) {
-  customElements.define("phe-activity-card-editor", PheActivityCardEditor);
+function pheRegister() {
+  if (!customElements.get("phe-activity-card-editor")) {
+    customElements.define("phe-activity-card-editor", PheActivityCardEditor);
+  }
+  if (!customElements.get("phe-activity-card")) {
+    customElements.define("phe-activity-card", PheActivityCard);
+    window.customCards = window.customCards || [];
+    pheLoadStrings(document.documentElement.lang || navigator.language).then((t) => {
+      window.customCards.push({ type: "phe-activity-card", name: t.cardName, description: t.cardDescription, preview: false });
+    });
+  }
 }
 
-if (typeof customElements !== "undefined" && !customElements.get("phe-activity-card")) {
-  customElements.define("phe-activity-card", PheActivityCard);
-  window.customCards = window.customCards || [];
-  pheLoadStrings(document.documentElement.lang || navigator.language).then((t) => {
-    window.customCards.push({ type: "phe-activity-card", name: t.cardName, description: t.cardDescription, preview: false });
-  });
+if (typeof customElements !== "undefined") {
+  // This module is loaded before the Home Assistant frontend installs its own
+  // element registry. A card defined that early is created but invisible to
+  // dashboards ("Custom element doesn't exist"), so define it again until the
+  // registry the dashboard reads reports it.
+  const pheEnsureRegistered = (attempt) => {
+    pheRegister();
+    if (!customElements.get("phe-activity-card") && attempt < 40) {
+      setTimeout(() => pheEnsureRegistered(attempt + 1), 250);
+    }
+  };
+  pheEnsureRegistered(0);
 }
 
 if (typeof module !== "undefined") {

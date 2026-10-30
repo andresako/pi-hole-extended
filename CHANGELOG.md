@@ -2,6 +2,11 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.11.2] - 2026-10-30
+
+### Fixed
+- The activity card showed "Custom element doesn't exist" when added to a dashboard. The card script is loaded before the Home Assistant frontend installs its element registry, so the card is now registered again until dashboards can see it.
+
 ## [0.11.1] - 2026-10-26
 
 ### Changed
