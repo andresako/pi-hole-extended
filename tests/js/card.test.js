@@ -75,7 +75,7 @@ test("nice max keeps round values and scales fractions", () => {
   assert.strictEqual(c.pheNiceMax(1.2), 2);
 });
 
-test("device view builds cards from one device's entities and its diagnostics", () => {
+test("device view builds a live card and the totals from one device's entities", () => {
   const t = new Proxy({}, { get: (_, key) => String(key) });
   const entities = [
     { entity_id: "sensor.phe_a_dns", tk: "queries" },
@@ -86,14 +86,31 @@ test("device view builds cards from one device's entities and its diagnostics", 
   ];
   const diagnostics = [{ entity_id: "sensor.pi_hole_coverage", tk: "coverage" }];
   const { cards } = c.pheBuildDeviceView({ name: "A", entities, diagnostics, t });
-  assert.deepStrictEqual(cards.map((card) => card.type), ["entities", "conditional", "custom:phe-activity-card", "entities", "entities", "entities"]);
-  assert.deepStrictEqual(cards[2].entities, ["sensor.phe_a_dns"]);
-  assert.deepStrictEqual(cards[3].entities.map((e) => e.entity), ["sensor.phe_a_allowed", "sensor.phe_a_blocked", "sensor.phe_a_dns"]);
-  assert.deepStrictEqual(cards[5].entities, [{ entity: "sensor.pi_hole_coverage", name: "diagCoverage" }]);
+  assert.deepStrictEqual(cards.map((card) => card.type), ["custom:phe-live-card", "entities"]);
+  assert.strictEqual(cards[0].entities.counter, "sensor.phe_a_dns");
+  assert.strictEqual(cards[0].entities.unusual, "binary_sensor.phe_a_unusual");
+  assert.strictEqual(cards[0].entities.allowed, "sensor.phe_a_allowed");
+  assert.strictEqual(cards[0].entities.coverage, "sensor.pi_hole_coverage");
+  assert.deepStrictEqual(cards[1].entities.map((e) => e.entity), ["sensor.phe_a_min", "sensor.phe_a_dns"]);
 });
 
-test("device view omits unusual-activity cards when the sensitivity is off", () => {
+test("device view still works without the unusual-activity sensor", () => {
   const t = new Proxy({}, { get: (_, key) => String(key) });
   const { cards } = c.pheBuildDeviceView({ name: "A", entities: [{ entity_id: "sensor.x", tk: "queries" }], diagnostics: [], t });
-  assert.ok(cards.every((card) => card.type !== "conditional"));
+  assert.strictEqual(cards[0].entities.unusual, undefined);
+});
+
+test("live beats spread the new queries over the time between updates", () => {
+  const beats = c.pheLiveBeats({ total: 4, blocked: 1 }, 10);
+  assert.strictEqual(beats.length, 4);
+  assert.ok(beats.every((b) => b.at > 0 && b.at < 10000));
+  assert.strictEqual(beats.filter((b) => b.blocked).length, 1);
+  assert.deepStrictEqual(c.pheLiveBeats({ total: 0, blocked: 0 }, 5), []);
+  assert.strictEqual(c.pheLiveBeats({ total: 500, blocked: 0 }, 5).length, 40);
+});
+
+test("live gauge angle is clamped to the sweep", () => {
+  assert.strictEqual(c.pheLiveAngle(0, 100), 135);
+  assert.strictEqual(c.pheLiveAngle(50, 100), 270);
+  assert.strictEqual(c.pheLiveAngle(500, 100), 405);
 });

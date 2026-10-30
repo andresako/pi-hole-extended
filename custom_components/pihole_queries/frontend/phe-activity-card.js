@@ -498,52 +498,30 @@ function pheBuildDeviceView({ name, entities, diagnostics, t }) {
   const find = (list, key) => list.find((e) => e.tk === key || e.tk.startsWith(`${key}_`));
   const id = (list, key) => (find(list, key) || {}).entity_id;
   const counter = id(entities, "queries");
-  const unusual = id(entities, "unusual_activity");
   const row = (entity, label) => (entity ? [{ entity, name: label }] : []);
-  const attr = (entity, attribute, label, suffix) => ({ type: "attribute", entity, attribute, name: label, suffix });
   const cards = [];
-
-  if (unusual) {
-    cards.push({ type: "entities", title: name, entities: row(unusual, t.unusualNow) });
+  if (counter) {
     cards.push({
-      type: "conditional",
-      conditions: [{ condition: "state", entity: unusual, state: "on" }],
-      card: {
-        type: "entities",
-        title: t.unusualNow,
-        entities: [
-          attr(unusual, "current_rate", t.currentRate, ` ${t.rate}`),
-          attr(unusual, "usual_rate", t.usualRate, ` ${t.rate}`),
-          attr(unusual, "times_usual", t.timesUsual, " ×"),
-          attr(unusual, "threshold", t.threshold, ` ${t.rate}`),
-          { ...attr(unusual, "since", t.since), format: "relative" },
-        ],
+      type: "custom:phe-live-card",
+      title: name,
+      entities: {
+        counter,
+        rate: id(entities, "queries_last_minute"),
+        unusual: id(entities, "unusual_activity"),
+        allowed: id(entities, "allowed"),
+        blocked: id(entities, "blocked"),
+        provisional: id(entities, "provisional"),
+        coverage: id(diagnostics, "coverage"),
+        status: id(diagnostics, "communication_status"),
+        last_query: id(diagnostics, "last_query_observed"),
       },
     });
   }
-  if (counter) cards.push({ type: "custom:phe-activity-card", title: name, entities: [counter], bucket: "30m", span: "1d", show_overview: false });
-  cards.push({
-    type: "entities",
-    title: t.composition,
-    entities: [
-      ...row(id(entities, "allowed"), t.allowed),
-      ...row(id(entities, "blocked"), t.blocked),
-      ...row(id(entities, "provisional"), t.provisional),
-      ...(counter ? [attr(counter, "blocked_percentage", t.blockedShare, " %")] : []),
-    ],
-  });
   cards.push({
     type: "entities",
     title: t.counters,
     entities: [...row(id(entities, "queries_last_minute"), t.queriesMinute), ...row(counter, t.queriesTotal)],
   });
-  const reliability = [
-    ["coverage", t.diagCoverage],
-    ["last_query_observed", t.diagLastQuery],
-    ["communication_status", t.diagStatus],
-    ["last_successful_read", t.diagLastRead],
-  ].flatMap(([key, label]) => row(id(diagnostics, key), label));
-  if (reliability.length) cards.push({ type: "entities", title: t.reliability, entities: reliability });
   return { cards };
 }
 
@@ -568,9 +546,308 @@ class PheDeviceViewStrategy extends HTMLElement {
   }
 }
 
+const PHE_LIVE_SWEEP = [135, 405];
+const PHE_LIVE_SLOTS = 60;
+const PHE_LIVE_MAX_BEATS = 40;
+
+function pheLivePolar(radius, degrees) {
+  const rad = (degrees * Math.PI) / 180;
+  return [120 + radius * Math.cos(rad), 120 + radius * Math.sin(rad)];
+}
+
+/** SVG path of a clockwise arc between two angles on the gauge radius. */
+function pheLiveArc(radius, from, to) {
+  const [x0, y0] = pheLivePolar(radius, from);
+  const [x1, y1] = pheLivePolar(radius, to);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${radius} ${radius} 0 ${to - from > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+
+/** Angle on the gauge for a rate, clamped to the sweep. */
+function pheLiveAngle(rate, max) {
+  const [from, to] = PHE_LIVE_SWEEP;
+  return from + (to - from) * Math.min(1, Math.max(0, rate / (max || 1)));
+}
+
+/**
+ * Turn the growth of the cumulative counters between two Home Assistant updates
+ * into beats spread over the time between them. Pi-hole is polled, so the real
+ * arrival time of each query is not known; this only paces the animation.
+ */
+function pheLiveBeats(delta, seconds) {
+  const total = Math.min(PHE_LIVE_MAX_BEATS, Math.max(0, Math.round(delta.total)));
+  if (!total) return [];
+  const span = Math.min(30, Math.max(1, seconds)) * 1000;
+  const blocked = Math.min(total, Math.round((total * Math.max(0, delta.blocked)) / Math.max(1, delta.total)));
+  const beats = [];
+  for (let i = 0; i < total; i += 1) beats.push({ at: ((i + 0.5) / total) * span, blocked: i < blocked });
+  return beats;
+}
+
+class PheLiveCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._cfg = null;
+    this._shown = 0;
+    this._max = 1;
+    this._target = 0;
+    this._queue = [];
+    this._slots = Array.from({ length: PHE_LIVE_SLOTS }, () => ({ allowed: 0, blocked: 0 }));
+    this._prev = null;
+    this._lastUpdate = 0;
+    this._lastTick = 0;
+    this._frame = 0;
+    this._strings = PHE_NO_STRINGS;
+  }
+
+  static getStubConfig() { return { entities: {} }; }
+  getCardSize() { return 6; }
+
+  setConfig(config) {
+    if (!config || !config.entities || !config.entities.counter) throw new Error("entities.counter is required");
+    this._cfg = config;
+    this._build();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (hass.language !== this._language) {
+      this._language = hass.language;
+      pheLoadStrings(hass.language).then((strings) => {
+        this._strings = strings;
+        this._paintStatic();
+      });
+    }
+    this._ingest();
+  }
+
+  connectedCallback() { this._start(); }
+  disconnectedCallback() { cancelAnimationFrame(this._frame); this._frame = 0; }
+
+  _num(id) {
+    const state = id && this._hass && this._hass.states[id];
+    const value = state ? Number(state.state) : NaN;
+    return Number.isFinite(value) ? value : null;
+  }
+
+  _build() {
+    const [from, to] = PHE_LIVE_SWEEP;
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display:block; }
+        ha-card { padding:16px; overflow:hidden; }
+        .head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .name { font-size:1.1em; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .badge { font-size:.8em; padding:2px 10px; border-radius:12px; background:var(--secondary-background-color); color:var(--secondary-text-color); white-space:nowrap; }
+        .badge.alert { background:var(--error-color); color:#fff; }
+        svg { width:100%; display:block; }
+        .gauge { max-width:360px; margin:4px auto 0; }
+        .track { fill:none; stroke:var(--divider-color); stroke-width:14; stroke-linecap:round; }
+        .band { fill:none; stroke:var(--primary-color); stroke-width:14; stroke-linecap:round; opacity:.22; }
+        .value { fill:none; stroke:var(--primary-color); stroke-width:14; stroke-linecap:round; }
+        .alert .value { stroke:var(--error-color); }
+        .limit { stroke:var(--warning-color); stroke-width:3; stroke-linecap:round; }
+        .seg { fill:none; stroke-width:6; transition:stroke-dasharray .8s ease, stroke-dashoffset .8s ease; transform:rotate(-90deg); transform-origin:120px 120px; }
+        .num { font-size:44px; font-weight:300; text-anchor:middle; fill:var(--primary-text-color); }
+        .unit, .sub { font-size:11px; text-anchor:middle; fill:var(--secondary-text-color); }
+        .ripple { fill:none; stroke-width:2; transform-origin:120px 120px; animation:phe-ripple 1.4s ease-out forwards; }
+        @keyframes phe-ripple { from { transform:scale(.5); opacity:.6; } to { transform:scale(1.9); opacity:0; } }
+        .strip { margin-top:8px; }
+        .strip rect { transition:height .3s; }
+        .foot { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:.85em; color:var(--secondary-text-color); }
+        .dot { width:10px; height:10px; border-radius:50%; background:var(--disabled-text-color); }
+        .dot.ok { background:var(--success-color); }
+        .dot.warn { background:var(--warning-color); }
+        .dot.bad { background:var(--error-color); }
+        .cov { margin-left:auto; }
+        .legend { display:flex; justify-content:center; flex-wrap:wrap; gap:4px 16px; margin-top:4px; font-size:.85em; color:var(--secondary-text-color); }
+        .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+        .dim .value, .dim .num { opacity:.4; }
+        @media (prefers-reduced-motion: reduce) { .ripple { display:none; } .seg, .strip rect { transition:none; } }
+      </style>
+      <ha-card>
+        <div class="head"><span class="name"></span><span class="badge"></span></div>
+        <svg class="gauge" viewBox="0 0 240 240">
+          <circle class="seg allowed" cx="120" cy="120" r="108" stroke="var(--primary-color)" opacity=".55"></circle>
+          <circle class="seg blocked" cx="120" cy="120" r="108" stroke="var(--error-color)"></circle>
+          <circle class="seg provisional" cx="120" cy="120" r="108" stroke="var(--warning-color)"></circle>
+          <g class="ripples"></g>
+          <path class="track" d="${pheLiveArc(84, from, to)}"></path>
+          <path class="band"></path>
+          <path class="value"></path>
+          <line class="limit"></line>
+          <text class="num" x="120" y="128"></text>
+          <text class="unit" x="120" y="146"></text>
+          <text class="sub" x="120" y="162"></text>
+        </svg>
+        <div class="legend">
+          <span><i style="background:var(--primary-color)"></i><b class="k-allowed"></b></span>
+          <span><i style="background:var(--error-color)"></i><b class="k-blocked"></b></span>
+          <span><i style="background:var(--warning-color)"></i><b class="k-provisional"></b></span>
+        </div>
+        <svg class="strip" viewBox="0 0 240 40" preserveAspectRatio="none">
+          ${Array.from({ length: PHE_LIVE_SLOTS }, (_, i) => `<rect class="a" x="${i * 4}" width="3" y="40" height="0" fill="var(--primary-color)"></rect><rect class="b" x="${i * 4}" width="3" y="40" height="0" fill="var(--error-color)"></rect>`).join("")}
+        </svg>
+        <div class="foot"><span class="dot"></span><span class="ago"></span><span class="cov"></span></div>
+      </ha-card>`;
+    const q = (selector) => this.shadowRoot.querySelector(selector);
+    this._el = {
+      card: q("ha-card"), name: q(".name"), badge: q(".badge"), band: q(".band"), value: q(".value"), limit: q(".limit"),
+      num: q(".num"), unit: q(".unit"), sub: q(".sub"), ripples: q(".ripples"), dot: q(".dot"), ago: q(".ago"), cov: q(".cov"),
+      legend: { allowed: q(".k-allowed"), blocked: q(".k-blocked"), provisional: q(".k-provisional") },
+      seg: { allowed: q(".seg.allowed"), blocked: q(".seg.blocked"), provisional: q(".seg.provisional") },
+      barsA: [...this.shadowRoot.querySelectorAll(".strip .a")], barsB: [...this.shadowRoot.querySelectorAll(".strip .b")],
+    };
+    this._el.name.textContent = this._cfg.title || "";
+    this._prev = null;
+    this._paintStatic();
+    if (this._hass) this._ingest();
+    this._start();
+  }
+
+  _paintStatic() {
+    if (!this._el) return;
+    this._el.unit.textContent = this._strings.rate || "";
+  }
+
+  /** Read the entities, pace the new queries as beats and refresh the static parts. */
+  _ingest() {
+    if (!this._el || !this._hass) return;
+    const e = this._cfg.entities;
+    const now = performance.now();
+    const current = {
+      total: this._num(e.counter), allowed: this._num(e.allowed), blocked: this._num(e.blocked), provisional: this._num(e.provisional),
+    };
+    if (this._prev && current.total != null && this._prev.total != null && current.total >= this._prev.total) {
+      const beats = pheLiveBeats(
+        { total: current.total - this._prev.total, blocked: (current.blocked ?? 0) - (this._prev.blocked ?? 0) },
+        (now - this._lastUpdate) / 1000,
+      );
+      for (const beat of beats) this._queue.push({ at: now + beat.at, blocked: beat.blocked });
+    }
+    if (current.total != null) {
+      this._prev = current;
+      this._lastUpdate = now;
+    }
+    const rate = this._num(e.rate);
+    const unusual = e.unusual && this._hass.states[e.unusual];
+    const attrs = (unusual && unusual.attributes) || {};
+    const isUnusual = !!unusual && unusual.state === "on";
+    const usual = Number.isFinite(Number(attrs.usual_rate)) && attrs.usual_rate != null ? Number(attrs.usual_rate) : null;
+    const limit = Number.isFinite(Number(attrs.threshold)) && attrs.threshold != null ? Number(attrs.threshold) : null;
+    this._target = rate == null ? 0 : rate;
+    this._max = pheNiceMax(Math.max(this._target, (limit || 0) * 1.15, (usual || 0) * 2, 1));
+    const t = this._strings;
+    this._el.card.classList.toggle("alert", isUnusual);
+    this._el.card.classList.toggle("dim", rate == null);
+    this._el.badge.classList.toggle("alert", isUnusual);
+    this._el.badge.textContent = unusual ? (isUnusual ? `${t.unusualNow}${attrs.times_usual ? ` · ${attrs.times_usual} ×` : ""}` : t.liveNormal) : "";
+    this._el.sub.textContent = usual != null ? `${t.base} ${pheFmt(usual)}` : unusual ? t.noBase : "";
+    this._el.band.setAttribute("d", usual != null ? pheLiveArc(84, PHE_LIVE_SWEEP[0], pheLiveAngle(usual, this._max)) : "");
+    if (limit != null) {
+      const angle = pheLiveAngle(limit, this._max);
+      const [x0, y0] = pheLivePolar(74, angle);
+      const [x1, y1] = pheLivePolar(94, angle);
+      this._el.limit.setAttribute("x1", x0); this._el.limit.setAttribute("y1", y0);
+      this._el.limit.setAttribute("x2", x1); this._el.limit.setAttribute("y2", y1);
+      this._el.limit.style.display = "";
+    } else {
+      this._el.limit.style.display = "none";
+    }
+    const parts = [current.allowed, current.blocked, current.provisional].map((v) => Math.max(0, v || 0));
+    const sum = parts.reduce((x, y) => x + y, 0);
+    const circumference = 2 * Math.PI * 108;
+    let start = 0;
+    ["allowed", "blocked", "provisional"].forEach((key, i) => {
+      const length = sum ? (parts[i] / sum) * circumference : 0;
+      this._el.seg[key].setAttribute("stroke-dasharray", `${Math.max(0, length - 2)} ${circumference}`);
+      this._el.seg[key].setAttribute("stroke-dashoffset", String(-start));
+      start += length;
+    });
+    const labels = { allowed: t.allowed, blocked: t.blocked, provisional: t.provisional };
+    for (const key of Object.keys(labels)) {
+      this._el.legend[key].textContent = `${labels[key]} ${current[key] == null ? "–" : pheFmt(current[key])}`;
+    }
+    const status = e.status && this._hass.states[e.status];
+    const coverage = e.coverage && this._hass.states[e.coverage];
+    const bad = status && status.state === "error";
+    const warn = (status && status.state !== "connected") || (coverage && coverage.state !== "complete");
+    this._el.dot.className = `dot ${bad ? "bad" : warn ? "warn" : status ? "ok" : ""}`;
+    this._el.cov.textContent = coverage && coverage.state !== "complete" ? t.livePartial : "";
+    this._lastQuery = e.last_query && this._hass.states[e.last_query] ? Date.parse(this._hass.states[e.last_query].state) : NaN;
+  }
+
+  _start() {
+    if (this._frame || !this._el || !this.isConnected) return;
+    this._lastTick = performance.now();
+    this._second = Math.floor(this._lastTick / 1000);
+    const step = (now) => {
+      this._frame = requestAnimationFrame(step);
+      this._tick(now, Math.min(0.1, (now - this._lastTick) / 1000));
+      this._lastTick = now;
+    };
+    this._frame = requestAnimationFrame(step);
+  }
+
+  _tick(now, dt) {
+    this._shown += (this._target - this._shown) * Math.min(1, dt * 4);
+    this._scale = (this._scale || this._max) + (this._max - (this._scale || this._max)) * Math.min(1, dt * 4);
+    const angle = pheLiveAngle(this._shown, this._scale);
+    this._el.value.setAttribute("d", angle - PHE_LIVE_SWEEP[0] < 0.5 ? "" : pheLiveArc(84, PHE_LIVE_SWEEP[0], angle));
+    this._el.num.textContent = pheFmt(Math.round(this._shown * 10) / 10);
+    while (this._queue.length && this._queue[0].at <= now) {
+      const beat = this._queue.shift();
+      this._slots[PHE_LIVE_SLOTS - 1][beat.blocked ? "blocked" : "allowed"] += 1;
+      if (!this._el.ripples.childElementCount || this._el.ripples.childElementCount < 8) {
+        const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        ring.setAttribute("class", "ripple");
+        ring.setAttribute("cx", "120"); ring.setAttribute("cy", "120"); ring.setAttribute("r", "84");
+        ring.setAttribute("stroke", beat.blocked ? "var(--error-color)" : "var(--primary-color)");
+        ring.addEventListener("animationend", () => ring.remove());
+        this._el.ripples.appendChild(ring);
+      }
+    }
+    const second = Math.floor(now / 1000);
+    if (second !== this._second) {
+      const shift = Math.min(PHE_LIVE_SLOTS, second - this._second);
+      for (let i = 0; i < shift; i += 1) {
+        this._slots.shift();
+        this._slots.push({ allowed: 0, blocked: 0 });
+      }
+      this._second = second;
+      this._paintStrip();
+      this._paintAgo();
+    }
+  }
+
+  _paintStrip() {
+    const peak = Math.max(1, ...this._slots.map((slot) => slot.allowed + slot.blocked));
+    this._slots.forEach((slot, i) => {
+      const a = (slot.allowed / peak) * 36;
+      const b = (slot.blocked / peak) * 36;
+      this._el.barsA[i].setAttribute("y", String(40 - a)); this._el.barsA[i].setAttribute("height", String(a));
+      this._el.barsB[i].setAttribute("y", String(40 - a - b)); this._el.barsB[i].setAttribute("height", String(b));
+    });
+  }
+
+  _paintAgo() {
+    if (!this._strings.liveAgo || !Number.isFinite(this._lastQuery)) { this._el.ago.textContent = ""; return; }
+    const seconds = Math.max(0, Math.round((Date.now() - this._lastQuery) / 1000));
+    const t = this._strings;
+    this._el.ago.textContent = t.liveAgo.replace("{n}", String(seconds));
+  }
+}
+
 function pheRegister() {
   if (!customElements.get("phe-activity-card-editor")) {
     customElements.define("phe-activity-card-editor", PheActivityCardEditor);
+  }
+  if (!customElements.get("phe-live-card")) {
+    customElements.define("phe-live-card", PheLiveCard);
+    window.customCards = window.customCards || [];
+    pheLoadStrings(document.documentElement.lang || navigator.language).then((t) => {
+      window.customCards.push({ type: "phe-live-card", name: t.cardLiveName, description: t.cardLiveDescription, preview: false });
+    });
   }
   if (!customElements.get("ll-strategy-view-phe-device")) {
     customElements.define("ll-strategy-view-phe-device", PheDeviceViewStrategy);
@@ -599,5 +876,5 @@ if (typeof customElements !== "undefined") {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheBuildDeviceView };
+  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheBuildDeviceView, pheLiveBeats, pheLiveAngle, pheLiveArc };
 }

@@ -14,7 +14,7 @@
 
 - **Un dispositivo de Home Assistant por cliente** que ve Pi-hole, con contadores de consultas DNS y desglose en permitidas, bloqueadas y provisionales.
 - **Tarjeta de actividad** para graficar uno o varios dispositivos en bloques de 5 minutos a 1 día durante hasta 30 días, como líneas o barras. Todo se ajusta desde el editor de la tarjeta.
-- **Vista por dispositivo** (`custom:phe-device`) que crea una vista completa para un dispositivo: veredicto, gráfica, permitidas y bloqueadas y fiabilidad de los datos. Ver [ejemplos de panel](docs/dashboard-examples.md#una-vista-por-dispositivo).
+- **Vista por dispositivo** (`custom:phe-device`) que muestra un dispositivo como un pulso en vivo: indicador de ritmo, rango habitual, anillo de permitidas y bloqueadas y una cinta de 60 segundos. Ver [ejemplos de panel](docs/dashboard-examples.md#una-vista-por-dispositivo).
 - **Detección de actividad inusual**: un dispositivo que se mantiene muy por encima de su propia tasa habitual se resalta en la gráfica y activa un sensor binario que puedes usar en automatizaciones.
 - **Diagnóstico** de la conexión, la última lectura, la última consulta vista y la cobertura de ingesta.
 - **Respetuosa con la privacidad**: la integración solo conserva contadores, y la tarjeta y los sensores usan recuentos agregados, nunca dominios. Las entradas opcionales de Activity sí incluyen el dominio consultado; elige *Solo totales* para desactivarlas.
