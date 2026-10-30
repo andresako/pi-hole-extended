@@ -12,6 +12,7 @@ All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](h
 - The live card editor only writes the options you change, so the YAML no longer lists every default.
 
 ### Fixed
+- The live card's alert threshold mark no longer uses the same amber as the provisional queries.
 - Card translations are revalidated on every load and never show "undefined" when a text is missing, so an updated card no longer shows blanks with old cached translations.
 - The live card's gauge, ring and bars toggles did nothing, because SVG elements have no `hidden` property.
 - The 60-second bars are kept per device, so they no longer disappear when the card is rebuilt, for example on every change in the card editor.

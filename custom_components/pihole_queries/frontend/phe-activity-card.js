@@ -694,7 +694,7 @@ class PheLiveCard extends HTMLElement {
         .band { fill:none; stroke:var(--primary-color); stroke-width:14; stroke-linecap:round; opacity:.22; }
         .value { fill:none; stroke:var(--primary-color); stroke-width:14; stroke-linecap:round; }
         .alert .value { stroke:var(--error-color); }
-        .limit { stroke:var(--warning-color); stroke-width:3; stroke-linecap:round; }
+        .limit { stroke:var(--primary-text-color); stroke-width:3; stroke-linecap:round; }
         .seg { fill:none; stroke-width:6; transform:rotate(-90deg); transform-origin:120px 120px; }
         .animate .seg { transition:stroke-dasharray .8s ease, stroke-dashoffset .8s ease; }
         .num { font-size:44px; font-weight:300; text-anchor:middle; fill:var(--primary-text-color); }
