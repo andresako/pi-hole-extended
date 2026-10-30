@@ -498,6 +498,11 @@ const PHE_LIVE_SLOTS = 60;
 const PHE_LIVE_MAX_BEATS = 40;
 const PHE_LIVE_SHOW = ["show_title", "show_badge", "show_gauge", "show_ring", "show_legend", "show_strip", "show_status"];
 const PHE_REGISTRY_TTL = 30000;
+
+/** Hide an element with the attribute: SVG elements have no `hidden` property. */
+function pheSetHidden(element, hidden) {
+  element.toggleAttribute("hidden", !!hidden);
+}
 const pheRegistryCache = new WeakMap();
 
 /** Entity registry rows of this integration, shared by every live card for a short time. */
@@ -571,6 +576,44 @@ function pheLiveBeats(delta, seconds) {
   return beats;
 }
 
+const pheLiveFeeds = new Map();
+
+/**
+ * Per-device history of the 60-second bars, kept outside the card so it survives
+ * the card being rebuilt (the editor preview does that on every change) and is
+ * shared by every card showing the same device.
+ */
+function pheLiveFeed(entity) {
+  if (!pheLiveFeeds.has(entity)) pheLiveFeeds.set(entity, { prev: null, at: 0, seconds: new Map() });
+  return pheLiveFeeds.get(entity);
+}
+
+/** Add the queries seen since the previous update to the seconds they are paced over. */
+function pheLiveRecord(feed, current, now) {
+  if (current.total == null) return;
+  if (feed.prev && feed.prev.total != null && current.total >= feed.prev.total) {
+    const beats = pheLiveBeats(
+      { total: current.total - feed.prev.total, blocked: (current.blocked ?? 0) - (feed.prev.blocked ?? 0) },
+      (now - feed.at) / 1000,
+    );
+    for (const beat of beats) {
+      const second = Math.floor((now + beat.at) / 1000);
+      const slot = feed.seconds.get(second) || { allowed: 0, blocked: 0 };
+      slot[beat.blocked ? "blocked" : "allowed"] += 1;
+      feed.seconds.set(second, slot);
+    }
+  }
+  feed.prev = current;
+  feed.at = now;
+  for (const second of feed.seconds.keys()) if (second < Math.floor(now / 1000) - 120) feed.seconds.delete(second);
+}
+
+/** The last PHE_LIVE_SLOTS seconds, oldest first; seconds still in the future are not shown yet. */
+function pheLiveSlots(feed, now) {
+  const last = Math.floor(now / 1000);
+  return Array.from({ length: PHE_LIVE_SLOTS }, (_, i) => feed.seconds.get(last - (PHE_LIVE_SLOTS - 1 - i)) || { allowed: 0, blocked: 0 });
+}
+
 class PheLiveCard extends HTMLElement {
   constructor() {
     super();
@@ -580,10 +623,6 @@ class PheLiveCard extends HTMLElement {
     this._shown = 0;
     this._max = 1;
     this._target = 0;
-    this._queue = [];
-    this._slots = Array.from({ length: PHE_LIVE_SLOTS }, () => ({ allowed: 0, blocked: 0 }));
-    this._prev = null;
-    this._lastUpdate = 0;
     this._strings = PHE_NO_STRINGS;
   }
 
@@ -597,11 +636,13 @@ class PheLiveCard extends HTMLElement {
 
   setConfig(config) {
     if (!config || !config.entity) throw new Error("entity is required");
+    const sameDevice = this._cfg && this._cfg.entity === config.entity;
     this._cfg = { animate: false, ...Object.fromEntries(PHE_LIVE_SHOW.map((key) => [key, true])), ...config };
-    this._ids = null;
-    this._prev = null;
+    if (!sameDevice) this._ids = null;
     this._build();
-    if (this._hass) this._resolve();
+    if (!this._hass) return;
+    if (this._ids) this._ingest();
+    else this._resolve();
   }
 
   set hass(hass) {
@@ -710,15 +751,15 @@ class PheLiveCard extends HTMLElement {
     };
     const show = (key) => this._cfg[key] !== false;
     this._el.card.classList.toggle("animate", !!this._cfg.animate);
-    this._el.name.hidden = !show("show_title");
-    this._el.ring.hidden = !show("show_ring");
-    this._el.dial.hidden = !show("show_gauge");
-    this._el.gauge.hidden = !show("show_ring") && !show("show_gauge");
-    this._el.legendBox.hidden = !show("show_legend");
-    this._el.strip.hidden = !show("show_strip");
-    this._el.foot.hidden = !show("show_status");
+    pheSetHidden(this._el.name, !show("show_title"));
+    pheSetHidden(this._el.ring, !show("show_ring"));
+    pheSetHidden(this._el.dial, !show("show_gauge"));
+    pheSetHidden(this._el.gauge, !show("show_ring") && !show("show_gauge"));
+    pheSetHidden(this._el.legendBox, !show("show_legend"));
+    pheSetHidden(this._el.strip, !show("show_strip"));
+    pheSetHidden(this._el.foot, !show("show_status"));
     this._badgeShown = show("show_badge");
-    this._el.head.hidden = this._el.name.hidden && !this._badgeShown;
+    pheSetHidden(this._el.head, !show("show_title") && !this._badgeShown);
     this._stop();
     this._start();
   }
@@ -727,19 +768,8 @@ class PheLiveCard extends HTMLElement {
   _ingest() {
     if (!this._el || !this._hass || !this._ids) return;
     const e = this._ids;
-    const now = performance.now();
     const current = { total: this._num(e.counter), allowed: this._num(e.allowed), blocked: this._num(e.blocked), provisional: this._num(e.provisional) };
-    if (this._prev && current.total != null && this._prev.total != null && current.total >= this._prev.total) {
-      const beats = pheLiveBeats(
-        { total: current.total - this._prev.total, blocked: (current.blocked ?? 0) - (this._prev.blocked ?? 0) },
-        (now - this._lastUpdate) / 1000,
-      );
-      for (const beat of beats) this._queue.push({ at: now + beat.at, blocked: beat.blocked });
-    }
-    if (current.total != null) {
-      this._prev = current;
-      this._lastUpdate = now;
-    }
+    pheLiveRecord(pheLiveFeed(this._cfg.entity), current, Date.now());
     const rate = this._num(e.rate);
     const unusual = e.unusual && this._hass.states[e.unusual];
     const attrs = (unusual && unusual.attributes) || {};
@@ -760,7 +790,7 @@ class PheLiveCard extends HTMLElement {
     this._el.card.classList.toggle("alert", isUnusual);
     this._el.card.classList.toggle("dim", rate == null);
     this._el.badge.classList.toggle("alert", isUnusual);
-    this._el.badge.hidden = !this._badgeShown || !unusual;
+    pheSetHidden(this._el.badge, !this._badgeShown || !unusual);
     this._el.badge.textContent = unusual ? (isUnusual ? `${t.unusualNow}${attrs.times_usual ? ` · ${attrs.times_usual} ×` : ""}` : t.liveNormal) : "";
     this._el.unit.textContent = t.rate || "";
     this._el.sub.textContent = usual ? `${t.base} ${pheFmt(usual)}` : unusual && usual == null ? t.noBase : "";
@@ -798,6 +828,7 @@ class PheLiveCard extends HTMLElement {
     this._el.cov.textContent = coverage && coverage.state !== "complete" ? t.livePartial : "";
     this._lastQuery = e.last_query && this._hass.states[e.last_query] ? Date.parse(this._hass.states[e.last_query].state) : NaN;
     this._paintAgo();
+    this._paintStrip();
   }
 
   _paintDial() {
@@ -809,7 +840,7 @@ class PheLiveCard extends HTMLElement {
   _start() {
     if (this._timer || !this._el || !this.isConnected) return;
     this._lastTick = performance.now();
-    this._second = Math.floor(this._lastTick / 1000);
+    this._second = Math.floor(Date.now() / 1000);
     if (this._cfg.animate) {
       const step = (now) => {
         this._timer = requestAnimationFrame(step);
@@ -835,17 +866,8 @@ class PheLiveCard extends HTMLElement {
       this._scale = (this._scale || this._max) + (this._max - (this._scale || this._max)) * Math.min(1, dt * 4);
       this._paintDial();
     }
-    while (this._queue.length && this._queue[0].at <= now) {
-      const beat = this._queue.shift();
-      this._slots[PHE_LIVE_SLOTS - 1][beat.blocked ? "blocked" : "allowed"] += 1;
-    }
-    const second = Math.floor(now / 1000);
+    const second = Math.floor(Date.now() / 1000);
     if (second !== this._second) {
-      const shift = Math.min(PHE_LIVE_SLOTS, second - this._second);
-      for (let i = 0; i < shift; i += 1) {
-        this._slots.shift();
-        this._slots.push({ allowed: 0, blocked: 0 });
-      }
       this._second = second;
       this._paintStrip();
       this._paintAgo();
@@ -853,8 +875,9 @@ class PheLiveCard extends HTMLElement {
   }
 
   _paintStrip() {
-    const peak = Math.max(1, ...this._slots.map((slot) => slot.allowed + slot.blocked));
-    this._slots.forEach((slot, i) => {
+    const slots = pheLiveSlots(pheLiveFeed(this._cfg.entity), Date.now());
+    const peak = Math.max(1, ...slots.map((slot) => slot.allowed + slot.blocked));
+    slots.forEach((slot, i) => {
       const a = (slot.allowed / peak) * 36;
       const b = (slot.blocked / peak) * 36;
       this._el.barsA[i].setAttribute("y", String(40 - a)); this._el.barsA[i].setAttribute("height", String(a));
@@ -968,5 +991,5 @@ if (typeof customElements !== "undefined") {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheResolveDevice, pheLiveBeats, pheLiveAngle, pheLiveArc };
+  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheResolveDevice, pheLiveFeed, pheLiveRecord, pheLiveSlots, pheLiveBeats, pheLiveAngle, pheLiveArc };
 }

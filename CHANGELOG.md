@@ -12,6 +12,8 @@ All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](h
 
 ### Fixed
 - Card translations are revalidated on every load and never show "undefined" when a text is missing, so an updated card no longer shows blanks with old cached translations.
+- The live card's gauge, ring and bars toggles did nothing, because SVG elements have no `hidden` property.
+- The 60-second bars are kept per device, so they no longer disappear when the card is rebuilt, for example on every change in the card editor.
 - The card registration waits for the Home Assistant frontend instead of retrying blindly, which fixes "Custom element doesn't exist" on some loads.
 
 ### Removed

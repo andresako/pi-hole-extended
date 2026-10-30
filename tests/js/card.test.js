@@ -115,3 +115,25 @@ test("live gauge angle is clamped to the sweep", () => {
   assert.strictEqual(c.pheLiveAngle(50, 100), 270);
   assert.strictEqual(c.pheLiveAngle(500, 100), 405);
 });
+
+test("live history is kept per device and survives a rebuilt card", () => {
+  const feed = c.pheLiveFeed("sensor.test_history");
+  const now = 1_000_000_000_000;
+  c.pheLiveRecord(feed, { total: 100, blocked: 10 }, now);
+  c.pheLiveRecord(feed, { total: 104, blocked: 11 }, now + 4000);
+  const same = c.pheLiveFeed("sensor.test_history");
+  assert.strictEqual(same, feed);
+  const slots = c.pheLiveSlots(same, now + 12000);
+  assert.strictEqual(slots.length, 60);
+  assert.strictEqual(slots.reduce((n, s) => n + s.allowed + s.blocked, 0), 4);
+  assert.strictEqual(slots.reduce((n, s) => n + s.blocked, 0), 1);
+});
+
+test("live history does not double count when two cards show the same device", () => {
+  const feed = c.pheLiveFeed("sensor.test_double");
+  const now = 2_000_000_000_000;
+  c.pheLiveRecord(feed, { total: 10, blocked: 0 }, now);
+  c.pheLiveRecord(feed, { total: 13, blocked: 0 }, now + 3000);
+  c.pheLiveRecord(feed, { total: 13, blocked: 0 }, now + 3000);
+  assert.strictEqual(c.pheLiveSlots(feed, now + 9000).reduce((n, s) => n + s.allowed + s.blocked, 0), 3);
+});
