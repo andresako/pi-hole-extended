@@ -10,6 +10,10 @@ All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](h
 ### Changed
 - The dashboard example's per-device view is a normal view with the live card instead of a generated one.
 
+### Fixed
+- Card translations are revalidated on every load and never show "undefined" when a text is missing, so an updated card no longer shows blanks with old cached translations.
+- The card registration waits for the Home Assistant frontend instead of retrying blindly, which fixes "Custom element doesn't exist" on some loads.
+
 ### Removed
 - The `custom:phe-device` view strategy added in 0.12.0. Its generated views could not be edited; use the live card in a view of your own.
 

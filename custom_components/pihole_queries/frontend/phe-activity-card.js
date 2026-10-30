@@ -30,8 +30,11 @@ function pheLoadStrings(language) {
   const short = String(language || "en").slice(0, 2);
   const lang = PHE_LANGUAGES.includes(short) ? short : "en";
   if (!pheStringCache[lang]) {
-    const read = (code) => fetch(`${PHE_TRANSLATIONS_URL}${code}.json`).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
-    pheStringCache[lang] = Promise.all([read("en"), lang === "en" ? {} : read(lang)]).then(([en, own]) => ({ ...en, ...own }));
+    const read = (code) => fetch(`${PHE_TRANSLATIONS_URL}${code}.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    pheStringCache[lang] = Promise.all([read("en"), lang === "en" ? {} : read(lang)]).then(([en, own]) => {
+      const strings = { ...en, ...own };
+      return new Proxy(strings, { get: (target, key) => (key in target ? target[key] : "") });
+    });
   }
   return pheStringCache[lang];
 }
@@ -682,7 +685,8 @@ class PheLiveCard extends HTMLElement {
             <line class="limit"></line>
             <text class="num" x="120" y="128"></text>
             <text class="unit" x="120" y="146"></text>
-            <text class="sub" x="120" y="162"></text>
+            <text class="sub" x="120" y="159"></text>
+            <text class="sub" x="120" y="172"></text>
           </g>
         </svg>
         <div class="legend">
@@ -698,7 +702,7 @@ class PheLiveCard extends HTMLElement {
     const q = (selector) => this.shadowRoot.querySelector(selector);
     this._el = {
       card: q("ha-card"), head: q(".head"), name: q(".name"), badge: q(".badge"), gauge: q(".gauge"), ring: q(".g-ring"), dial: q(".g-gauge"),
-      band: q(".band"), value: q(".value"), limit: q(".limit"), num: q(".num"), unit: q(".unit"), sub: q(".sub"),
+      band: q(".band"), value: q(".value"), limit: q(".limit"), num: q(".num"), unit: q(".unit"), sub: q(".sub"), sub2: this.shadowRoot.querySelectorAll(".sub")[1],
       legendBox: q(".legend"), strip: q(".strip"), foot: q(".foot"), dot: q(".dot"), ago: q(".ago"), cov: q(".cov"),
       legend: { allowed: q(".k-allowed"), blocked: q(".k-blocked"), provisional: q(".k-provisional") },
       seg: { allowed: q(".seg.allowed"), blocked: q(".seg.blocked"), provisional: q(".seg.provisional") },
@@ -706,8 +710,7 @@ class PheLiveCard extends HTMLElement {
     };
     const show = (key) => this._cfg[key] !== false;
     this._el.card.classList.toggle("animate", !!this._cfg.animate);
-    this._el.name.textContent = this._cfg.title || "";
-    this._el.name.hidden = !show("show_title") || !this._cfg.title;
+    this._el.name.hidden = !show("show_title");
     this._el.ring.hidden = !show("show_ring");
     this._el.dial.hidden = !show("show_gauge");
     this._el.gauge.hidden = !show("show_ring") && !show("show_gauge");
@@ -751,14 +754,18 @@ class PheLiveCard extends HTMLElement {
       this._paintDial();
     }
     const t = this._strings;
+    const counterState = this._hass.states[e.counter];
+    const deviceName = counterState && (counterState.attributes.client_name || counterState.attributes.client_ip);
+    this._el.name.textContent = this._cfg.title || deviceName || "";
     this._el.card.classList.toggle("alert", isUnusual);
     this._el.card.classList.toggle("dim", rate == null);
     this._el.badge.classList.toggle("alert", isUnusual);
     this._el.badge.hidden = !this._badgeShown || !unusual;
     this._el.badge.textContent = unusual ? (isUnusual ? `${t.unusualNow}${attrs.times_usual ? ` · ${attrs.times_usual} ×` : ""}` : t.liveNormal) : "";
     this._el.unit.textContent = t.rate || "";
-    this._el.sub.textContent = usual != null ? `${t.base} ${pheFmt(usual)}` : unusual ? t.noBase : "";
-    this._el.band.setAttribute("d", usual != null ? pheLiveArc(84, PHE_LIVE_SWEEP[0], pheLiveAngle(usual, this._max)) : "");
+    this._el.sub.textContent = usual ? `${t.base} ${pheFmt(usual)}` : unusual && usual == null ? t.noBase : "";
+    this._el.sub2.textContent = limit != null ? t.liveThreshold.replace("{n}", pheFmt(limit)) : "";
+    this._el.band.setAttribute("d", usual ? pheLiveArc(84, PHE_LIVE_SWEEP[0], pheLiveAngle(usual, this._max)) : "");
     if (limit != null) {
       const angle = pheLiveAngle(limit, this._max);
       const [x0, y0] = pheLivePolar(74, angle);
@@ -810,10 +817,10 @@ class PheLiveCard extends HTMLElement {
         this._lastTick = now;
       };
       this._timer = requestAnimationFrame(step);
-      this._cancel = cancelAnimationFrame;
+      this._cancel = (id) => cancelAnimationFrame(id);
     } else {
       this._timer = setInterval(() => this._tick(performance.now(), 1), 1000);
-      this._cancel = clearInterval;
+      this._cancel = (id) => clearInterval(id);
     }
   }
 
@@ -863,13 +870,13 @@ class PheLiveCard extends HTMLElement {
   }
 }
 
-function pheLiveEditorSchema(devices) {
+function pheLiveEditorSchema(devices, t) {
   const toggle = (name) => ({ name, selector: { boolean: {} } });
   return [
-    { name: "entity", selector: { entity: { include_entities: devices.map((d) => d.id) } } },
+    { name: "entity", required: true, selector: { entity: { include_entities: devices.map((d) => d.id) } } },
     { name: "title", selector: { text: {} } },
-    { type: "grid", name: "", schema: PHE_LIVE_SHOW.map(toggle) },
-    toggle("animate"),
+    { type: "expandable", name: "", title: t.editDisplay, flatten: true, expanded: true, schema: ["show_title", "show_badge", "show_gauge", "show_ring", "show_legend", "show_strip", "show_status"].map(toggle) },
+    { type: "expandable", name: "", title: t.editBehavior, flatten: true, schema: [toggle("animate")] },
   ];
 }
 
@@ -910,11 +917,15 @@ class PheLiveCardEditor extends HTMLElement {
       entity: t.editDevice, title: t.editTitle, show_title: t.editShowTitle, show_badge: t.editShowBadge, show_gauge: t.editShowGauge,
       show_ring: t.editShowRing, show_legend: t.editShowLegend, show_strip: t.editShowStrip, show_status: t.editShowStatus, animate: t.editAnimate,
     };
+    const helpers = {
+      entity: t.editDeviceHelp, title: t.editTitleHelp, show_title: t.editShowTitleHelp, show_badge: t.editShowBadgeHelp, show_gauge: t.editShowGaugeHelp,
+      show_ring: t.editShowRingHelp, show_legend: t.editShowLegendHelp, show_strip: t.editShowStripHelp, show_status: t.editShowStatusHelp, animate: t.editAnimateHelp,
+    };
     this._form.hass = this._hass;
     this._form.data = this._config;
-    this._form.schema = pheLiveEditorSchema(pheDiscover(this._hass.states));
+    this._form.schema = pheLiveEditorSchema(pheDiscover(this._hass.states), t);
     this._form.computeLabel = (item) => labels[item.name] || item.name;
-    this._form.computeHelper = (item) => (item.name === "animate" ? t.editAnimateHelp : "");
+    this._form.computeHelper = (item) => helpers[item.name] || "";
   }
 }
 
@@ -944,15 +955,16 @@ function pheRegister() {
 if (typeof customElements !== "undefined") {
   // This module is loaded before the Home Assistant frontend installs its own
   // element registry. A card defined that early is created but invisible to
-  // dashboards ("Custom element doesn't exist"), so define it again until the
-  // registry the dashboard reads reports it.
-  const pheEnsureRegistered = (attempt) => {
-    pheRegister();
-    if (!customElements.get("phe-activity-card") && attempt < 480) {
-      setTimeout(() => pheEnsureRegistered(attempt + 1), 250);
+  // dashboards ("Custom element doesn't exist"), so wait until the frontend has
+  // defined its root element, which only happens once that registry is in place.
+  const pheRegisterWhenReady = (attempt) => {
+    if (customElements.get("home-assistant")) {
+      pheRegister();
+    } else if (attempt < 1200) {
+      setTimeout(() => pheRegisterWhenReady(attempt + 1), 100);
     }
   };
-  pheEnsureRegistered(0);
+  pheRegisterWhenReady(0);
 }
 
 if (typeof module !== "undefined") {
