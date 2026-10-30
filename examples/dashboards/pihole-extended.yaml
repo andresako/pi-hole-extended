@@ -47,9 +47,12 @@ views:
   - title: Device
     path: device
     icon: mdi:lan
-    # One view per device, generated from the device's own entities: no entity
-    # IDs to copy. Use `device` (a device ID) or `entity` (the device's DNS
-    # queries counter). Add one view like this for each device you want.
-    strategy:
-      type: custom:phe-device
-      entity: sensor.phe_192_0_2_21_consultas_dns
+    cards:
+      # A normal view you can edit: add one live card per device. It finds the
+      # device's other entities itself, so `entity` (the DNS queries counter) is
+      # all it needs. Everything else is optional and can be set in the card editor.
+      - type: custom:phe-live-card
+        entity: sensor.phe_192_0_2_21_consultas_dns
+        title: Kitchen speaker
+        show_strip: true
+        animate: false

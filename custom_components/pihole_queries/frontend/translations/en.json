@@ -40,5 +40,15 @@
   "liveAgo": "last query {n} s ago",
   "livePartial": "Incomplete data",
   "cardLiveName": "Pi-hole Extended live device",
-  "cardLiveDescription": "Live pulse of one device: rate, usual range, allowed and blocked queries"
+  "cardLiveDescription": "Live pulse of one device: rate, usual range, allowed and blocked queries",
+  "editDevice": "Device",
+  "editShowTitle": "Show title",
+  "editShowBadge": "Show status badge",
+  "editShowGauge": "Show rate gauge",
+  "editShowRing": "Show allowed/blocked ring",
+  "editShowLegend": "Show legend",
+  "editShowStrip": "Show 60-second bars",
+  "editShowStatus": "Show connection status",
+  "editAnimate": "Animations",
+  "editAnimateHelp": "Smooth gauge and ring movement. Off by default."
 }

@@ -40,5 +40,15 @@
   "liveAgo": "última consulta hace {n} s",
   "livePartial": "Datos incompletos",
   "cardLiveName": "Pi-hole Extended dispositivo en vivo",
-  "cardLiveDescription": "Pulso en vivo de un dispositivo: ritmo, rango habitual y consultas permitidas y bloqueadas"
+  "cardLiveDescription": "Pulso en vivo de un dispositivo: ritmo, rango habitual y consultas permitidas y bloqueadas",
+  "editDevice": "Dispositivo",
+  "editShowTitle": "Mostrar título",
+  "editShowBadge": "Mostrar etiqueta de estado",
+  "editShowGauge": "Mostrar indicador de ritmo",
+  "editShowRing": "Mostrar anillo de permitidas y bloqueadas",
+  "editShowLegend": "Mostrar leyenda",
+  "editShowStrip": "Mostrar barras de 60 segundos",
+  "editShowStatus": "Mostrar estado de la conexión",
+  "editAnimate": "Animaciones",
+  "editAnimateHelp": "Movimiento suave del indicador y del anillo. Desactivado por defecto."
 }

@@ -4,8 +4,11 @@ All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](h
 
 ## [Unreleased]
 
+### Added
+- `custom:phe-live-card`: a live card for one device with a rate gauge (usual range and alert threshold), an allowed/blocked/provisional ring, 60-second bars and a status dot. It is configured from the card editor, which can show or hide each part, and finds the device's other entities from its DNS queries counter.
+
 ### Changed
-- The per-device view is now a live card (`custom:phe-live-card`) instead of a chart and entity rows: rate gauge with usual range and alert threshold, allowed/blocked/provisional ring, 60-second strip and status dot.
+- The dashboard example's per-device view is a normal view with the live card instead of a generated one.
 
 ## [0.12.0] - 2026-10-30
 

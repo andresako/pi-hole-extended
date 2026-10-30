@@ -14,7 +14,7 @@
 
 - **One Home Assistant device per client** that Pi-hole sees, with DNS query counters and allowed, blocked and provisional breakdowns.
 - **Activity card** to chart one or more devices by 5-minute to 1-day blocks over up to 30 days, as lines or bars. Everything is set from the card editor.
-- **Per-device view** (`custom:phe-device`) that shows one device as a live card: rate gauge, usual range, allowed/blocked ring and a 60-second strip. See [dashboard examples](docs/dashboard-examples.md#one-view-per-device).
+- **Live device card** (`custom:phe-live-card`) that shows one device live: rate gauge, usual range, allowed/blocked ring and 60-second bars, editable from the card editor. See [dashboard examples](docs/dashboard-examples.md#live-device-card).
 - **Unusual-activity detection**: a device that stays far above its own usual rate is highlighted in the chart and turns on a binary sensor you can use in automations.
 - **Diagnostics** for the connection, the last read, the last query seen and ingestion coverage.
 - **Privacy-minded**: the integration keeps only counters, and the card and sensors use aggregate counts, never domains. Optional Activity entries do include the queried domain; choose *Totals only* to turn them off.

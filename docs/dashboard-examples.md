@@ -24,22 +24,21 @@ The activity card needs no entity list: `type: custom:phe-activity-card` alone i
 
 Import the automation from **Settings → Automations & scenes → ⋮ → Edit in YAML**, replace the entity IDs, and change `notify.notify` to your notification service. It waits ten minutes in the *on* state before notifying, so brief bursts do not alert you. The binary sensor's attributes (`current_rate`, `usual_rate`, `threshold`, `times_usual`, `since`) can be used in the message.
 
-## One view per device
+## Live device card
 
-A view with `strategy: type: custom:phe-device` shows one device as a live card (`custom:phe-live-card`): a gauge with the current queries per minute, the device's usual range and alert threshold, a ring with the allowed, blocked and provisional share, a 60-second strip that moves as queries arrive, and a status dot with the age of the last query. The gauge turns red when the device is unusual. It is generated from the device's own entities, so there are no IDs to copy.
+`custom:phe-live-card` shows one device live: a gauge with the current queries per minute, the device's usual range and alert threshold, a ring with the allowed, blocked and provisional share, a 60-second strip of bars, and a status dot with the age of the last query. The gauge turns red when the device is unusual.
 
-Pi-hole is polled, so the strip spreads the queries that arrived between two updates over that time; it does not show the exact second of each query. The poll interval (15 seconds by default) sets how often the real values change.
+Add it from **Edit dashboard → Add card → Pi-hole Extended live device** and set everything in the card editor, or in YAML:
 
 ```yaml
-views:
-  - title: Kitchen speaker
-    path: kitchen-speaker
-    strategy:
-      type: custom:phe-device
-      entity: sensor.phe_192_0_2_21_consultas_dns
+type: custom:phe-live-card
+entity: sensor.phe_192_0_2_21_consultas_dns
+title: Kitchen speaker
 ```
 
-Use `entity` (the device's **DNS queries** counter) or `device` (a device ID). `name` overrides the title. Add one view per device. The view shows aggregate counts only, never domains.
+`entity` is the device's **DNS queries** counter; the card finds the device's other entities and the diagnostics of its Pi-hole entry by itself. The editor can show or hide each part: `show_title`, `show_badge`, `show_gauge`, `show_ring`, `show_legend`, `show_strip` and `show_status` (all on by default). `animate` (off by default) smooths the movement of the gauge and the ring. Add one card per device, in a view of your own so you can arrange it. The card shows aggregate counts only, never domains.
+
+Pi-hole is polled, so the strip spreads the queries that arrived between two updates over that time; it does not show the exact second of each query. The poll interval (15 seconds by default) sets how often the real values change.
 
 ## Several Pi-hole entries
 
@@ -71,22 +70,21 @@ La tarjeta de actividad no necesita lista de entidades: `type: custom:phe-activi
 
 Importa la automatización desde **Ajustes → Automatizaciones y escenas → ⋮ → Editar en YAML**, sustituye los ID y cambia `notify.notify` por tu servicio de notificaciones. Espera diez minutos en estado *on* antes de avisar, así que las ráfagas breves no te molestan. Los atributos del sensor binario (`current_rate`, `usual_rate`, `threshold`, `times_usual`, `since`) sirven para el mensaje.
 
-## Una vista por dispositivo
+## Tarjeta en vivo de un dispositivo
 
-Una vista con `strategy: type: custom:phe-device` muestra un dispositivo como una tarjeta en vivo (`custom:phe-live-card`): un indicador con las consultas por minuto actuales, el rango habitual y el umbral de aviso del dispositivo, un anillo con la proporción de permitidas, bloqueadas y provisionales, una cinta de 60 segundos que avanza al llegar consultas y un punto de estado con la antigüedad de la última consulta. El indicador se pone rojo cuando el dispositivo es inusual. Se genera a partir de las entidades del propio dispositivo, así que no hay ID que copiar.
+`custom:phe-live-card` muestra un dispositivo en vivo: un indicador con las consultas por minuto actuales, el rango habitual y el umbral de aviso del dispositivo, un anillo con la proporción de permitidas, bloqueadas y provisionales, una cinta de barras de 60 segundos y un punto de estado con la antigüedad de la última consulta. El indicador se pone rojo cuando el dispositivo es inusual.
 
-Pi-hole se consulta por sondeo, así que la cinta reparte las consultas llegadas entre dos actualizaciones a lo largo de ese tiempo; no muestra el segundo exacto de cada una. El intervalo de sondeo (15 segundos por defecto) marca cada cuánto cambian los valores reales.
+Añádela desde **Editar panel → Añadir tarjeta → Pi-hole Extended dispositivo en vivo** y ajusta todo en el editor de la tarjeta, o en YAML:
 
 ```yaml
-views:
-  - title: Altavoz de la cocina
-    path: altavoz-cocina
-    strategy:
-      type: custom:phe-device
-      entity: sensor.phe_192_0_2_21_consultas_dns
+type: custom:phe-live-card
+entity: sensor.phe_192_0_2_21_consultas_dns
+title: Altavoz de la cocina
 ```
 
-Usa `entity` (el contador **Consultas DNS** del dispositivo) o `device` (un ID de dispositivo). `name` cambia el título. Añade una vista por dispositivo. La vista muestra solo recuentos agregados, nunca dominios.
+`entity` es el contador **Consultas DNS** del dispositivo; la tarjeta encuentra sola las demás entidades del dispositivo y los diagnósticos de su entrada de Pi-hole. El editor permite mostrar u ocultar cada parte: `show_title`, `show_badge`, `show_gauge`, `show_ring`, `show_legend`, `show_strip` y `show_status` (todas activas por defecto). `animate` (desactivado por defecto) suaviza el movimiento del indicador y del anillo. Añade una tarjeta por dispositivo, en una vista tuya para poder ordenarlas. La tarjeta muestra solo recuentos agregados, nunca dominios.
+
+Pi-hole se consulta por sondeo, así que la cinta reparte las consultas llegadas entre dos actualizaciones a lo largo de ese tiempo; no muestra el segundo exacto de cada una. El intervalo de sondeo (15 segundos por defecto) marca cada cuánto cambian los valores reales.
 
 ## Varias entradas de Pi-hole
 

@@ -490,65 +490,75 @@ class PheActivityCardEditor extends HTMLElement {
   }
 }
 
+const PHE_LIVE_SWEEP = [135, 405];
+const PHE_LIVE_SLOTS = 60;
+const PHE_LIVE_MAX_BEATS = 40;
+const PHE_LIVE_SHOW = ["show_title", "show_badge", "show_gauge", "show_ring", "show_legend", "show_strip", "show_status"];
+const PHE_REGISTRY_TTL = 30000;
+const pheRegistryCache = new WeakMap();
+
+/** Entity registry rows of this integration, shared by every live card for a short time. */
+function pheRegistry(hass) {
+  const cached = pheRegistryCache.get(hass.connection);
+  if (cached && Date.now() - cached.at < PHE_REGISTRY_TTL) return cached.promise;
+  const promise = hass
+    .callWS({ type: "config/entity_registry/list_for_display" })
+    .then((result) => result.entities.filter((e) => e.pl === "pihole_queries" && e.tk))
+    .catch(() => []);
+  pheRegistryCache.set(hass.connection, { at: Date.now(), promise });
+  return promise;
+}
+
 /**
- * Build the cards of a one-device view from the device's registry entities
- * ({ entity_id, tk }) and the diagnostics of its Pi-hole entry.
+ * Find the entities of one device from its DNS queries counter: its own sensors,
+ * and the diagnostics of the Pi-hole entry (a device that shares a config entry).
  */
-function pheBuildDeviceView({ name, entities, diagnostics, t }) {
-  const find = (list, key) => list.find((e) => e.tk === key || e.tk.startsWith(`${key}_`));
-  const id = (list, key) => (find(list, key) || {}).entity_id;
-  const counter = id(entities, "queries");
+function pheResolveDevice(registry, devices, counterId) {
+  const me = registry.find((e) => e.ei === counterId);
+  if (!me) return null;
+  const configEntries = (id) => ((devices || {})[id] || {}).config_entries || [];
+  const mine = registry.filter((e) => e.di === me.di);
+  const own = configEntries(me.di);
+  const shared = registry.filter((e) => e.di !== me.di && configEntries(e.di).some((entry) => own.includes(entry)));
+  const pick = (list, key) => (list.find((e) => e.tk === key || e.tk.startsWith(`${key}_`)) || {}).ei;
+  return {
+    device: me.di,
+    counter: counterId,
+    rate: pick(mine, "queries_last_minute"),
+    unusual: pick(mine, "unusual_activity"),
+    allowed: pick(mine, "allowed"),
+    blocked: pick(mine, "blocked"),
+    provisional: pick(mine, "provisional"),
+    coverage: pick(shared, "coverage"),
+    status: pick(shared, "communication_status"),
+    last_query: pick(shared, "last_query_observed"),
+  };
+}
+
+/** Cards of a one-device view: the live card plus the totals, from the resolved entity IDs. */
+function pheBuildDeviceView({ name, ids, t }) {
   const row = (entity, label) => (entity ? [{ entity, name: label }] : []);
-  const cards = [];
-  if (counter) {
-    cards.push({
-      type: "custom:phe-live-card",
-      title: name,
-      entities: {
-        counter,
-        rate: id(entities, "queries_last_minute"),
-        unusual: id(entities, "unusual_activity"),
-        allowed: id(entities, "allowed"),
-        blocked: id(entities, "blocked"),
-        provisional: id(entities, "provisional"),
-        coverage: id(diagnostics, "coverage"),
-        status: id(diagnostics, "communication_status"),
-        last_query: id(diagnostics, "last_query_observed"),
-      },
-    });
-  }
-  cards.push({
-    type: "entities",
-    title: t.counters,
-    entities: [...row(id(entities, "queries_last_minute"), t.queriesMinute), ...row(counter, t.queriesTotal)],
-  });
-  return { cards };
+  return {
+    cards: [
+      { type: "custom:phe-live-card", entity: ids.counter, title: name },
+      { type: "entities", title: t.counters, entities: [...row(ids.rate, t.queriesMinute), ...row(ids.counter, t.queriesTotal)] },
+    ],
+  };
 }
 
 /** Custom view strategy: `strategy: { type: custom:phe-device, device: <device_id> }` or `entity: <counter>`. */
 class PheDeviceViewStrategy extends HTMLElement {
   static async generate(config, hass) {
     const t = await pheLoadStrings(hass.language);
-    const registry = (await hass.callWS({ type: "config/entity_registry/list_for_display" })).entities;
-    const own = registry.filter((e) => e.pl === "pihole_queries");
-    const entry = config.entity ? own.find((e) => e.ei === config.entity) : null;
-    const deviceId = config.device || (entry && entry.di);
-    const entities = own.filter((e) => e.di === deviceId && e.tk).map((e) => ({ entity_id: e.ei, tk: e.tk }));
-    if (!deviceId || !entities.length) return { cards: [{ type: "markdown", content: t.deviceNotFound }] };
-    const entries = ((hass.devices || {})[deviceId] || {}).config_entries || [];
-    const diagnostics = own
-      .filter((e) => e.di !== deviceId && e.tk && entries.some((c) => (((hass.devices || {})[e.di] || {}).config_entries || []).includes(c)))
-      .map((e) => ({ entity_id: e.ei, tk: e.tk }));
-    const counter = entities.find((e) => e.tk === "queries");
-    const state = counter && hass.states[counter.entity_id];
-    const name = config.name || (state && (state.attributes.client_name || state.attributes.client_ip)) || deviceId;
-    return pheBuildDeviceView({ name, entities, diagnostics, t });
+    const registry = await pheRegistry(hass);
+    const counter = config.entity || (registry.find((e) => e.di === config.device && e.tk === "queries") || {}).ei;
+    const ids = counter && pheResolveDevice(registry, hass.devices, counter);
+    if (!ids) return { cards: [{ type: "markdown", content: t.deviceNotFound }] };
+    const state = hass.states[counter];
+    const name = config.name || (state && (state.attributes.client_name || state.attributes.client_ip)) || ids.device;
+    return pheBuildDeviceView({ name, ids, t });
   }
 }
-
-const PHE_LIVE_SWEEP = [135, 405];
-const PHE_LIVE_SLOTS = 60;
-const PHE_LIVE_MAX_BEATS = 40;
 
 function pheLivePolar(radius, degrees) {
   const rad = (degrees * Math.PI) / 180;
@@ -571,7 +581,7 @@ function pheLiveAngle(rate, max) {
 /**
  * Turn the growth of the cumulative counters between two Home Assistant updates
  * into beats spread over the time between them. Pi-hole is polled, so the real
- * arrival time of each query is not known; this only paces the animation.
+ * arrival time of each query is not known; this only paces the strip.
  */
 function pheLiveBeats(delta, seconds) {
   const total = Math.min(PHE_LIVE_MAX_BEATS, Math.max(0, Math.round(delta.total)));
@@ -588,6 +598,7 @@ class PheLiveCard extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._cfg = null;
+    this._ids = null;
     this._shown = 0;
     this._max = 1;
     this._target = 0;
@@ -595,34 +606,52 @@ class PheLiveCard extends HTMLElement {
     this._slots = Array.from({ length: PHE_LIVE_SLOTS }, () => ({ allowed: 0, blocked: 0 }));
     this._prev = null;
     this._lastUpdate = 0;
-    this._lastTick = 0;
-    this._frame = 0;
     this._strings = PHE_NO_STRINGS;
   }
 
-  static getStubConfig() { return { entities: {} }; }
+  static getStubConfig(hass) {
+    const busiest = pheDiscover(hass && hass.states).sort((a, b) => b.rate - a.rate)[0];
+    return { entity: busiest ? busiest.id : "" };
+  }
+
+  static getConfigElement() { return document.createElement("phe-live-card-editor"); }
   getCardSize() { return 6; }
 
   setConfig(config) {
-    if (!config || !config.entities || !config.entities.counter) throw new Error("entities.counter is required");
-    this._cfg = config;
+    if (!config || !config.entity) throw new Error("entity is required");
+    this._cfg = { animate: false, ...Object.fromEntries(PHE_LIVE_SHOW.map((key) => [key, true])), ...config };
+    this._ids = null;
+    this._prev = null;
     this._build();
+    if (this._hass) this._resolve();
   }
 
   set hass(hass) {
+    const first = !this._hass;
     this._hass = hass;
     if (hass.language !== this._language) {
       this._language = hass.language;
       pheLoadStrings(hass.language).then((strings) => {
         this._strings = strings;
-        this._paintStatic();
+        this._ingest();
       });
     }
-    this._ingest();
+    if (first || !this._ids) this._resolve();
+    else this._ingest();
   }
 
   connectedCallback() { this._start(); }
-  disconnectedCallback() { cancelAnimationFrame(this._frame); this._frame = 0; }
+  disconnectedCallback() { this._stop(); }
+
+  _resolve() {
+    if (!this._hass || !this._cfg || this._resolving) return;
+    this._resolving = true;
+    pheRegistry(this._hass).then((registry) => {
+      this._resolving = false;
+      this._ids = pheResolveDevice(registry, this._hass.devices, this._cfg.entity) || { counter: this._cfg.entity };
+      this._ingest();
+    });
+  }
 
   _num(id) {
     const state = id && this._hass && this._hass.states[id];
@@ -638,7 +667,7 @@ class PheLiveCard extends HTMLElement {
         ha-card { padding:16px; overflow:hidden; }
         .head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
         .name { font-size:1.1em; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .badge { font-size:.8em; padding:2px 10px; border-radius:12px; background:var(--secondary-background-color); color:var(--secondary-text-color); white-space:nowrap; }
+        .badge { margin-left:auto; font-size:.8em; padding:2px 10px; border-radius:12px; background:var(--secondary-background-color); color:var(--secondary-text-color); white-space:nowrap; }
         .badge.alert { background:var(--error-color); color:#fff; }
         svg { width:100%; display:block; }
         .gauge { max-width:360px; margin:4px auto 0; }
@@ -647,11 +676,11 @@ class PheLiveCard extends HTMLElement {
         .value { fill:none; stroke:var(--primary-color); stroke-width:14; stroke-linecap:round; }
         .alert .value { stroke:var(--error-color); }
         .limit { stroke:var(--warning-color); stroke-width:3; stroke-linecap:round; }
-        .seg { fill:none; stroke-width:6; transition:stroke-dasharray .8s ease, stroke-dashoffset .8s ease; transform:rotate(-90deg); transform-origin:120px 120px; }
+        .seg { fill:none; stroke-width:6; transform:rotate(-90deg); transform-origin:120px 120px; }
+        .animate .seg { transition:stroke-dasharray .8s ease, stroke-dashoffset .8s ease; }
         .num { font-size:44px; font-weight:300; text-anchor:middle; fill:var(--primary-text-color); }
         .unit, .sub { font-size:11px; text-anchor:middle; fill:var(--secondary-text-color); }
         .strip { margin-top:8px; }
-        .strip rect { transition:height .3s; }
         .foot { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:.85em; color:var(--secondary-text-color); }
         .dot { width:10px; height:10px; border-radius:50%; background:var(--disabled-text-color); }
         .dot.ok { background:var(--success-color); }
@@ -661,21 +690,25 @@ class PheLiveCard extends HTMLElement {
         .legend { display:flex; justify-content:center; flex-wrap:wrap; gap:4px 16px; margin-top:4px; font-size:.85em; color:var(--secondary-text-color); }
         .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
         .dim .value, .dim .num { opacity:.4; }
-        @media (prefers-reduced-motion: reduce) { .seg, .strip rect { transition:none; } }
+        [hidden] { display:none !important; }
       </style>
       <ha-card>
         <div class="head"><span class="name"></span><span class="badge"></span></div>
         <svg class="gauge" viewBox="0 0 240 240">
-          <circle class="seg allowed" cx="120" cy="120" r="108" stroke="var(--primary-color)" opacity=".55"></circle>
-          <circle class="seg blocked" cx="120" cy="120" r="108" stroke="var(--error-color)"></circle>
-          <circle class="seg provisional" cx="120" cy="120" r="108" stroke="var(--warning-color)"></circle>
-          <path class="track" d="${pheLiveArc(84, from, to)}"></path>
-          <path class="band"></path>
-          <path class="value"></path>
-          <line class="limit"></line>
-          <text class="num" x="120" y="128"></text>
-          <text class="unit" x="120" y="146"></text>
-          <text class="sub" x="120" y="162"></text>
+          <g class="g-ring">
+            <circle class="seg allowed" cx="120" cy="120" r="108" stroke="var(--primary-color)" opacity=".55"></circle>
+            <circle class="seg blocked" cx="120" cy="120" r="108" stroke="var(--error-color)"></circle>
+            <circle class="seg provisional" cx="120" cy="120" r="108" stroke="var(--warning-color)"></circle>
+          </g>
+          <g class="g-gauge">
+            <path class="track" d="${pheLiveArc(84, from, to)}"></path>
+            <path class="band"></path>
+            <path class="value"></path>
+            <line class="limit"></line>
+            <text class="num" x="120" y="128"></text>
+            <text class="unit" x="120" y="146"></text>
+            <text class="sub" x="120" y="162"></text>
+          </g>
         </svg>
         <div class="legend">
           <span><i style="background:var(--primary-color)"></i><b class="k-allowed"></b></span>
@@ -689,32 +722,35 @@ class PheLiveCard extends HTMLElement {
       </ha-card>`;
     const q = (selector) => this.shadowRoot.querySelector(selector);
     this._el = {
-      card: q("ha-card"), name: q(".name"), badge: q(".badge"), band: q(".band"), value: q(".value"), limit: q(".limit"),
-      num: q(".num"), unit: q(".unit"), sub: q(".sub"), dot: q(".dot"), ago: q(".ago"), cov: q(".cov"),
+      card: q("ha-card"), head: q(".head"), name: q(".name"), badge: q(".badge"), gauge: q(".gauge"), ring: q(".g-ring"), dial: q(".g-gauge"),
+      band: q(".band"), value: q(".value"), limit: q(".limit"), num: q(".num"), unit: q(".unit"), sub: q(".sub"),
+      legendBox: q(".legend"), strip: q(".strip"), foot: q(".foot"), dot: q(".dot"), ago: q(".ago"), cov: q(".cov"),
       legend: { allowed: q(".k-allowed"), blocked: q(".k-blocked"), provisional: q(".k-provisional") },
       seg: { allowed: q(".seg.allowed"), blocked: q(".seg.blocked"), provisional: q(".seg.provisional") },
       barsA: [...this.shadowRoot.querySelectorAll(".strip .a")], barsB: [...this.shadowRoot.querySelectorAll(".strip .b")],
     };
+    const show = (key) => this._cfg[key] !== false;
+    this._el.card.classList.toggle("animate", !!this._cfg.animate);
     this._el.name.textContent = this._cfg.title || "";
-    this._prev = null;
-    this._paintStatic();
-    if (this._hass) this._ingest();
+    this._el.name.hidden = !show("show_title") || !this._cfg.title;
+    this._el.ring.hidden = !show("show_ring");
+    this._el.dial.hidden = !show("show_gauge");
+    this._el.gauge.hidden = !show("show_ring") && !show("show_gauge");
+    this._el.legendBox.hidden = !show("show_legend");
+    this._el.strip.hidden = !show("show_strip");
+    this._el.foot.hidden = !show("show_status");
+    this._badgeShown = show("show_badge");
+    this._el.head.hidden = this._el.name.hidden && !this._badgeShown;
+    this._stop();
     this._start();
   }
 
-  _paintStatic() {
-    if (!this._el) return;
-    this._el.unit.textContent = this._strings.rate || "";
-  }
-
-  /** Read the entities, pace the new queries as beats and refresh the static parts. */
+  /** Read the entities, pace the new queries as beats and refresh the dial. */
   _ingest() {
-    if (!this._el || !this._hass) return;
-    const e = this._cfg.entities;
+    if (!this._el || !this._hass || !this._ids) return;
+    const e = this._ids;
     const now = performance.now();
-    const current = {
-      total: this._num(e.counter), allowed: this._num(e.allowed), blocked: this._num(e.blocked), provisional: this._num(e.provisional),
-    };
+    const current = { total: this._num(e.counter), allowed: this._num(e.allowed), blocked: this._num(e.blocked), provisional: this._num(e.provisional) };
     if (this._prev && current.total != null && this._prev.total != null && current.total >= this._prev.total) {
       const beats = pheLiveBeats(
         { total: current.total - this._prev.total, blocked: (current.blocked ?? 0) - (this._prev.blocked ?? 0) },
@@ -730,15 +766,22 @@ class PheLiveCard extends HTMLElement {
     const unusual = e.unusual && this._hass.states[e.unusual];
     const attrs = (unusual && unusual.attributes) || {};
     const isUnusual = !!unusual && unusual.state === "on";
-    const usual = Number.isFinite(Number(attrs.usual_rate)) && attrs.usual_rate != null ? Number(attrs.usual_rate) : null;
-    const limit = Number.isFinite(Number(attrs.threshold)) && attrs.threshold != null ? Number(attrs.threshold) : null;
+    const usual = attrs.usual_rate != null && Number.isFinite(Number(attrs.usual_rate)) ? Number(attrs.usual_rate) : null;
+    const limit = attrs.threshold != null && Number.isFinite(Number(attrs.threshold)) ? Number(attrs.threshold) : null;
     this._target = rate == null ? 0 : rate;
     this._max = pheNiceMax(Math.max(this._target, (limit || 0) * 1.15, (usual || 0) * 2, 1));
+    if (!this._cfg.animate) {
+      this._shown = this._target;
+      this._scale = this._max;
+      this._paintDial();
+    }
     const t = this._strings;
     this._el.card.classList.toggle("alert", isUnusual);
     this._el.card.classList.toggle("dim", rate == null);
     this._el.badge.classList.toggle("alert", isUnusual);
+    this._el.badge.hidden = !this._badgeShown || !unusual;
     this._el.badge.textContent = unusual ? (isUnusual ? `${t.unusualNow}${attrs.times_usual ? ` · ${attrs.times_usual} ×` : ""}` : t.liveNormal) : "";
+    this._el.unit.textContent = t.rate || "";
     this._el.sub.textContent = usual != null ? `${t.base} ${pheFmt(usual)}` : unusual ? t.noBase : "";
     this._el.band.setAttribute("d", usual != null ? pheLiveArc(84, PHE_LIVE_SWEEP[0], pheLiveAngle(usual, this._max)) : "");
     if (limit != null) {
@@ -772,26 +815,44 @@ class PheLiveCard extends HTMLElement {
     this._el.dot.className = `dot ${bad ? "bad" : warn ? "warn" : status ? "ok" : ""}`;
     this._el.cov.textContent = coverage && coverage.state !== "complete" ? t.livePartial : "";
     this._lastQuery = e.last_query && this._hass.states[e.last_query] ? Date.parse(this._hass.states[e.last_query].state) : NaN;
+    this._paintAgo();
+  }
+
+  _paintDial() {
+    const angle = pheLiveAngle(this._shown, this._scale || this._max);
+    this._el.value.setAttribute("d", angle - PHE_LIVE_SWEEP[0] < 0.5 ? "" : pheLiveArc(84, PHE_LIVE_SWEEP[0], angle));
+    this._el.num.textContent = pheFmt(Math.round(this._shown * 10) / 10);
   }
 
   _start() {
-    if (this._frame || !this._el || !this.isConnected) return;
+    if (this._timer || !this._el || !this.isConnected) return;
     this._lastTick = performance.now();
     this._second = Math.floor(this._lastTick / 1000);
-    const step = (now) => {
-      this._frame = requestAnimationFrame(step);
-      this._tick(now, Math.min(0.1, (now - this._lastTick) / 1000));
-      this._lastTick = now;
-    };
-    this._frame = requestAnimationFrame(step);
+    if (this._cfg.animate) {
+      const step = (now) => {
+        this._timer = requestAnimationFrame(step);
+        this._tick(now, Math.min(0.1, (now - this._lastTick) / 1000));
+        this._lastTick = now;
+      };
+      this._timer = requestAnimationFrame(step);
+      this._cancel = cancelAnimationFrame;
+    } else {
+      this._timer = setInterval(() => this._tick(performance.now(), 1), 1000);
+      this._cancel = clearInterval;
+    }
+  }
+
+  _stop() {
+    if (this._timer && this._cancel) this._cancel(this._timer);
+    this._timer = 0;
   }
 
   _tick(now, dt) {
-    this._shown += (this._target - this._shown) * Math.min(1, dt * 4);
-    this._scale = (this._scale || this._max) + (this._max - (this._scale || this._max)) * Math.min(1, dt * 4);
-    const angle = pheLiveAngle(this._shown, this._scale);
-    this._el.value.setAttribute("d", angle - PHE_LIVE_SWEEP[0] < 0.5 ? "" : pheLiveArc(84, PHE_LIVE_SWEEP[0], angle));
-    this._el.num.textContent = pheFmt(Math.round(this._shown * 10) / 10);
+    if (this._cfg.animate) {
+      this._shown += (this._target - this._shown) * Math.min(1, dt * 4);
+      this._scale = (this._scale || this._max) + (this._max - (this._scale || this._max)) * Math.min(1, dt * 4);
+      this._paintDial();
+    }
     while (this._queue.length && this._queue[0].at <= now) {
       const beat = this._queue.shift();
       this._slots[PHE_LIVE_SLOTS - 1][beat.blocked ? "blocked" : "allowed"] += 1;
@@ -820,16 +881,74 @@ class PheLiveCard extends HTMLElement {
   }
 
   _paintAgo() {
-    if (!this._strings.liveAgo || !Number.isFinite(this._lastQuery)) { this._el.ago.textContent = ""; return; }
-    const seconds = Math.max(0, Math.round((Date.now() - this._lastQuery) / 1000));
     const t = this._strings;
+    if (!t.liveAgo || !Number.isFinite(this._lastQuery)) { this._el.ago.textContent = ""; return; }
+    const seconds = Math.max(0, Math.round((Date.now() - this._lastQuery) / 1000));
     this._el.ago.textContent = t.liveAgo.replace("{n}", String(seconds));
+  }
+}
+
+function pheLiveEditorSchema(devices) {
+  const toggle = (name) => ({ name, selector: { boolean: {} } });
+  return [
+    { name: "entity", selector: { entity: { include_entities: devices.map((d) => d.id) } } },
+    { name: "title", selector: { text: {} } },
+    { type: "grid", name: "", schema: PHE_LIVE_SHOW.map(toggle) },
+    toggle("animate"),
+  ];
+}
+
+class PheLiveCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = { animate: false, ...Object.fromEntries(PHE_LIVE_SHOW.map((key) => [key, true])), ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    const language = hass && hass.language;
+    if (language !== this._language) {
+      this._language = language;
+      pheLoadStrings(language).then((strings) => {
+        if (language !== this._language) return;
+        this._strings = strings;
+        this._render();
+      });
+    }
+    this._render();
+  }
+
+  _render() {
+    if (!this._config || !this._hass) return;
+    const t = this._strings || PHE_NO_STRINGS;
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        this._config = ev.detail.value;
+        this._render();
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
+      });
+      this.append(this._form);
+    }
+    const labels = {
+      entity: t.editDevice, title: t.editTitle, show_title: t.editShowTitle, show_badge: t.editShowBadge, show_gauge: t.editShowGauge,
+      show_ring: t.editShowRing, show_legend: t.editShowLegend, show_strip: t.editShowStrip, show_status: t.editShowStatus, animate: t.editAnimate,
+    };
+    this._form.hass = this._hass;
+    this._form.data = this._config;
+    this._form.schema = pheLiveEditorSchema(pheDiscover(this._hass.states));
+    this._form.computeLabel = (item) => labels[item.name] || item.name;
+    this._form.computeHelper = (item) => (item.name === "animate" ? t.editAnimateHelp : "");
   }
 }
 
 function pheRegister() {
   if (!customElements.get("phe-activity-card-editor")) {
     customElements.define("phe-activity-card-editor", PheActivityCardEditor);
+  }
+  if (!customElements.get("phe-live-card-editor")) {
+    customElements.define("phe-live-card-editor", PheLiveCardEditor);
   }
   if (!customElements.get("phe-live-card")) {
     customElements.define("phe-live-card", PheLiveCard);
@@ -865,5 +984,5 @@ if (typeof customElements !== "undefined") {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheBuildDeviceView, pheLiveBeats, pheLiveAngle, pheLiveArc };
+  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheBuildDeviceView, pheResolveDevice, pheLiveBeats, pheLiveAngle, pheLiveArc };
 }

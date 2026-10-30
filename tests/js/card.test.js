@@ -75,29 +75,38 @@ test("nice max keeps round values and scales fractions", () => {
   assert.strictEqual(c.pheNiceMax(1.2), 2);
 });
 
-test("device view builds a live card and the totals from one device's entities", () => {
-  const t = new Proxy({}, { get: (_, key) => String(key) });
-  const entities = [
-    { entity_id: "sensor.phe_a_dns", tk: "queries" },
-    { entity_id: "sensor.phe_a_min", tk: "queries_last_minute" },
-    { entity_id: "sensor.phe_a_allowed", tk: "allowed_v2" },
-    { entity_id: "sensor.phe_a_blocked", tk: "blocked_v2" },
-    { entity_id: "binary_sensor.phe_a_unusual", tk: "unusual_activity" },
+test("resolve finds a device's own entities and the diagnostics of its Pi-hole entry", () => {
+  const registry = [
+    { ei: "sensor.phe_a_dns", di: "dev-a", tk: "queries" },
+    { ei: "sensor.phe_a_min", di: "dev-a", tk: "queries_last_minute" },
+    { ei: "sensor.phe_a_allowed", di: "dev-a", tk: "allowed_v2" },
+    { ei: "sensor.phe_a_blocked", di: "dev-a", tk: "blocked_v2" },
+    { ei: "binary_sensor.phe_a_unusual", di: "dev-a", tk: "unusual_activity" },
+    { ei: "sensor.phe_b_dns", di: "dev-b", tk: "queries" },
+    { ei: "sensor.pi_hole_coverage", di: "diag-1", tk: "coverage" },
+    { ei: "sensor.other_coverage", di: "diag-2", tk: "coverage" },
   ];
-  const diagnostics = [{ entity_id: "sensor.pi_hole_coverage", tk: "coverage" }];
-  const { cards } = c.pheBuildDeviceView({ name: "A", entities, diagnostics, t });
-  assert.deepStrictEqual(cards.map((card) => card.type), ["custom:phe-live-card", "entities"]);
-  assert.strictEqual(cards[0].entities.counter, "sensor.phe_a_dns");
-  assert.strictEqual(cards[0].entities.unusual, "binary_sensor.phe_a_unusual");
-  assert.strictEqual(cards[0].entities.allowed, "sensor.phe_a_allowed");
-  assert.strictEqual(cards[0].entities.coverage, "sensor.pi_hole_coverage");
-  assert.deepStrictEqual(cards[1].entities.map((e) => e.entity), ["sensor.phe_a_min", "sensor.phe_a_dns"]);
+  const devices = { "dev-a": { config_entries: ["e1"] }, "dev-b": { config_entries: ["e1"] }, "diag-1": { config_entries: ["e1"] }, "diag-2": { config_entries: ["e2"] } };
+  const ids = c.pheResolveDevice(registry, devices, "sensor.phe_a_dns");
+  assert.strictEqual(ids.rate, "sensor.phe_a_min");
+  assert.strictEqual(ids.unusual, "binary_sensor.phe_a_unusual");
+  assert.strictEqual(ids.allowed, "sensor.phe_a_allowed");
+  assert.strictEqual(ids.coverage, "sensor.pi_hole_coverage");
+  assert.strictEqual(ids.status, undefined);
+  assert.strictEqual(c.pheResolveDevice(registry, devices, "sensor.unknown"), null);
 });
 
-test("device view still works without the unusual-activity sensor", () => {
+test("device without the unusual-activity sensor still resolves", () => {
+  const registry = [{ ei: "sensor.x", di: "d", tk: "queries" }];
+  assert.strictEqual(c.pheResolveDevice(registry, {}, "sensor.x").unusual, undefined);
+});
+
+test("device view is the live card plus the totals", () => {
   const t = new Proxy({}, { get: (_, key) => String(key) });
-  const { cards } = c.pheBuildDeviceView({ name: "A", entities: [{ entity_id: "sensor.x", tk: "queries" }], diagnostics: [], t });
-  assert.strictEqual(cards[0].entities.unusual, undefined);
+  const { cards } = c.pheBuildDeviceView({ name: "A", ids: { counter: "sensor.phe_a_dns", rate: "sensor.phe_a_min" }, t });
+  assert.deepStrictEqual(cards.map((card) => card.type), ["custom:phe-live-card", "entities"]);
+  assert.strictEqual(cards[0].entity, "sensor.phe_a_dns");
+  assert.deepStrictEqual(cards[1].entities.map((e) => e.entity), ["sensor.phe_a_min", "sensor.phe_a_dns"]);
 });
 
 test("live beats spread the new queries over the time between updates", () => {
