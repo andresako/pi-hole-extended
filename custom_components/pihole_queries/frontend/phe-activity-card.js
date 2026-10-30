@@ -893,6 +893,12 @@ class PheLiveCard extends HTMLElement {
   }
 }
 
+/** Drop the options that still have their default value, so the YAML only holds what was changed. */
+function pheLiveCompact(config) {
+  const defaults = { animate: false, ...Object.fromEntries(PHE_LIVE_SHOW.map((key) => [key, true])), title: "" };
+  return Object.fromEntries(Object.entries(config).filter(([key, value]) => !(key in defaults) || value !== defaults[key]));
+}
+
 function pheLiveEditorSchema(devices, t) {
   const toggle = (name) => ({ name, selector: { boolean: {} } });
   return [
@@ -932,7 +938,7 @@ class PheLiveCardEditor extends HTMLElement {
         ev.stopPropagation();
         this._config = ev.detail.value;
         this._render();
-        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: pheLiveCompact(this._config) }, bubbles: true, composed: true }));
       });
       this.append(this._form);
     }
@@ -991,5 +997,5 @@ if (typeof customElements !== "undefined") {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheResolveDevice, pheLiveFeed, pheLiveRecord, pheLiveSlots, pheLiveBeats, pheLiveAngle, pheLiveArc };
+  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheResolveDevice, pheLiveCompact, pheLiveFeed, pheLiveRecord, pheLiveSlots, pheLiveBeats, pheLiveAngle, pheLiveArc };
 }

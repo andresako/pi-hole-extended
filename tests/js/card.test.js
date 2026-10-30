@@ -137,3 +137,12 @@ test("live history does not double count when two cards show the same device", (
   c.pheLiveRecord(feed, { total: 13, blocked: 0 }, now + 3000);
   assert.strictEqual(c.pheLiveSlots(feed, now + 9000).reduce((n, s) => n + s.allowed + s.blocked, 0), 3);
 });
+
+test("live card config keeps only the options that differ from the defaults", () => {
+  const all = { type: "custom:phe-live-card", entity: "sensor.x", title: "", show_title: true, show_badge: true, show_gauge: true, show_ring: true, show_legend: true, show_strip: true, show_status: true, animate: false };
+  assert.deepStrictEqual(c.pheLiveCompact(all), { type: "custom:phe-live-card", entity: "sensor.x" });
+  assert.deepStrictEqual(
+    c.pheLiveCompact({ ...all, title: "Kitchen", show_strip: false, animate: true }),
+    { type: "custom:phe-live-card", entity: "sensor.x", title: "Kitchen", show_strip: false, animate: true },
+  );
+});

@@ -9,6 +9,7 @@ All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](h
 
 ### Changed
 - The dashboard example's per-device view is a normal view with the live card instead of a generated one.
+- The live card editor only writes the options you change, so the YAML no longer lists every default.
 
 ### Fixed
 - Card translations are revalidated on every load and never show "undefined" when a text is missing, so an updated card no longer shows blanks with old cached translations.

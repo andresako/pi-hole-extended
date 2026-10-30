@@ -50,9 +50,8 @@ views:
     cards:
       # A normal view you can edit: add one live card per device. It finds the
       # device's other entities itself, so `entity` (the DNS queries counter) is
-      # all it needs. Everything else is optional and can be set in the card editor.
+      # all it needs. Everything else is optional and can be set in the card editor,
+      # which only writes the options you change.
       - type: custom:phe-live-card
         entity: sensor.phe_192_0_2_21_consultas_dns
         title: Kitchen speaker
-        show_strip: true
-        animate: false
