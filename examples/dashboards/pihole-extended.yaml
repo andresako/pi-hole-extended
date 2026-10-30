@@ -44,3 +44,12 @@ views:
             name: Last query observed
           - entity: sensor.pi_hole_192_0_2_2_diagnostico_cobertura_de_ingesta
             name: Ingestion coverage
+  - title: Device
+    path: device
+    icon: mdi:lan
+    # One view per device, generated from the device's own entities: no entity
+    # IDs to copy. Use `device` (a device ID) or `entity` (the device's DNS
+    # queries counter). Add one view like this for each device you want.
+    strategy:
+      type: custom:phe-device
+      entity: sensor.phe_192_0_2_21_consultas_dns

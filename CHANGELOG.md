@@ -2,6 +2,11 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-10-30
+
+### Added
+- Per-device view: `strategy: type: custom:phe-device` (with `entity` or `device`) generates a view for one device with its unusual-activity verdict, activity chart, allowed/blocked/provisional counts and the data coverage of its Pi-hole entry. Included as a third view in the dashboard example.
+
 ## [0.11.2] - 2026-10-30
 
 ### Fixed

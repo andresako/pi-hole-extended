@@ -490,9 +490,90 @@ class PheActivityCardEditor extends HTMLElement {
   }
 }
 
+/**
+ * Build the cards of a one-device view from the device's registry entities
+ * ({ entity_id, tk }) and the diagnostics of its Pi-hole entry.
+ */
+function pheBuildDeviceView({ name, entities, diagnostics, t }) {
+  const find = (list, key) => list.find((e) => e.tk === key || e.tk.startsWith(`${key}_`));
+  const id = (list, key) => (find(list, key) || {}).entity_id;
+  const counter = id(entities, "queries");
+  const unusual = id(entities, "unusual_activity");
+  const row = (entity, label) => (entity ? [{ entity, name: label }] : []);
+  const attr = (entity, attribute, label, suffix) => ({ type: "attribute", entity, attribute, name: label, suffix });
+  const cards = [];
+
+  if (unusual) {
+    cards.push({ type: "entities", title: name, entities: row(unusual, t.unusualNow) });
+    cards.push({
+      type: "conditional",
+      conditions: [{ condition: "state", entity: unusual, state: "on" }],
+      card: {
+        type: "entities",
+        title: t.unusualNow,
+        entities: [
+          attr(unusual, "current_rate", t.currentRate, ` ${t.rate}`),
+          attr(unusual, "usual_rate", t.usualRate, ` ${t.rate}`),
+          attr(unusual, "times_usual", t.timesUsual, " ×"),
+          attr(unusual, "threshold", t.threshold, ` ${t.rate}`),
+          { ...attr(unusual, "since", t.since), format: "relative" },
+        ],
+      },
+    });
+  }
+  if (counter) cards.push({ type: "custom:phe-activity-card", title: name, entities: [counter], bucket: "30m", span: "1d", show_overview: false });
+  cards.push({
+    type: "entities",
+    title: t.composition,
+    entities: [
+      ...row(id(entities, "allowed"), t.allowed),
+      ...row(id(entities, "blocked"), t.blocked),
+      ...row(id(entities, "provisional"), t.provisional),
+      ...(counter ? [attr(counter, "blocked_percentage", t.blockedShare, " %")] : []),
+    ],
+  });
+  cards.push({
+    type: "entities",
+    title: t.counters,
+    entities: [...row(id(entities, "queries_last_minute"), t.queriesMinute), ...row(counter, t.queriesTotal)],
+  });
+  const reliability = [
+    ["coverage", t.diagCoverage],
+    ["last_query_observed", t.diagLastQuery],
+    ["communication_status", t.diagStatus],
+    ["last_successful_read", t.diagLastRead],
+  ].flatMap(([key, label]) => row(id(diagnostics, key), label));
+  if (reliability.length) cards.push({ type: "entities", title: t.reliability, entities: reliability });
+  return { cards };
+}
+
+/** Custom view strategy: `strategy: { type: custom:phe-device, device: <device_id> }` or `entity: <counter>`. */
+class PheDeviceViewStrategy extends HTMLElement {
+  static async generate(config, hass) {
+    const t = await pheLoadStrings(hass.language);
+    const registry = (await hass.callWS({ type: "config/entity_registry/list_for_display" })).entities;
+    const own = registry.filter((e) => e.pl === "pihole_queries");
+    const entry = config.entity ? own.find((e) => e.ei === config.entity) : null;
+    const deviceId = config.device || (entry && entry.di);
+    const entities = own.filter((e) => e.di === deviceId && e.tk).map((e) => ({ entity_id: e.ei, tk: e.tk }));
+    if (!deviceId || !entities.length) return { cards: [{ type: "markdown", content: t.deviceNotFound }] };
+    const entries = ((hass.devices || {})[deviceId] || {}).config_entries || [];
+    const diagnostics = own
+      .filter((e) => e.di !== deviceId && e.tk && entries.some((c) => (((hass.devices || {})[e.di] || {}).config_entries || []).includes(c)))
+      .map((e) => ({ entity_id: e.ei, tk: e.tk }));
+    const counter = entities.find((e) => e.tk === "queries");
+    const state = counter && hass.states[counter.entity_id];
+    const name = config.name || (state && (state.attributes.client_name || state.attributes.client_ip)) || deviceId;
+    return pheBuildDeviceView({ name, entities, diagnostics, t });
+  }
+}
+
 function pheRegister() {
   if (!customElements.get("phe-activity-card-editor")) {
     customElements.define("phe-activity-card-editor", PheActivityCardEditor);
+  }
+  if (!customElements.get("ll-strategy-view-phe-device")) {
+    customElements.define("ll-strategy-view-phe-device", PheDeviceViewStrategy);
   }
   if (!customElements.get("phe-activity-card")) {
     customElements.define("phe-activity-card", PheActivityCard);
@@ -518,5 +599,5 @@ if (typeof customElements !== "undefined") {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema };
+  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheBuildDeviceView };
 }

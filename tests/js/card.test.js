@@ -74,3 +74,26 @@ test("nice max keeps round values and scales fractions", () => {
   assert.strictEqual(c.pheNiceMax(200), 200);
   assert.strictEqual(c.pheNiceMax(1.2), 2);
 });
+
+test("device view builds cards from one device's entities and its diagnostics", () => {
+  const t = new Proxy({}, { get: (_, key) => String(key) });
+  const entities = [
+    { entity_id: "sensor.phe_a_dns", tk: "queries" },
+    { entity_id: "sensor.phe_a_min", tk: "queries_last_minute" },
+    { entity_id: "sensor.phe_a_allowed", tk: "allowed_v2" },
+    { entity_id: "sensor.phe_a_blocked", tk: "blocked_v2" },
+    { entity_id: "binary_sensor.phe_a_unusual", tk: "unusual_activity" },
+  ];
+  const diagnostics = [{ entity_id: "sensor.pi_hole_coverage", tk: "coverage" }];
+  const { cards } = c.pheBuildDeviceView({ name: "A", entities, diagnostics, t });
+  assert.deepStrictEqual(cards.map((card) => card.type), ["entities", "conditional", "custom:phe-activity-card", "entities", "entities", "entities"]);
+  assert.deepStrictEqual(cards[2].entities, ["sensor.phe_a_dns"]);
+  assert.deepStrictEqual(cards[3].entities.map((e) => e.entity), ["sensor.phe_a_allowed", "sensor.phe_a_blocked", "sensor.phe_a_dns"]);
+  assert.deepStrictEqual(cards[5].entities, [{ entity: "sensor.pi_hole_coverage", name: "diagCoverage" }]);
+});
+
+test("device view omits unusual-activity cards when the sensitivity is off", () => {
+  const t = new Proxy({}, { get: (_, key) => String(key) });
+  const { cards } = c.pheBuildDeviceView({ name: "A", entities: [{ entity_id: "sensor.x", tk: "queries" }], diagnostics: [], t });
+  assert.ok(cards.every((card) => card.type !== "conditional"));
+});
