@@ -10,6 +10,9 @@ All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](h
 ### Changed
 - The dashboard example's per-device view is a normal view with the live card instead of a generated one.
 
+### Removed
+- The `custom:phe-device` view strategy added in 0.12.0. Its generated views could not be edited; use the live card in a view of your own.
+
 ## [0.12.0] - 2026-10-30
 
 ### Added

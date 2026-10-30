@@ -101,14 +101,6 @@ test("device without the unusual-activity sensor still resolves", () => {
   assert.strictEqual(c.pheResolveDevice(registry, {}, "sensor.x").unusual, undefined);
 });
 
-test("device view is the live card plus the totals", () => {
-  const t = new Proxy({}, { get: (_, key) => String(key) });
-  const { cards } = c.pheBuildDeviceView({ name: "A", ids: { counter: "sensor.phe_a_dns", rate: "sensor.phe_a_min" }, t });
-  assert.deepStrictEqual(cards.map((card) => card.type), ["custom:phe-live-card", "entities"]);
-  assert.strictEqual(cards[0].entity, "sensor.phe_a_dns");
-  assert.deepStrictEqual(cards[1].entities.map((e) => e.entity), ["sensor.phe_a_min", "sensor.phe_a_dns"]);
-});
-
 test("live beats spread the new queries over the time between updates", () => {
   const beats = c.pheLiveBeats({ total: 4, blocked: 1 }, 10);
   assert.strictEqual(beats.length, 4);

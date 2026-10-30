@@ -535,31 +535,6 @@ function pheResolveDevice(registry, devices, counterId) {
   };
 }
 
-/** Cards of a one-device view: the live card plus the totals, from the resolved entity IDs. */
-function pheBuildDeviceView({ name, ids, t }) {
-  const row = (entity, label) => (entity ? [{ entity, name: label }] : []);
-  return {
-    cards: [
-      { type: "custom:phe-live-card", entity: ids.counter, title: name },
-      { type: "entities", title: t.counters, entities: [...row(ids.rate, t.queriesMinute), ...row(ids.counter, t.queriesTotal)] },
-    ],
-  };
-}
-
-/** Custom view strategy: `strategy: { type: custom:phe-device, device: <device_id> }` or `entity: <counter>`. */
-class PheDeviceViewStrategy extends HTMLElement {
-  static async generate(config, hass) {
-    const t = await pheLoadStrings(hass.language);
-    const registry = await pheRegistry(hass);
-    const counter = config.entity || (registry.find((e) => e.di === config.device && e.tk === "queries") || {}).ei;
-    const ids = counter && pheResolveDevice(registry, hass.devices, counter);
-    if (!ids) return { cards: [{ type: "markdown", content: t.deviceNotFound }] };
-    const state = hass.states[counter];
-    const name = config.name || (state && (state.attributes.client_name || state.attributes.client_ip)) || ids.device;
-    return pheBuildDeviceView({ name, ids, t });
-  }
-}
-
 function pheLivePolar(radius, degrees) {
   const rad = (degrees * Math.PI) / 180;
   return [120 + radius * Math.cos(rad), 120 + radius * Math.sin(rad)];
@@ -957,9 +932,6 @@ function pheRegister() {
       window.customCards.push({ type: "phe-live-card", name: t.cardLiveName, description: t.cardLiveDescription, preview: false });
     });
   }
-  if (!customElements.get("ll-strategy-view-phe-device")) {
-    customElements.define("ll-strategy-view-phe-device", PheDeviceViewStrategy);
-  }
   if (!customElements.get("phe-activity-card")) {
     customElements.define("phe-activity-card", PheActivityCard);
     window.customCards = window.customCards || [];
@@ -976,7 +948,7 @@ if (typeof customElements !== "undefined") {
   // registry the dashboard reads reports it.
   const pheEnsureRegistered = (attempt) => {
     pheRegister();
-    if (!customElements.get("phe-activity-card") && attempt < 40) {
+    if (!customElements.get("phe-activity-card") && attempt < 480) {
       setTimeout(() => pheEnsureRegistered(attempt + 1), 250);
     }
   };
@@ -984,5 +956,5 @@ if (typeof customElements !== "undefined") {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheBuildDeviceView, pheResolveDevice, pheLiveBeats, pheLiveAngle, pheLiveArc };
+  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheResolveDevice, pheLiveBeats, pheLiveAngle, pheLiveArc };
 }
