@@ -2,7 +2,7 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.13.1] - 2026-10-30
 
 ### Fixed
 - Both cards now show a live preview in Home Assistant's **Add card** picker instead of an empty tile.
