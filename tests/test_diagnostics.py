@@ -33,6 +33,7 @@ def _coordinator(
 ) -> SimpleNamespace:
     return SimpleNamespace(
         async_add_listener=lambda _listener: lambda: None,
+        async_add_client_removed_listener=lambda _listener: lambda: None,
         update_interval=timedelta(seconds=interval),
         last_update_success=last_update_success,
         last_successful_read=last_successful_read,

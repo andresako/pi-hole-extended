@@ -58,6 +58,7 @@ Abre la integración y elige **Configurar**:
 | Frecuencia de consulta | 1–3600 s | Cada cuánto se lee Pi-hole. |
 | Política de Activity | Activity habilitada · Solo totales | Si las consultas nuevas se envían a Activity de Home Assistant. *Solo totales* no envía ninguna. |
 | Eventos de Activity | Todos · Solo bloqueados · Ninguno | Qué consultas nuevas aparecen en Activity. Los contadores nunca se filtran. |
+| Dispositivos en Home Assistant | Todos los clientes · Solo registros DNS locales | *Solo registros DNS locales* crea dispositivos solo para las IP con registro DNS local en Pi-hole, usa ese nombre y cuenta el resto en **Otros dispositivos**. Los que queden fuera dejan de actualizarse; elimínalos desde su página. Por defecto: Todos los clientes. |
 | Aviso de actividad inusual | Desactivado · Baja · Media · Alta | Sensibilidad de la tarjeta y de los sensores binarios. *Desactivado* no crea sensores. Por defecto: Media. |
 
 Usa **Reconfigurar** para cambiar la dirección o las credenciales; elige *Es el mismo Pi-hole* para conservar contadores e identidad, o *Es un Pi-hole de reemplazo* cuando el servidor se ha sustituido.
@@ -76,6 +77,8 @@ Para cada cliente, agrupadas bajo su propio dispositivo:
 | `binary_sensor.phe_<cliente>_actividad_inusual` | **Actividad inusual**, ver más abajo. |
 
 Por cada entrada de Pi-hole, cuatro sensores de diagnóstico: **Estado de comunicación**, **Última lectura correcta**, **Última consulta observada** y **Cobertura de ingesta**. `<cliente>` es la dirección del cliente con guiones bajos, por ejemplo `192_0_2_21`; el registro de entidades muestra los ID exactos.
+
+Para eliminar un dispositivo que no quieras, ábrelo y elige **Eliminar**. Se borran con él sus entidades y contadores; si el cliente vuelve a consultar a Pi-hole, el dispositivo reaparece con los contadores desde cero.
 
 La integración cuenta las consultas que observa mientras sondea. No recupera lo que Pi-hole atendió antes de la configuración.
 

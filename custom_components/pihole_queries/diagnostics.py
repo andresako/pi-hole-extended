@@ -54,6 +54,8 @@ async def async_get_config_entry_diagnostics(
             ),
             "retention_mode": coordinator.retention_mode,
             "activity_mode": coordinator.activity_mode,
+            "client_scope": coordinator.client_scope,
+            "local_host_count": len(coordinator.local_hosts) if coordinator.local_hosts else 0,
             "update_interval_seconds": coordinator.update_interval.total_seconds(),
         },
         "client_count": len(clients),

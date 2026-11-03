@@ -438,6 +438,9 @@ async def test_new_sensor_setup_adds_restored_minute_sensor_and_four_diagnostics
         def async_add_listener(self, _listener):
             return lambda: None
 
+        def async_add_client_removed_listener(self, _listener):
+            return lambda: None
+
     coordinator = Coordinator()
     coordinator.hass = hass
     hass.data[DOMAIN] = {entry.entry_id: {"coordinator": coordinator}}

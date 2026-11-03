@@ -25,7 +25,10 @@ from .const import (
     ACTIVITY_ALL,
     ACTIVITY_BLOCKED,
     ACTIVITY_NONE,
+    CLIENT_SCOPE_ALL,
+    CLIENT_SCOPE_LOCAL_DNS,
     CONF_ACTIVITY_MODE,
+    CONF_CLIENT_SCOPE,
     CONF_HOST,
     CONF_PASSWORD,
     CONF_PORT,
@@ -38,6 +41,7 @@ from .const import (
     CONF_USE_HTTPS,
     CONF_VERIFY_SSL,
     DEFAULT_ACTIVITY_MODE,
+    DEFAULT_CLIENT_SCOPE,
     DEFAULT_PORT,
     DEFAULT_RETENTION_MODE,
     DEFAULT_SCAN_INTERVAL,
@@ -80,6 +84,16 @@ def _schema(
                     selector.SelectSelectorConfig(
                         options=[RETENTION_DETAIL, RETENTION_AGGREGATE],
                         translation_key="retention_mode",
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_CLIENT_SCOPE,
+                    default=defaults.get(CONF_CLIENT_SCOPE, DEFAULT_CLIENT_SCOPE),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[CLIENT_SCOPE_ALL, CLIENT_SCOPE_LOCAL_DNS],
+                        translation_key="client_scope",
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),

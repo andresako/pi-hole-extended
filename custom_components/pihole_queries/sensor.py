@@ -23,6 +23,7 @@ from homeassistant.util import dt as dt_util
 from .classification import CLASSIFIER_VERSION
 from .const import (
     DOMAIN,
+    OTHER_CLIENTS_NAME,
 )
 from .coordinator import PiHoleQueryCoordinator
 from .entity_ids import client_device_identifier as _client_device_identifier
@@ -122,6 +123,8 @@ def client_device_info(
     if client_name == "Cliente desconocido":
         language = coordinator.hass.config.language.split("-")[0]
         client_name = "Unknown client" if language == "en" else "Cliente desconocido"
+    if client_name == OTHER_CLIENTS_NAME and coordinator.hass.config.language.startswith("en"):
+        client_name = "Other devices"
     name = (
         f"{client_name} ({client_ip})"
         if client_ip and client_ip != "Desconocida"
@@ -162,6 +165,9 @@ async def async_setup_entry(
         for description in DIAGNOSTIC_DESCRIPTIONS
     )
     entry.async_on_unload(coordinator.async_add_listener(add_new_clients))
+    entry.async_on_unload(
+        coordinator.async_add_client_removed_listener(added_clients.discard)
+    )
 
 
 class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity):

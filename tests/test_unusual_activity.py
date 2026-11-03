@@ -183,6 +183,7 @@ async def test_platform_creates_one_sensor_per_client_unless_off() -> None:
         coordinator = SimpleNamespace(
             client_data={"192.0.2.10": {}, "192.0.2.11": {}},
             async_add_listener=lambda listener: (lambda: None),
+            async_add_client_removed_listener=lambda listener: (lambda: None),
         )
         hass = SimpleNamespace(data={DOMAIN: {"entry-1": {"coordinator": coordinator}}})
         entry = SimpleNamespace(**{**ENTRY.__dict__, "options": options})

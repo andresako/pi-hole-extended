@@ -58,6 +58,7 @@ async def async_setup_entry(
 
     add_new_clients()
     entry.async_on_unload(coordinator.async_add_listener(add_new_clients))
+    entry.async_on_unload(coordinator.async_add_client_removed_listener(added.discard))
     monitor.async_start()
 
 

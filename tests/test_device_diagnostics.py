@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 from custom_components.pihole_queries import async_remove_config_entry_device
 from custom_components.pihole_queries.const import (
@@ -15,6 +17,7 @@ from custom_components.pihole_queries.const import (
     LEGACY_SOURCE_GENERATION,
     CoverageReason,
 )
+from custom_components.pihole_queries.coordinator import PiHoleQueryCoordinator
 from custom_components.pihole_queries.diagnostics import (
     async_get_config_entry_diagnostics,
 )
@@ -48,6 +51,8 @@ def _coordinator() -> SimpleNamespace:
         last_successful_read=datetime(2025, 1, 1, tzinfo=UTC),
         retention_mode="detail",
         activity_mode="all",
+        client_scope="all",
+        local_hosts=None,
         update_interval=timedelta(seconds=15),
         client_data={
             "192.0.2.10": {
@@ -77,13 +82,92 @@ async def test_diagnostics_redact_credentials_and_clients() -> None:
     assert result["clients"][0]["query_count"] == 7
 
 
-async def test_only_inactive_client_devices_can_be_removed() -> None:
-    entry = _entry()
-    hass = SimpleNamespace(
-        data={DOMAIN: {entry.entry_id: {"coordinator": _coordinator()}}}
-    )
-    active = SimpleNamespace(identifiers={(DOMAIN, f"{entry.entry_id}_192.0.2.10")})
-    gone = SimpleNamespace(identifiers={(DOMAIN, f"{entry.entry_id}_192.0.2.99")})
+def _removal_coordinator(*clients: str) -> PiHoleQueryCoordinator:
+    coordinator = PiHoleQueryCoordinator.__new__(PiHoleQueryCoordinator)
+    coordinator.client_data = {key: {"client_ip": key, "query_count": 7} for key in clients}
+    coordinator.aggregate_pending = {}
+    coordinator._client_removed_listeners = []
+    coordinator._save_cursor = AsyncMock()
+    return coordinator
 
-    assert await async_remove_config_entry_device(hass, entry, active) is False
-    assert await async_remove_config_entry_device(hass, entry, gone) is True
+
+def _device(entry: SimpleNamespace, key: str) -> SimpleNamespace:
+    return SimpleNamespace(identifiers={(DOMAIN, f"{entry.entry_id}_{key}")})
+
+
+async def test_known_client_device_is_removed_and_forgotten() -> None:
+    entry = _entry()
+    coordinator = _removal_coordinator("192.0.2.10", "192.0.2.11")
+    removed: list[str] = []
+    coordinator.async_add_client_removed_listener(removed.append)
+    hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: {"coordinator": coordinator}}})
+
+    assert await async_remove_config_entry_device(hass, entry, _device(entry, "192.0.2.10"))
+
+    assert set(coordinator.client_data) == {"192.0.2.11"}
+    coordinator._save_cursor.assert_awaited_once()
+    assert removed == ["192.0.2.10"]
+
+
+async def test_device_without_client_data_can_be_removed() -> None:
+    entry = _entry()
+    coordinator = _removal_coordinator("192.0.2.10")
+    hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: {"coordinator": coordinator}}})
+
+    assert await async_remove_config_entry_device(hass, entry, _device(entry, "192.0.2.99"))
+
+    assert set(coordinator.client_data) == {"192.0.2.10"}
+    coordinator._save_cursor.assert_not_awaited()
+
+
+async def test_client_is_kept_when_its_removal_cannot_be_saved() -> None:
+    entry = _entry()
+    coordinator = _removal_coordinator("192.0.2.10")
+    coordinator._save_cursor.side_effect = OSError("disk full")
+    removed: list[str] = []
+    coordinator.async_add_client_removed_listener(removed.append)
+    hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: {"coordinator": coordinator}}})
+
+    assert not await async_remove_config_entry_device(hass, entry, _device(entry, "192.0.2.10"))
+
+    assert set(coordinator.client_data) == {"192.0.2.10"}
+    assert removed == []
+
+
+async def test_diagnostics_device_cannot_be_removed() -> None:
+    entry = _entry()
+    coordinator = _removal_coordinator("192.0.2.10")
+    hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: {"coordinator": coordinator}}})
+
+    assert not await async_remove_config_entry_device(hass, entry, _device(entry, "diagnostics"))
+
+
+async def test_device_of_an_unloaded_entry_cannot_be_removed() -> None:
+    entry = _entry()
+    hass = SimpleNamespace(data={DOMAIN: {}})
+
+    assert not await async_remove_config_entry_device(hass, entry, _device(entry, "192.0.2.10"))
+
+
+async def test_removed_client_is_not_restored_by_a_poll_in_progress() -> None:
+    coordinator = _removal_coordinator("192.0.2.10")
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def snapshot() -> dict:
+        checkpoint = dict(coordinator.client_data)
+        started.set()
+        await release.wait()
+        coordinator.client_data = checkpoint  # what a failed poll's rollback does
+        return checkpoint
+
+    coordinator._async_update_data_snapshot = snapshot
+    poll = asyncio.create_task(coordinator._async_update_data())
+    await started.wait()
+    forget = asyncio.create_task(coordinator.async_forget_client("192.0.2.10"))
+    await asyncio.sleep(0)
+    release.set()
+    await poll
+
+    assert await forget
+    assert coordinator.client_data == {}

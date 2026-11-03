@@ -63,12 +63,14 @@
           "scan_interval": "Polling interval (seconds)",
           "retention_mode": "Activity policy",
           "activity_mode": "Activity events",
-          "unusual_activity": "Unusual activity alert"
+          "unusual_activity": "Unusual activity alert",
+          "client_scope": "Devices in Home Assistant"
         },
         "data_description": {
           "retention_mode": "Activity enabled sends entries according to the Activity setting. Totals only suppresses new Activity entries.",
           "activity_mode": "Choose all events, blocked events only, or none. Totals only always disables Activity entries.",
-          "unusual_activity": "Creates a binary sensor per device that turns on when it stays far above its own usual activity. Evaluated every 5 minutes from Recorder statistics."
+          "unusual_activity": "Creates a binary sensor per device that turns on when it stays far above its own usual activity. Evaluated every 5 minutes from Recorder statistics.",
+          "client_scope": "All creates a device for every client. Local DNS records only creates devices for IPs with a local record in Pi-hole, uses that name and adds the rest up under Other devices. Existing devices are not deleted: those left out stop updating and you can delete them from their page."
         }
       }
     }
@@ -152,6 +154,12 @@
         "low": "Low (extreme cases only)",
         "medium": "Medium (recommended)",
         "high": "High (detects sooner)"
+      }
+    },
+    "client_scope": {
+      "options": {
+        "all": "All clients",
+        "local_dns": "Local DNS records only"
       }
     }
   },

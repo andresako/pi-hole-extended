@@ -2,6 +2,14 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] - 2026-11-03
+
+### Added
+- **Devices in Home Assistant** option. *Local DNS records only* creates devices just for IPs with a local DNS record in Pi-hole, names them from that record and counts everything else under one **Other devices** device, which also gets the unusual-activity sensor. The default stays *All clients*. Existing devices are not deleted; those left out stop updating.
+
+### Fixed
+- Client devices can be deleted. Home Assistant rejected every deletion because the integration still held the device's counters; they are now removed with it, and the device returns from zero if the client queries again. The diagnostics device cannot be deleted.
+
 ## [0.13.1] - 2026-10-30
 
 ### Fixed

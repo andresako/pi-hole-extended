@@ -153,17 +153,14 @@ class PiHoleClient:
             raise PiHoleConnectionError("Respuesta de /api/auth no válida")
         self._sid = sid
 
-    async def async_get_queries(self, *, length: int, cursor: int | None = None) -> dict[str, Any]:
-        """Fetch a query page, retrying exactly once after an expired SID."""
-        params: dict[str, int] = {"length": length}
-        if cursor is not None:
-            params["cursor"] = cursor
+    async def _async_get(self, path: str, params: dict[str, int] | None = None) -> Any:
+        """GET an API path as JSON, retrying exactly once after an expired SID."""
         for attempt in range(2):
             if self._sid is None:
                 await self.async_authenticate()
             try:
                 async with self._session.get(
-                    f"{self._base_url}/api/queries",
+                    f"{self._base_url}{path}",
                     params=params,
                     headers={"X-FTL-SID": self._sid or ""},
                     ssl=self._verify_ssl,
@@ -175,10 +172,8 @@ class PiHoleClient:
                             continue
                         raise PiHoleAuthenticationError
                     if response.status >= 400:
-                        raise PiHoleConnectionError(
-                            f"/api/queries respondió HTTP {response.status}"
-                        )
-                    payload = await response.json(content_type=None)
+                        raise PiHoleConnectionError(f"{path} respondió HTTP {response.status}")
+                    return await response.json(content_type=None)
             except PiHoleAuthenticationError:
                 raise
             except PiHoleConnectionError:
@@ -188,21 +183,45 @@ class PiHoleClient:
                     "No se pudo verificar el certificado HTTPS de Pi-hole"
                 ) from err
             except TimeoutError as err:
-                raise PiHoleConnectionError(
-                    "tiempo de espera agotado al llamar a /api/queries"
-                ) from err
+                raise PiHoleConnectionError(f"tiempo de espera agotado al llamar a {path}") from err
             except aiohttp.ClientError as err:
                 raise PiHoleConnectionError(
-                    f"fallo de red al llamar a /api/queries ({type(err).__name__})"
+                    f"fallo de red al llamar a {path} ({type(err).__name__})"
                 ) from err
             except ValueError as err:
-                raise PiHoleConnectionError(
-                    "Pi-hole devolvió JSON no válido en /api/queries"
-                ) from err
-            if not isinstance(payload, dict) or not isinstance(payload.get("queries"), list):
-                raise PiHoleConnectionError("Respuesta de /api/queries no válida")
-            return payload
+                raise PiHoleConnectionError(f"Pi-hole devolvió JSON no válido en {path}") from err
         raise PiHoleAuthenticationError
+
+    async def async_get_queries(self, *, length: int, cursor: int | None = None) -> dict[str, Any]:
+        """Fetch a query page."""
+        params: dict[str, int] = {"length": length}
+        if cursor is not None:
+            params["cursor"] = cursor
+        payload = await self._async_get("/api/queries", params)
+        if not isinstance(payload, dict) or not isinstance(payload.get("queries"), list):
+            raise PiHoleConnectionError("Respuesta de /api/queries no válida")
+        return payload
+
+    async def async_get_local_hosts(self) -> dict[str, str]:
+        """Map each IP with a Pi-hole local DNS record to its first hostname."""
+        path = "/api/config/dns/hosts"
+        payload = await self._async_get(path)
+        try:
+            records = payload["config"]["dns"]["hosts"]
+        except (KeyError, TypeError) as err:
+            raise PiHoleConnectionError(f"Respuesta de {path} no válida") from err
+        if not isinstance(records, list):
+            raise PiHoleConnectionError(f"Respuesta de {path} no válida")
+        hosts: dict[str, str] = {}
+        for record in records:
+            fields = record.split() if isinstance(record, str) else []
+            if len(fields) < 2:
+                continue
+            try:
+                hosts.setdefault(ipaddress.ip_address(fields[0]).compressed, fields[1])
+            except ValueError:
+                continue
+        return hosts
 
     async def async_close(self) -> None:
         """Invalidate the active SID when unloading the config entry."""

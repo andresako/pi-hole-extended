@@ -63,12 +63,14 @@
           "scan_interval": "Frecuencia de consulta (segundos)",
           "retention_mode": "Política de Activity",
           "activity_mode": "Eventos de Activity",
-          "unusual_activity": "Aviso de actividad inusual"
+          "unusual_activity": "Aviso de actividad inusual",
+          "client_scope": "Dispositivos en Home Assistant"
         },
         "data_description": {
           "retention_mode": "Activity habilitada envía entradas según su opción de eventos. Solo totales suprime las nuevas entradas de Activity.",
           "activity_mode": "Elige todos los eventos, solo bloqueados o ninguno. Solo totales siempre desactiva las entradas de Activity.",
-          "unusual_activity": "Crea un sensor binario por dispositivo que se activa cuando mantiene una actividad muy superior a la suya habitual. Se evalúa cada 5 minutos con las estadísticas del Recorder."
+          "unusual_activity": "Crea un sensor binario por dispositivo que se activa cuando mantiene una actividad muy superior a la suya habitual. Se evalúa cada 5 minutos con las estadísticas del Recorder.",
+          "client_scope": "Todos crean un dispositivo por cada cliente. Solo registros DNS locales crea dispositivos para las IP con registro local en Pi-hole, usa ese nombre y suma el resto en Otros dispositivos. Los dispositivos ya creados no se borran: deja de actualizarse lo que quede fuera y puedes eliminarlos desde su página."
         }
       }
     }
@@ -152,6 +154,12 @@
         "low": "Baja (solo casos extremos)",
         "medium": "Media (recomendada)",
         "high": "Alta (detecta antes)"
+      }
+    },
+    "client_scope": {
+      "options": {
+        "all": "Todos los clientes",
+        "local_dns": "Solo registros DNS locales"
       }
     }
   },

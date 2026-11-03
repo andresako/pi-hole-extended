@@ -6,12 +6,14 @@ import asyncio
 import logging
 import math
 import time
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from functools import cached_property
 from typing import Any
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -27,12 +29,18 @@ from .const import (
     ACTIVITY_ALL,
     ACTIVITY_BLOCKED,
     ACTIVITY_NONE,
+    CLIENT_SCOPE_LOCAL_DNS,
     CONF_ACTIVITY_MODE,
+    CONF_CLIENT_SCOPE,
     CONF_RETENTION_MODE,
     CONF_SCAN_INTERVAL,
     DEFAULT_ACTIVITY_MODE,
+    DEFAULT_CLIENT_SCOPE,
     DEFAULT_RETENTION_MODE,
     DOMAIN,
+    LOCAL_HOSTS_REFRESH_SECONDS,
+    OTHER_CLIENTS_KEY,
+    OTHER_CLIENTS_NAME,
     QUERY_BATCH_SIZE,
     RETENTION_AGGREGATE,
     RETENTION_DETAIL,
@@ -237,6 +245,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             raise HomeAssistantError("La política de Activity configurada no es válida")
         self.cursor: int | None = None
         self.client_data: dict[str, dict[str, Any]] = {}
+        self._client_removed_listeners: list[Callable[[str], None]] = []
+        self.client_scope = entry.options.get(CONF_CLIENT_SCOPE, DEFAULT_CLIENT_SCOPE)
+        self.local_hosts: dict[str, str] | None = None
+        self._local_hosts_read_at = 0.0
         self.aggregate_pending: dict[str, dict[str, Any]] = {}
         self.aggregate_pending_cursor: int | None = None
         self.aggregate_pending_time: float | None = None
@@ -602,7 +614,41 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         """Fetch data and update summaries from the Pi-hole API."""
-        return await self._async_update_data_snapshot()
+        async with self._state_lock:
+            return await self._async_update_data_snapshot()
+
+    @cached_property
+    def _state_lock(self) -> asyncio.Lock:
+        """Keep a poll's checkpoint from restoring a client removed meanwhile."""
+        return asyncio.Lock()
+
+    @callback
+    def async_add_client_removed_listener(
+        self, listener: Callable[[str], None]
+    ) -> Callable[[], None]:
+        """Call a listener with the key of each client the user removes."""
+        self._client_removed_listeners.append(listener)
+        return lambda: self._client_removed_listeners.remove(listener)
+
+    async def async_forget_client(self, client_key: str) -> bool:
+        """Drop a client's counters; it starts from zero if it queries again."""
+        async with self._state_lock:
+            summary = self.client_data.pop(client_key, None)
+            pending = self.aggregate_pending.pop(client_key, None)
+            try:
+                await self._save_cursor()
+            except BaseException as err:
+                if summary is not None:
+                    self.client_data[client_key] = summary
+                if pending is not None:
+                    self.aggregate_pending[client_key] = pending
+                if not isinstance(err, Exception):
+                    raise
+                _LOGGER.warning("No se pudo eliminar el cliente del Store local: %s", err)
+                return False
+        for listener in list(self._client_removed_listeners):
+            listener(client_key)
+        return True
 
     def _data_snapshot(self) -> dict[str, dict[str, Any]]:
         """Copy the bounded numeric client summaries for Home Assistant."""
@@ -627,6 +673,36 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.last_successful_read = dt_util.utcnow()
         return response
 
+    async def _async_refresh_local_hosts(self) -> None:
+        """Keep the local DNS records current; a stale list beats none."""
+        if getattr(self, "client_scope", DEFAULT_CLIENT_SCOPE) != CLIENT_SCOPE_LOCAL_DNS:
+            return
+        now = time.monotonic()
+        if self.local_hosts is not None and now - self._local_hosts_read_at < LOCAL_HOSTS_REFRESH_SECONDS:
+            return
+        try:
+            self.local_hosts = await self.client.async_get_local_hosts()
+        except PiHoleConnectionError as err:
+            if self.local_hosts is None:
+                # Without a list, queries can't be attributed: retry them next poll.
+                self.last_api_attempt_successful = False
+                raise
+            _LOGGER.warning("Se mantienen los registros DNS locales anteriores: %s", err)
+        except PiHoleAuthenticationError:
+            self.last_api_attempt_successful = False
+            raise
+        self._local_hosts_read_at = now
+
+    def _resolve_client(self, query: dict[str, Any]) -> tuple[str, str, str]:
+        """Return the client to count a query under, applying the client scope."""
+        key, client_name, client_ip = _client_key(query, self.client_data)
+        if getattr(self, "client_scope", DEFAULT_CLIENT_SCOPE) != CLIENT_SCOPE_LOCAL_DNS:
+            return key, client_name, client_ip
+        hostname = (self.local_hosts or {}).get(client_ip)
+        if hostname is None:
+            return OTHER_CLIENTS_KEY, OTHER_CLIENTS_NAME, "Desconocida"
+        return key, hostname, client_ip
+
     async def _async_update_data_snapshot(self) -> dict[str, dict[str, Any]]:
         """Fetch new queries and return a snapshot of per-client summaries."""
         self.coverage = getattr(self, "coverage", "unknown")
@@ -636,6 +712,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.recovery_cursor = getattr(self, "recovery_cursor", None)
         checkpoint = self._checkpoint()
         try:
+            await self._async_refresh_local_hosts()
             if getattr(self, "retention_mode", RETENTION_DETAIL) == RETENTION_AGGREGATE:
                 return await self._async_update_aggregate_data(checkpoint=checkpoint)
             pages: list[dict[str, Any]] = [
@@ -1122,7 +1199,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
             client = row.get("client")
             minimal_query = {"client": client if isinstance(client, dict) else {}}
-            key, client_name, client_ip = _client_key(minimal_query, self.client_data)
+            key, client_name, client_ip = self._resolve_client(minimal_query)
             item = pending.setdefault(
                 key,
                 {
@@ -1394,7 +1471,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         count_as_new: bool,
     ) -> None:
         """Update one client's count and bounded query history."""
-        key, client_name, client_ip = _client_key(query, self.client_data)
+        key, client_name, client_ip = self._resolve_client(query)
         summary = self.client_data.setdefault(
             key,
             {

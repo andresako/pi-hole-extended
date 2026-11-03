@@ -369,15 +369,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_remove_config_entry_device(
     hass: HomeAssistant, entry: ConfigEntry, device_entry: dr.DeviceEntry
 ) -> bool:
-    """Allow removing client devices that Pi-hole no longer reports."""
+    """Let the user remove any client device; it returns if the client queries again."""
+    if (DOMAIN, f"{entry.entry_id}_diagnostics") in device_entry.identifiers:
+        return False
     runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if runtime is None:
-        return True
-    active = {
-        client_device_identifier(entry, client_key)
-        for client_key in runtime["coordinator"].client_data
-    }
-    return not any(identifier in active for identifier in device_entry.identifiers)
+        # The client's counters can't be dropped now and would restore the device.
+        return False
+    coordinator = runtime["coordinator"]
+    for client_key in {*coordinator.client_data, *coordinator.aggregate_pending}:
+        if client_device_identifier(entry, client_key) in device_entry.identifiers:
+            return await coordinator.async_forget_client(client_key)
+    return True
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:

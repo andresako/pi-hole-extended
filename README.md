@@ -58,6 +58,7 @@ Open the integration and choose **Configure**:
 | Polling interval | 1–3600 s | How often Pi-hole is read. |
 | Activity policy | Activity enabled · Totals only | Whether new queries are sent to Home Assistant Activity. *Totals only* sends none. |
 | Activity events | All · Blocked only · None | Which new queries appear in Activity. Counters are never filtered. |
+| Devices in Home Assistant | All clients · Local DNS records only | *Local DNS records only* creates devices just for IPs with a local DNS record in Pi-hole, uses that name and counts the rest under **Other devices**. Devices left out stop updating; delete them from their page. Default: All clients. |
 | Unusual activity alert | Off · Low · Medium · High | Sensitivity of the card and the binary sensors. *Off* creates no sensors. Default: Medium. |
 
 Use **Reconfigure** to change the address or credentials; choose *Same Pi-hole* to keep counters and identity, or *Replacement Pi-hole* when the server itself was replaced.
@@ -76,6 +77,8 @@ For every client, grouped under its own device:
 | `binary_sensor.phe_<client>_actividad_inusual` | **Unusual activity**, see below. |
 
 Per Pi-hole entry, four diagnostic sensors: **Communication status**, **Last successful read**, **Last query observed** and **Ingestion coverage**. `<client>` is the client's address with underscores, for example `192_0_2_21`; the entity registry shows the exact IDs.
+
+To delete a device you do not want, open it and choose **Delete**. Its entities and counters go with it; if the client queries Pi-hole again, the device returns with counters from zero.
 
 The integration counts the queries it observes while polling. It does not backfill what Pi-hole handled before setup.
 
