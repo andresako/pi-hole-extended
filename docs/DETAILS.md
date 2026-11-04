@@ -103,7 +103,7 @@ The binary sensors run the same code every five minutes over 5-minute blocks of 
 
 ## Development and publication
 
-The repository includes HACS validation and Hassfest workflows. Release notes are in [CHANGELOG.md](../CHANGELOG.md). The integration is available through HACS's default catalog.
+The repository includes HACS validation, Hassfest and test workflows. Release notes are in [CHANGELOG.md](../CHANGELOG.md). The integration is available through HACS's default catalog.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) and [SECURITY.md](../SECURITY.md). Spanish installation and lifecycle instructions are in [README.es.md](../README.es.md).
 
