@@ -2,9 +2,12 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.0] - 2026-11-04
+
+First release in the HACS default catalog. It removes everything kept for earlier versions, so **existing installations must remove and re-add the integration**, which starts its counters and statistics from zero.
 
 ### Changed
+- Install from the HACS default catalog: search for **Pi-hole Extended** in HACS.
 - **Breaking:** entity IDs are now in English whatever language Home Assistant uses, for example `sensor.phe_<client>_dns_queries`, `sensor.phe_<client>_allowed` and `binary_sensor.phe_<client>_unusual_activity`. Diagnostic entities follow the same rule (`sensor.<entry>_diagnostics_communication_status`). Update your dashboards and automations after re-adding the integration.
 - **Breaking:** the rolling-minute sensor reports `queries/min` instead of `consultas/min`.
 - `classifier_rates_last_minute` is now `class_rates_last_minute`, with one count per class.
