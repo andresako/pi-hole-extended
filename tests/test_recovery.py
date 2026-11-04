@@ -174,7 +174,7 @@ async def test_name_fallback_reuses_legacy_key_when_case_or_spacing_changes() ->
     stored["clients"] = {
         "Living Room": {
             "client_name": "Living Room",
-            "client_ip": "Desconocida",
+            "client_ip": "Unknown",
             "query_count": 5,
             "allowed_count": 4,
             "blocked_count": 1,
@@ -245,7 +245,7 @@ async def test_api_failure_does_not_advance_cursor_or_change_counters() -> None:
     )
     coordinator = _coordinator(api)
 
-    with pytest.raises(UpdateFailed, match="consultar la API"):
+    with pytest.raises(UpdateFailed, match="query the Pi-hole API"):
         await coordinator._async_update_data()
 
     assert coordinator.cursor == 100
@@ -388,7 +388,7 @@ async def test_invalid_query_count_fails_closed_without_relogging() -> None:
     coordinator.store.value["clients"]["192.0.2.10"]["query_count"] = "corrupt"
 
     await coordinator.async_load_cursor()
-    with pytest.raises(UpdateFailed, match="datos locales"):
+    with pytest.raises(UpdateFailed, match="local data"):
         await coordinator._async_update_data()
 
     assert coordinator.cursor == 100
@@ -408,7 +408,7 @@ async def test_non_mapping_client_summaries_keep_coverage_unknown_and_counters_u
     coordinator.store.value["clients"] = clients
 
     await coordinator.async_load_cursor()
-    with pytest.raises(UpdateFailed, match="datos locales"):
+    with pytest.raises(UpdateFailed, match="local data"):
         await coordinator._async_update_data()
 
     assert coordinator.cursor == 100
@@ -472,7 +472,7 @@ async def test_invalid_classifier_counts_fail_closed_without_resetting_series(
     )
 
     await coordinator.async_load_cursor()
-    with pytest.raises(UpdateFailed, match="datos locales"):
+    with pytest.raises(UpdateFailed, match="local data"):
         await coordinator._async_update_data()
 
     assert coordinator.cursor == 100
@@ -513,7 +513,7 @@ async def test_invalid_aggregate_pending_cursor_interval_fails_closed(
     coordinator._client_store_invalid = False
 
     await coordinator.async_load_cursor()
-    with pytest.raises(UpdateFailed, match="datos locales"):
+    with pytest.raises(UpdateFailed, match="local data"):
         await coordinator._async_update_data()
 
     assert coordinator.cursor == 100
@@ -531,7 +531,7 @@ async def test_malformed_generation_gate_fails_closed_without_mixing_series() ->
     coordinator = _coordinator(api, stored=stored)
 
     await coordinator.async_load_cursor()
-    with pytest.raises(UpdateFailed, match="datos locales"):
+    with pytest.raises(UpdateFailed, match="local data"):
         await coordinator._async_update_data()
 
     assert coordinator.cursor == 490
@@ -564,7 +564,7 @@ async def test_malformed_store_root_fields_fail_closed(field: str, value: Any) -
     coordinator.store.value[field] = deepcopy(value)
 
     await coordinator.async_load_cursor()
-    with pytest.raises(UpdateFailed, match="datos locales"):
+    with pytest.raises(UpdateFailed, match="local data"):
         await coordinator._async_update_data()
 
     assert coordinator.cursor == 100
@@ -595,7 +595,7 @@ async def test_missing_or_malformed_client_counters_fail_closed(field: str) -> N
     coordinator.store.value["clients"]["192.0.2.10"].pop(field)
 
     await coordinator.async_load_cursor()
-    with pytest.raises(UpdateFailed, match="datos locales"):
+    with pytest.raises(UpdateFailed, match="local data"):
         await coordinator._async_update_data()
 
     assert coordinator.cursor == 100

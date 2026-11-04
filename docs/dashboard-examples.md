@@ -11,12 +11,12 @@
 
 | Example ID | Entity |
 |---|---|
-| `sensor.phe_192_0_2_21_consultas_dns` | A device's **DNS queries** counter, used by the activity card |
-| `sensor.phe_192_0_2_21_consultas_en_el_ultimo_minuto` | The same device's **Queries (last minute)** |
-| `binary_sensor.phe_192_0_2_21_actividad_inusual` | The same device's **Unusual activity** |
-| `sensor.pi_hole_192_0_2_2_diagnostico_…` | The four diagnostic entities of your Pi-hole entry |
+| `sensor.phe_192_0_2_21_dns_queries` | A device's **DNS queries** counter, used by the activity card |
+| `sensor.phe_192_0_2_21_queries_last_minute` | The same device's **Queries (last minute)** |
+| `binary_sensor.phe_192_0_2_21_unusual_activity` | The same device's **Unusual activity** |
+| `sensor.pi_hole_192_0_2_2_diagnostics_…` | The four diagnostic entities of your Pi-hole entry |
 
-`192.0.2.x` is a documentation address; your IDs contain each device's own address. Diagnostic IDs follow the language Home Assistant used when the entry was created.
+`192.0.2.x` is a documentation address; your IDs contain each device's own address. IDs are in English whatever language Home Assistant uses.
 
 The activity card needs no entity list: `type: custom:phe-activity-card` alone is a valid card, and you can pick the devices from the card editor.
 
@@ -32,7 +32,7 @@ Add it from **Edit dashboard → Add card → Pi-hole Extended live device** and
 
 ```yaml
 type: custom:phe-live-card
-entity: sensor.phe_192_0_2_21_consultas_dns
+entity: sensor.phe_192_0_2_21_dns_queries
 title: Kitchen speaker
 ```
 
@@ -57,12 +57,12 @@ Each Pi-hole entry has its own devices and diagnostics. The card lists the devic
 
 | ID de ejemplo | Entidad |
 |---|---|
-| `sensor.phe_192_0_2_21_consultas_dns` | El contador **Consultas DNS** de un dispositivo, usado por la tarjeta de actividad |
-| `sensor.phe_192_0_2_21_consultas_en_el_ultimo_minuto` | **Consultas (último minuto)** del mismo dispositivo |
-| `binary_sensor.phe_192_0_2_21_actividad_inusual` | **Actividad inusual** del mismo dispositivo |
-| `sensor.pi_hole_192_0_2_2_diagnostico_…` | Las cuatro entidades de diagnóstico de tu entrada de Pi-hole |
+| `sensor.phe_192_0_2_21_dns_queries` | El contador **Consultas DNS** de un dispositivo, usado por la tarjeta de actividad |
+| `sensor.phe_192_0_2_21_queries_last_minute` | **Consultas (último minuto)** del mismo dispositivo |
+| `binary_sensor.phe_192_0_2_21_unusual_activity` | **Actividad inusual** del mismo dispositivo |
+| `sensor.pi_hole_192_0_2_2_diagnostics_…` | Las cuatro entidades de diagnóstico de tu entrada de Pi-hole |
 
-`192.0.2.x` es una dirección de documentación; tus ID contienen la dirección de cada dispositivo. Los ID de diagnóstico siguen el idioma que usaba Home Assistant al crear la entrada.
+`192.0.2.x` es una dirección de documentación; tus ID contienen la dirección de cada dispositivo. Los ID están en inglés, sea cual sea el idioma de Home Assistant.
 
 La tarjeta de actividad no necesita lista de entidades: `type: custom:phe-activity-card` es una tarjeta válida y los dispositivos se eligen desde el editor de la tarjeta.
 
@@ -78,7 +78,7 @@ Añádela desde **Editar panel → Añadir tarjeta → Pi-hole Extended disposit
 
 ```yaml
 type: custom:phe-live-card
-entity: sensor.phe_192_0_2_21_consultas_dns
+entity: sensor.phe_192_0_2_21_dns_queries
 title: Altavoz de la cocina
 ```
 

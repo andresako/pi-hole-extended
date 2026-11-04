@@ -2,75 +2,75 @@
   "config": {
     "step": {
       "user": {
-        "title": "Conectar con Pi-hole v6",
-        "description": "Introduce un host sin protocolo ni ruta, el puerto web/API y una contraseña de aplicación. HTTPS usa exactamente el puerto indicado; no se cambia automáticamente. Si usas un certificado autofirmado, desactiva la verificación HTTPS.",
+        "title": "Connect to Pi-hole v6",
+        "description": "Enter a host without a scheme or path, the web/API port, and an application password. HTTPS uses the port exactly as entered; it is not changed automatically. For a self-signed certificate, turn off HTTPS certificate verification.",
         "data": {
-          "host": "Host o dirección IP",
-          "port": "Puerto web/API",
-          "use_https": "Usar HTTPS",
-          "verify_ssl": "Verificar el certificado HTTPS",
-          "password": "Contraseña de aplicación",
-          "scan_interval": "Frecuencia de consulta (segundos)"
+          "host": "Host or IP address",
+          "port": "Web/API port",
+          "use_https": "Use HTTPS",
+          "verify_ssl": "Verify HTTPS certificate",
+          "password": "Application password",
+          "scan_interval": "Polling interval (seconds)"
         },
         "data_description": {
-          "host": "Solo nombre de host o dirección IP; no pegues una URL ni incluyas puerto o ruta.",
-          "port": "Puerto web/API usado literalmente (por ejemplo, 80 para HTTP o 443 para HTTPS).",
-          "use_https": "Sin HTTPS, la contraseña viaja sin cifrar por tu red.",
-          "verify_ssl": "Desactívalo solo para certificados autofirmados de confianza.",
-          "password": "Crea una contraseña de aplicación desde Pi-hole."
+          "host": "Enter only a hostname or IP address; do not include a URL, port, or path.",
+          "port": "The web/API port is used as entered (for example, 80 for HTTP or 443 for HTTPS).",
+          "use_https": "Without HTTPS, the password is sent unencrypted over your network.",
+          "verify_ssl": "Turn off only for trusted self-signed certificates.",
+          "password": "Create an application password in Pi-hole."
         }
       },
       "reconfigure": {
-        "title": "Cambiar conexión de Pi-hole",
-        "description": "Valida la conexión antes de guardarla. Confirma si sigue siendo el mismo servidor o si es un Pi-hole de reemplazo. Puerto y protocolo se usan tal como se indican; la contraseña vacía conserva la guardada.",
+        "title": "Change the Pi-hole connection",
+        "description": "The connection is validated before it is saved. Confirm whether this is the same server or a replacement Pi-hole. Protocol and port are used as entered; a blank password keeps the saved one.",
         "data": {
-          "host": "Host o dirección IP, sin URL ni ruta",
-          "port": "Puerto web/API explícito",
-          "use_https": "Usar HTTPS",
-          "verify_ssl": "Verificar el certificado HTTPS",
-          "password": "Nueva contraseña de aplicación (opcional)",
-          "source_action": "Identidad del servidor"
+          "host": "Hostname or IP address, without a URL or path",
+          "port": "Explicit web/API port",
+          "use_https": "Use HTTPS",
+          "verify_ssl": "Verify HTTPS certificate",
+          "password": "New application password (optional)",
+          "source_action": "Server identity"
         }
       },
       "reauth_confirm": {
-        "title": "Actualizar credenciales de Pi-hole",
-        "description": "Pi-hole ha rechazado la credencial guardada. Introduce una contraseña de aplicación nueva para {host}.",
+        "title": "Update Pi-hole credentials",
+        "description": "Pi-hole rejected the stored credential. Enter a new application password for {host}.",
         "data": {
-          "password": "Contraseña de aplicación"
+          "password": "Application password"
         }
       }
     },
     "error": {
-      "invalid_host": "Introduce solo un nombre DNS o una dirección IP, sin protocolo, puerto, ruta ni credenciales.",
-      "already_configured": "Otra entrada de Pi-hole ya usa ese host, protocolo y puerto.",
-      "cannot_connect": "No se pudo conectar a la API v6 de Pi-hole. Revisa host, puerto, protocolo y que /api/docs esté disponible.",
-      "ssl_certificate": "Home Assistant no confía en el certificado HTTPS de Pi-hole. Si es autofirmado, desactiva la verificación del certificado.",
-      "invalid_auth": "Pi-hole rechazó la contraseña de aplicación."
+      "invalid_host": "Enter a DNS hostname or IP address only. Do not include a URL scheme, port, path, or credentials.",
+      "already_configured": "Another Pi-hole entry already uses that host, protocol, and port.",
+      "cannot_connect": "Could not connect to the Pi-hole v6 API. Check the host, port, protocol, and that /api/docs is available.",
+      "ssl_certificate": "Home Assistant does not trust Pi-hole's HTTPS certificate. If it is self-signed, turn off certificate verification.",
+      "invalid_auth": "Pi-hole rejected the application password."
     },
     "abort": {
-      "reauth_successful": "Credenciales actualizadas.",
-      "reconfigure_successful": "Conexión actualizada.",
-      "reconfigure_entry_not_found": "No se encontró la entrada de Pi-hole que se iba a cambiar.",
-      "reconfigure_entry_changed": "La entrada cambió mientras se validaba la conexión. Inicia de nuevo la reconfiguración."
+      "reauth_successful": "Credentials updated.",
+      "reconfigure_successful": "Connection updated.",
+      "reconfigure_entry_not_found": "The Pi-hole entry to change could not be found.",
+      "reconfigure_entry_changed": "The entry changed while the connection was being validated. Start reconfiguration again."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Frecuencia y Activity",
-        "description": "Elige si la integración envía eventos de consultas nuevas a Home Assistant Activity. La integración no conserva detalles de consultas.",
+        "title": "Polling and Activity",
+        "description": "Choose whether the integration sends new query events to Home Assistant Activity. Query details are not retained by the integration.",
         "data": {
-          "scan_interval": "Frecuencia de consulta (segundos)",
-          "retention_mode": "Política de Activity",
-          "activity_mode": "Eventos de Activity",
-          "unusual_activity": "Aviso de actividad inusual",
-          "client_scope": "Dispositivos en Home Assistant"
+          "scan_interval": "Polling interval (seconds)",
+          "retention_mode": "Activity policy",
+          "activity_mode": "Activity events",
+          "unusual_activity": "Unusual activity alert",
+          "client_scope": "Devices in Home Assistant"
         },
         "data_description": {
-          "retention_mode": "Activity habilitada envía entradas según su opción de eventos. Solo totales suprime las nuevas entradas de Activity.",
-          "activity_mode": "Elige todos los eventos, solo bloqueados o ninguno. Solo totales siempre desactiva las entradas de Activity.",
-          "unusual_activity": "Crea un sensor binario por dispositivo que se activa cuando mantiene una actividad muy superior a la suya habitual. Se evalúa cada 5 minutos con las estadísticas del Recorder.",
-          "client_scope": "Todos crean un dispositivo por cada cliente. Solo registros DNS locales crea dispositivos para las IP con registro local en Pi-hole, usa ese nombre y suma el resto en Otros dispositivos. Los dispositivos ya creados no se borran: deja de actualizarse lo que quede fuera y puedes eliminarlos desde su página."
+          "retention_mode": "Activity enabled sends entries according to the Activity setting. Totals only suppresses new Activity entries.",
+          "activity_mode": "Choose all events, blocked events only, or none. Totals only always disables Activity entries.",
+          "unusual_activity": "Creates a binary sensor per device that turns on when it stays far above its own usual activity. Evaluated every 5 minutes from Recorder statistics.",
+          "client_scope": "All creates a device for every client. Local DNS records only creates devices for IPs with a local record in Pi-hole, uses that name and adds the rest up under Other devices. Existing devices are not deleted: those left out stop updating and you can delete them from their page."
         }
       }
     }
@@ -78,88 +78,82 @@
   "entity": {
     "sensor": {
       "communication_status": {
-        "name": "Estado de comunicación",
+        "name": "Communication status",
         "state": {
-          "connected": "Conectado",
-          "error": "Error de comunicación",
-          "stale": "Lectura obsoleta",
-          "unknown": "Desconocido"
+          "connected": "Connected",
+          "error": "Communication error",
+          "stale": "Stale read",
+          "unknown": "Unknown"
         }
       },
       "last_successful_read": {
-        "name": "Última lectura correcta"
+        "name": "Last successful read"
       },
       "last_query_observed": {
-        "name": "Última consulta observada"
+        "name": "Last query observed"
       },
       "coverage": {
-        "name": "Cobertura de ingesta",
+        "name": "Ingestion coverage",
         "state": {
-          "unknown": "Desconocida",
-          "complete": "Completa desde el cursor base",
-          "partial": "Parcial"
+          "unknown": "Unknown",
+          "complete": "Complete since baseline cursor",
+          "partial": "Partial"
         }
       },
       "queries": {
-        "name": "Consultas DNS"
+        "name": "DNS queries"
       },
       "queries_last_minute": {
-        "name": "Consultas (último minuto)"
-      },
-      "legacy_allowed": {
-        "name": "Permitidas (histórico legado)"
-      },
-      "legacy_blocked": {
-        "name": "Bloqueadas (histórico legado)"
+        "name": "Queries (last minute)"
       },
       "allowed_v1": {
-        "name": "Consultas permitidas"
+        "name": "Allowed queries"
       },
       "blocked_v1": {
-        "name": "Consultas bloqueadas"
+        "name": "Blocked queries"
       },
       "provisional_v1": {
-        "name": "Consultas provisionales"
+        "name": "Provisional queries"
       }
     },
     "binary_sensor": {
       "unusual_activity": {
-        "name": "Actividad inusual"
+        "name": "Unusual activity"
       }
     }
   },
   "selector": {
     "retention_mode": {
       "options": {
-        "detail": "Activity habilitada (predeterminado)",
-        "aggregate": "Solo totales (sin Activity)"
+        "detail": "Activity enabled (default)",
+        "aggregate": "Totals only (no Activity)"
       }
     },
     "activity_mode": {
       "options": {
-        "all": "Todos los eventos",
-        "blocked": "Solo eventos bloqueados",
-        "none": "Sin eventos de Activity"
+        "all": "All events",
+        "blocked": "Blocked events only",
+        "none": "No Activity events"
       }
     },
     "source_action": {
       "options": {
-        "same_source": "Es el mismo Pi-hole; conservar cursor e identidad",
-        "new_source": "Es un Pi-hole de reemplazo; iniciar una generación nueva"
+        "same_source": "Same Pi-hole; keep its cursor and identity",
+        "new_source": "Replacement Pi-hole; start a new generation"
       }
     },
     "unusual_activity": {
       "options": {
-        "off": "Desactivado (sin sensores)",
-        "low": "Baja (solo casos extremos)",
-        "medium": "Media (recomendada)",
-        "high": "Alta (detecta antes)"
+        "off": "Off (no sensors)",
+        "low": "Low (extreme cases only)",
+        "medium": "Medium (recommended)",
+        "high": "High (detects sooner)"
       }
     },
     "client_scope": {
       "options": {
-        "all": "Todos los clientes",
-        "local_dns": "Solo registros DNS locales"
+        "all": "All clients",
+        "local_dns": "Local DNS records only"
       }
     }
   },
@@ -168,7 +162,7 @@
       "name": "{client_name}"
     },
     "pihole_instance": {
-      "name": "{entry_title} · Diagnóstico"
+      "name": "{entry_title} · Diagnostics"
     }
   }
 }

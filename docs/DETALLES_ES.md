@@ -60,7 +60,7 @@ Durante la configuración, la integración consulta `GET /api/queries` para comp
 
 Home Assistant documenta las [entradas personalizadas de Activity/Logbook](https://www.home-assistant.io/integrations/logbook/#custom-entries) y la [persistencia de eventos en Recorder](https://www.home-assistant.io/integrations/recorder). Esos mecanismos son los que usa este diseño.
 
-Los nombres de sensores y dispositivos usan las traducciones de integración de Home Assistant en inglés y español. Activity funciona de otra manera: `logbook.log` recibe un mensaje ya compuesto, no una clave de traducción de la integración; por eso una entrada existente no puede traducirse para cada persona que la consulte. El texto actual de los eventos está en español. Los nombres y valores de atributos de sensores también son datos simples; el frontend de Home Assistant no aplica actualmente traducciones de integración a atributos arbitrarios. Los nombres de entidades sí permanecen localizados.
+Los nombres de sensores y dispositivos usan las traducciones de integración de Home Assistant en inglés y español. Activity funciona de otra manera: `logbook.log` recibe un mensaje ya compuesto, no una clave de traducción de la integración; por eso una entrada existente no puede traducirse para cada persona que la consulte. El texto de los eventos está en inglés. Los nombres y valores de atributos de sensores también son datos simples; el frontend de Home Assistant no aplica actualmente traducciones de integración a atributos arbitrarios. Los nombres de entidades sí permanecen localizados.
 
 ## Intervalo, retrasos y límites
 
@@ -116,9 +116,9 @@ Un bloque supera el umbral cuando su tasa excede el mayor de estos valores: la m
 
 | Sensibilidad | Múltiplo de la mediana | Tasa mínima | Duración mínima |
 |---|---|---|---|
-| Baja | 8× | 20 consultas/min | 30 min |
-| Media | 5× | 10 consultas/min | 15 min |
-| Alta | 3× | 5 consultas/min | 10 min |
+| Baja | 8× | 20 queries/min | 30 min |
+| Media | 5× | 10 queries/min | 15 min |
+| Alta | 3× | 5 queries/min | 10 min |
 
 Un dispositivo necesita al menos 24 bloques de historial para tener referencia. Solo se leen recuentos agregados; nunca intervienen dominios.
 

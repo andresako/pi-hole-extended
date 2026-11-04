@@ -380,7 +380,7 @@ async def test_malformed_aggregate_store_fails_closed(corrupt: dict[str, Any]) -
     )
     await coordinator.async_load_cursor()
 
-    with pytest.raises(UpdateFailed, match="datos locales"):
+    with pytest.raises(UpdateFailed, match="local data"):
         await coordinator._async_update_data()
 
 

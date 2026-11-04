@@ -74,8 +74,11 @@ the original unique IDs.
 
 ## Conventions
 
-- Entity IDs are `phe_<client>_<metric>`; the metric suffix is Spanish
-  (`consultas_dns`, `actividad_inusual`) to keep IDs stable for existing users.
+- Entity IDs are English and do not depend on the Home Assistant language:
+  `phe_<client>_<metric>` (`dns_queries`, `unusual_activity`) for clients and
+  `<entry>_diagnostics_<metric>` for diagnostics.
+- English is the base language: `strings.json` matches `translations/en.json`, and
+  logs and error messages are English.
 - Entity names come from translations only; never set `name=` on descriptions
   that have a `translation_key`.
 - Persisted coverage reasons are `CoverageReason` members; add new ones there

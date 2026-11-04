@@ -71,12 +71,12 @@ Para cada cliente, agrupadas bajo su propio dispositivo:
 
 | Entidad | Descripción |
 |---|---|
-| `sensor.phe_<cliente>_consultas_dns` | **Consultas DNS**: consultas observadas, acumuladas. |
-| `sensor.phe_<cliente>_consultas_en_el_ultimo_minuto` | **Consultas (último minuto)**: recuento móvil según la hora de la consulta en Pi-hole. |
-| `sensor.phe_<cliente>_permitidas_v1` | **Consultas permitidas**, acumuladas. |
-| `sensor.phe_<cliente>_bloqueadas_v1` | **Consultas bloqueadas**, acumuladas. |
-| `sensor.phe_<cliente>_provisionales_v1` | **Consultas provisionales**: resultado aún no reconocido. |
-| `binary_sensor.phe_<cliente>_actividad_inusual` | **Actividad inusual**, ver más abajo. |
+| `sensor.phe_<cliente>_dns_queries` | **Consultas DNS**: consultas observadas, acumuladas. |
+| `sensor.phe_<cliente>_queries_last_minute` | **Consultas (último minuto)**: recuento móvil según la hora de la consulta en Pi-hole. |
+| `sensor.phe_<cliente>_allowed_v1` | **Consultas permitidas**, acumuladas. |
+| `sensor.phe_<cliente>_blocked_v1` | **Consultas bloqueadas**, acumuladas. |
+| `sensor.phe_<cliente>_provisional_v1` | **Consultas provisionales**: resultado aún no reconocido. |
+| `binary_sensor.phe_<cliente>_unusual_activity` | **Actividad inusual**, ver más abajo. |
 
 Por cada entrada de Pi-hole, cuatro sensores de diagnóstico: **Estado de comunicación**, **Última lectura correcta**, **Última consulta observada** y **Cobertura de ingesta**. `<cliente>` es la dirección del cliente con guiones bajos, por ejemplo `192_0_2_21`; el registro de entidades muestra los ID exactos.
 
@@ -100,15 +100,15 @@ Elige los dispositivos, el tamaño de bloque, el rango, el tipo de gráfica y el
 type: custom:phe-activity-card
 title: Actividad de la red
 entities:
-  - sensor.phe_192_0_2_21_consultas_dns
-  - sensor.phe_192_0_2_34_consultas_dns
+  - sensor.phe_192_0_2_21_dns_queries
+  - sensor.phe_192_0_2_34_dns_queries
 bucket: 30m
 span: 1d
 chart_type: bar
 log_scale: false
 show_overview: true
 names:
-  sensor.phe_192_0_2_21_consultas_dns: TV del salón
+  sensor.phe_192_0_2_21_dns_queries: TV del salón
 ```
 
 | Opción | Valores | Por defecto |
@@ -132,7 +132,7 @@ La tarjeta se carga sola. Añádela a un panel con **Editar panel → Añadir ta
 
 ```yaml
 type: custom:phe-live-card
-entity: sensor.phe_192_0_2_21_consultas_dns
+entity: sensor.phe_192_0_2_21_dns_queries
 ```
 
 ![Tarjeta en vivo con un dispositivo inusual](docs/images/live-card-es.png)
@@ -141,7 +141,7 @@ Muestra un dispositivo ahora mismo: un indicador con las consultas por minuto ac
 
 ```yaml
 type: custom:phe-live-card
-entity: sensor.phe_192_0_2_21_consultas_dns
+entity: sensor.phe_192_0_2_21_dns_queries
 title: Cámara
 show_legend: false
 animate: true
@@ -175,7 +175,7 @@ automation:
   - alias: Pi-hole · actividad inusual de un dispositivo
     triggers:
       - trigger: state
-        entity_id: binary_sensor.phe_192_0_2_47_actividad_inusual
+        entity_id: binary_sensor.phe_192_0_2_47_unusual_activity
         to: "on"
         for: "00:10:00"
     actions:
@@ -184,7 +184,7 @@ automation:
           title: Actividad DNS inusual
           message: >-
             {{ trigger.to_state.name }} hace
-            {{ trigger.to_state.attributes.current_rate }} consultas/min,
+            {{ trigger.to_state.attributes.current_rate }} queries/min,
             {{ trigger.to_state.attributes.times_usual }}× lo habitual.
 ```
 

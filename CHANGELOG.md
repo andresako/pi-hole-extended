@@ -2,6 +2,16 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **Breaking:** entity IDs are now in English whatever language Home Assistant uses, for example `sensor.phe_<client>_dns_queries` and `binary_sensor.phe_<client>_unusual_activity`. Diagnostic entities follow the same rule (`sensor.<entry>_diagnostics_communication_status`). Existing entities keep their IDs; remove and re-add the integration to get the new ones, then update your dashboards and automations.
+- **Breaking:** the rolling-minute sensor reports `queries/min` instead of `consultas/min`.
+- Logbook entries, logs and error messages are in English, and so are the fallback names and translations for languages without their own catalog.
+
+### Removed
+- **Breaking:** upgrades from config entries older than version 8 (integration releases before the current identity scheme), including the step that archived the retired allowed and blocked sensors. An older entry no longer loads; remove and re-add it.
+
 ## [0.14.0] - 2026-11-03
 
 ### Added

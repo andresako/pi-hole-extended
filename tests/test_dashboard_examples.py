@@ -14,8 +14,8 @@ GUIDE_PATH = ROOT / "docs/dashboard-examples.md"
 READMES = [ROOT / "README.md", ROOT / "README.es.md"]
 CARD_KEYS = {"type", "title", "entities", "bucket", "span", "chart_type", "log_scale", "show_overview", "names"}
 ENTITY_ID = re.compile(
-    r"(sensor|binary_sensor)\.(phe_192_0_2_\d+_(consultas_dns|consultas_en_el_ultimo_minuto|actividad_inusual)"
-    r"|pi_hole_192_0_2_2_diagnostico_[a-z_]+)"
+    r"(sensor|binary_sensor)\.(phe_192_0_2_\d+_(dns_queries|queries_last_minute|unusual_activity)"
+    r"|pi_hole_192_0_2_2_diagnostics_[a-z_]+)"
 )
 
 

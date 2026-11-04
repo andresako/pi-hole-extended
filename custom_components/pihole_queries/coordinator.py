@@ -44,6 +44,8 @@ from .const import (
     QUERY_BATCH_SIZE,
     RETENTION_AGGREGATE,
     RETENTION_DETAIL,
+    UNKNOWN_CLIENT_IP,
+    UNKNOWN_CLIENT_NAME,
     CoverageReason,
 )
 from .validation import valid_classifier_epoch, valid_query_time_buckets
@@ -165,27 +167,27 @@ def _query_description(query: dict[str, Any]) -> tuple[str, str]:
     ede = query.get("ede") or {}
     if not isinstance(ede, dict):
         ede = {}
-    client_ip = str(client.get("ip") or "IP desconocida")
+    client_ip = str(client.get("ip") or "unknown IP")
     client_name = str(client.get("name") or client_ip)
-    domain = str(query.get("domain") or "dominio desconocido")
-    status = query.get("status") if "status" in query else "ausente"
+    domain = str(query.get("domain") or "unknown domain")
+    status = query.get("status") if "status" in query else "missing"
     classification = _classification(status)
     verdict = {
-        "allowed": "permitida",
-        "blocked": "bloqueada",
-        "provisional": "provisional",
+        "allowed": "Allowed",
+        "blocked": "Blocked",
+        "provisional": "Provisional",
     }[classification]
     name = f"Pi-hole · {client_name} ({client_ip})"
-    details = [f"Consulta {verdict}: {domain}", f"Estado: {status}"]
+    details = [f"{verdict} query: {domain}", f"Status: {status}"]
     for label, value in (
-        ("Tipo", query.get("type")),
-        ("Respuesta", reply.get("type")),
-        ("Tiempo de respuesta (s)", reply.get("time")),
-        ("CNAME bloqueado", query.get("cname")),
-        ("ID de lista/regla", query.get("list_id")),
+        ("Type", query.get("type")),
+        ("Reply", reply.get("type")),
+        ("Reply time (s)", reply.get("time")),
+        ("Blocked CNAME", query.get("cname")),
+        ("List/rule ID", query.get("list_id")),
         ("DNSSEC", query.get("dnssec")),
-        ("Servidor ascendente", query.get("upstream")),
-        ("Motivo extendido", ede.get("text")),
+        ("Upstream server", query.get("upstream")),
+        ("Extended reason", ede.get("text")),
     ):
         if value not in (None, ""):
             details.append(f"{label}: {value}")
@@ -216,13 +218,13 @@ def _client_key(
         for existing_key, summary in existing_clients.items():
             if not isinstance(summary, dict):
                 continue
-            if summary.get("client_ip") not in (None, "", "Desconocida"):
+            if summary.get("client_ip") not in (None, "", UNKNOWN_CLIENT_IP):
                 continue
             existing_name = summary.get("client_name") or existing_key
             if _normalize_client_name(existing_name) == normalized_name:
                 key = str(existing_key)
                 break
-    return key, client_name or client_ip or "Cliente desconocido", client_ip or "Desconocida"
+    return key, client_name or client_ip or UNKNOWN_CLIENT_NAME, client_ip or UNKNOWN_CLIENT_IP
 
 
 class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
@@ -240,9 +242,9 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.retention_mode = entry.options.get(CONF_RETENTION_MODE, DEFAULT_RETENTION_MODE)
         self.activity_mode = entry.options.get(CONF_ACTIVITY_MODE, DEFAULT_ACTIVITY_MODE)
         if self.retention_mode not in {RETENTION_DETAIL, RETENTION_AGGREGATE}:
-            raise HomeAssistantError("La política de conservación configurada no es válida")
+            raise HomeAssistantError("The configured retention policy is not valid")
         if self.activity_mode not in {ACTIVITY_ALL, ACTIVITY_BLOCKED, ACTIVITY_NONE}:
-            raise HomeAssistantError("La política de Activity configurada no es válida")
+            raise HomeAssistantError("The configured Activity policy is not valid")
         self.cursor: int | None = None
         self.client_data: dict[str, dict[str, Any]] = {}
         self._client_removed_listeners: list[Callable[[str], None]] = []
@@ -289,7 +291,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         if not isinstance(saved, dict):
             self.coverage = "unknown"
             self.coverage_reason = CoverageReason.INVALID_LEGACY_STORE
-            _LOGGER.warning("Se ignoró un Store local de Pi-hole con formato no válido")
+            _LOGGER.warning("Ignored a local Pi-hole Store with an invalid format")
             return
         pending = saved.get("aggregate_pending", {})
         if not isinstance(pending, dict):
@@ -377,7 +379,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         try:
             self.cursor = _query_id({"id": saved["cursor"]})
             if self.cursor is None:
-                raise ValueError("cursor inválido")
+                raise ValueError("invalid cursor")
             self._bootstrapped = True
         except (KeyError, TypeError, ValueError):
             cursor_valid = False
@@ -389,7 +391,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 and saved_reason in {CoverageReason.INVALID_LEGACY_STORE, CoverageReason.INVALID_STORE_STATE}
                 else CoverageReason.INVALID_LEGACY_CURSOR
             )
-            _LOGGER.warning("Se ignoró un cursor local de Pi-hole no válido")
+            _LOGGER.warning("Ignored an invalid local Pi-hole cursor")
         coverage = saved.get("coverage")
         if "coverage" in saved and (
             not isinstance(coverage, str)
@@ -480,7 +482,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self.client_data = {}
             self.coverage = "unknown"
             self.coverage_reason = CoverageReason.INVALID_CLIENT_SUMMARIES
-            _LOGGER.warning("Se conservaron los contadores de Pi-hole porque los resúmenes locales no son válidos")
+            _LOGGER.warning("Kept the Pi-hole counters because the local summaries are not valid")
             return
         self.client_data = {}
         for key, value in clients.items():
@@ -598,7 +600,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if getattr(self, "_store_state_invalid", False)
                 else CoverageReason.INVALID_CLIENT_SUMMARIES
             )
-            _LOGGER.warning("Se conservaron los contadores de Pi-hole porque hay agregados locales no válidos")
+            _LOGGER.warning("Kept the Pi-hole counters because the local aggregates are not valid")
         for summary in self.client_data.values():
             summary["classifier_version"] = CLASSIFIER_VERSION
             counts = summary.get("classifier_counts")
@@ -644,7 +646,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     self.aggregate_pending[client_key] = pending
                 if not isinstance(err, Exception):
                     raise
-                _LOGGER.warning("No se pudo eliminar el cliente del Store local: %s", err)
+                _LOGGER.warning("Could not remove the client from the local Store: %s", err)
                 return False
         for listener in list(self._client_removed_listeners):
             listener(client_key)
@@ -687,7 +689,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 # Without a list, queries can't be attributed: retry them next poll.
                 self.last_api_attempt_successful = False
                 raise
-            _LOGGER.warning("Se mantienen los registros DNS locales anteriores: %s", err)
+            _LOGGER.warning("Keeping the previous local DNS records: %s", err)
         except PiHoleAuthenticationError:
             self.last_api_attempt_successful = False
             raise
@@ -700,7 +702,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             return key, client_name, client_ip
         hostname = (self.local_hosts or {}).get(client_ip)
         if hostname is None:
-            return OTHER_CLIENTS_KEY, OTHER_CLIENTS_NAME, "Desconocida"
+            return OTHER_CLIENTS_KEY, OTHER_CLIENTS_NAME, UNKNOWN_CLIENT_IP
         return key, hostname, client_ip
 
     async def _async_update_data_snapshot(self) -> dict[str, dict[str, Any]]:
@@ -728,7 +730,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     else CoverageReason.INVALID_CLIENT_SUMMARIES
                 )
                 raise UpdateFailed(
-                    "No se pueden actualizar los contadores porque los datos locales no son válidos"
+                    "Cannot update the counters because the local data is not valid"
                 )
             if self.awaiting_generation:
                 # Keep checking API health, but attach a new source generation
@@ -876,7 +878,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 # Attach a new source generation before ingestion can
                 # resume; otherwise cumulative series would combine databases.
                 _LOGGER.warning(
-                    "El identificador de consultas de Pi-hole se reinició; se establece un cursor nuevo"
+                    "The Pi-hole query ID was reset; starting a new cursor"
                 )
                 self.cursor = newest_id
                 self.coverage = "unknown"
@@ -979,15 +981,15 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             return self._data_snapshot()
         except PiHoleAuthenticationError as err:
             raise ConfigEntryAuthFailed(
-                "Contraseña de aplicación de Pi-hole no válida o sesión expirada"
+                "Invalid Pi-hole application password or expired session"
             ) from err
         except PiHoleConnectionError as err:
-            raise UpdateFailed(f"No se pudo consultar la API de Pi-hole: {err}") from err
+            raise UpdateFailed(f"Could not query the Pi-hole API: {err}") from err
         except UpdateFailed:
             raise
         except HomeAssistantError as err:
             raise UpdateFailed(
-                f"No se pudo registrar una consulta en el Logbook de Home Assistant: {err}"
+                f"Could not record a query in the Home Assistant Logbook: {err}"
             ) from err
 
     def _checkpoint(self) -> _Checkpoint:
@@ -1045,7 +1047,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self._restore(
                 checkpoint, restore_awaiting=restore_awaiting, aggregate_state=aggregate_state
             )
-            raise UpdateFailed("No se pudo confirmar el progreso de consultas en el Store") from err
+            raise UpdateFailed("Could not confirm query progress in the Store") from err
 
     async def _async_update_aggregate_data(
         self,
@@ -1081,7 +1083,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         ):
             self.coverage = "unknown"
             self.coverage_reason = CoverageReason.INVALID_STORE_STATE if self._store_state_invalid else CoverageReason.INVALID_CLIENT_SUMMARIES
-            raise UpdateFailed("No se pueden actualizar los contadores porque los datos locales no son válidos")
+            raise UpdateFailed("Cannot update the counters because the local data is not valid")
 
         latest = await self._async_get_queries(length=1)
         latest_rows = latest.get("queries", []) if isinstance(latest, dict) else None
@@ -1132,7 +1134,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             return self._data_snapshot()
 
         if checkpoint.cursor is not None and latest_id < checkpoint.cursor:
-            _LOGGER.warning("El identificador de consultas de Pi-hole se reinició; se establece un cursor nuevo")
+            _LOGGER.warning("The Pi-hole query ID was reset; starting a new cursor")
             self.cursor = latest_id
             self.coverage = "unknown"
             self.coverage_reason = CoverageReason.QUERY_ID_RESET
@@ -1550,14 +1552,14 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         query_time = (
             dt_util.as_local(event_time).isoformat(sep=" ", timespec="seconds")
             if event_time is not None
-            else "no fiable"
+            else "unreliable"
         )
         await self.hass.services.async_call(
             "logbook",
             "log",
             {
                 "name": name,
-                "message": f"Fecha/hora de Pi-hole: {query_time} · {message}",
+                "message": f"Pi-hole time: {query_time} · {message}",
                 "domain": DOMAIN,
             },
             blocking=True,

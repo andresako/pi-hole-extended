@@ -7,6 +7,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from custom_components.pihole_queries.const import DOMAIN
+from custom_components.pihole_queries.entity_ids import (
+    canonical_entity_id,
+    diagnostic_entity_id,
+)
 from custom_components.pihole_queries.sensor import (
     DIAGNOSTIC_DESCRIPTIONS,
     SENSOR_DESCRIPTIONS,
@@ -36,15 +40,13 @@ def test_base_and_shipped_translations_have_the_same_shape() -> None:
     assert _keys(catalogs[0]) == _keys(catalogs[1]) == _keys(catalogs[2])
 
 
-def test_fallback_entity_and_device_names_are_spanish() -> None:
-    fallback = json.loads((COMPONENT / "strings.json").read_text(encoding="utf-8"))
-    spanish = json.loads(
-        (COMPONENT / "translations" / "es.json").read_text(encoding="utf-8")
+def test_base_catalog_is_english() -> None:
+    base = json.loads((COMPONENT / "strings.json").read_text(encoding="utf-8"))
+    english = json.loads(
+        (COMPONENT / "translations" / "en.json").read_text(encoding="utf-8")
     )
 
-    # Home Assistant uses strings.json when no locale-specific catalog applies.
-    assert fallback["entity"] == spanish["entity"]
-    assert fallback["device"] == spanish["device"]
+    assert base == english
 
 
 def test_all_client_and_diagnostic_sensor_names_have_both_translations() -> None:
@@ -94,9 +96,10 @@ def test_unknown_client_device_fallback_uses_home_assistant_language() -> None:
     for language, expected_name in (
         ("en-US", "Unknown client"),
         ("es-ES", "Cliente desconocido"),
+        ("fr", "Unknown client"),
     ):
         coordinator = SimpleNamespace(
-            client_data={"unknown": {"client_name": "Cliente desconocido"}},
+            client_data={"unknown": {"client_name": "Unknown client"}},
             hass=SimpleNamespace(config=SimpleNamespace(language=language)),
         )
         sensor = PiHoleClientSensor(coordinator, entry, "unknown", description)
@@ -106,3 +109,35 @@ def test_unknown_client_device_fallback_uses_home_assistant_language() -> None:
         actual_ids.add(sensor.unique_id)
 
     assert actual_ids == {"stable-entry_unknown"}
+
+
+def test_entity_ids_are_english_and_ignore_the_language() -> None:
+    entry = SimpleNamespace(
+        unique_id="stable-entry", entry_id="entry-id", title="Pi-hole 192.0.2.2", data={}
+    )
+
+    assert {
+        canonical_entity_id(entry, domain, f"stable-entry_192.0.2.10{suffix}")
+        for domain, suffix in (
+            ("sensor", ""),
+            ("sensor", "_queries_last_minute"),
+            ("sensor", "_allowed_v1"),
+            ("sensor", "_blocked_v1"),
+            ("sensor", "_provisional_v1"),
+            ("binary_sensor", "_unusual_activity"),
+        )
+    } == {
+        "sensor.phe_192_0_2_10_dns_queries",
+        "sensor.phe_192_0_2_10_queries_last_minute",
+        "sensor.phe_192_0_2_10_allowed_v1",
+        "sensor.phe_192_0_2_10_blocked_v1",
+        "sensor.phe_192_0_2_10_provisional_v1",
+        "binary_sensor.phe_192_0_2_10_unusual_activity",
+    }
+    assert {description.key: diagnostic_entity_id(entry, description.key)
+            for description in DIAGNOSTIC_DESCRIPTIONS} == {
+        "communication_status": "sensor.pi_hole_192_0_2_2_diagnostics_communication_status",
+        "last_successful_read": "sensor.pi_hole_192_0_2_2_diagnostics_last_successful_read",
+        "last_query_observed": "sensor.pi_hole_192_0_2_2_diagnostics_last_query_observed",
+        "coverage": "sensor.pi_hole_192_0_2_2_diagnostics_ingestion_coverage",
+    }

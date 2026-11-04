@@ -491,7 +491,7 @@ class _IdentityStore:
                 or not isinstance(current.get("data"), dict)
             ):
                 raise HomeAssistantError(
-                    "El Store v2 no coincide con la identidad o el esquema de esta entrada"
+                    "The v2 Store does not match the identity or schema of this entry"
                 )
             prepared = self._prepare_legacy_data(
                 current["data"], invalid_reason=CoverageReason.INVALID_STORE_STATE

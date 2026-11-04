@@ -31,7 +31,9 @@ UNUSUAL_HIGH = "high"
 CLIENT_SCOPE_ALL = "all"
 CLIENT_SCOPE_LOCAL_DNS = "local_dns"
 OTHER_CLIENTS_KEY = "other_devices"
-OTHER_CLIENTS_NAME = "Otros dispositivos"
+OTHER_CLIENTS_NAME = "Other devices"
+UNKNOWN_CLIENT_NAME = "Unknown client"
+UNKNOWN_CLIENT_IP = "Unknown"
 
 DEFAULT_PORT = 80
 DEFAULT_SCAN_INTERVAL = 15

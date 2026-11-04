@@ -106,12 +106,6 @@
       "queries_last_minute": {
         "name": "Consultas (último minuto)"
       },
-      "legacy_allowed": {
-        "name": "Permitidas (histórico legado)"
-      },
-      "legacy_blocked": {
-        "name": "Bloqueadas (histórico legado)"
-      },
       "allowed_v1": {
         "name": "Consultas permitidas"
       },

@@ -68,16 +68,16 @@ async def test_monitor_stores_a_result_per_client_and_notifies() -> None:
     monitor, registry = _monitor(
         ["192.0.2.10", "192.0.2.11"],
         {
-            "pi-hole.test_192.0.2.10": "sensor.phe_192_0_2_10_consultas_dns",
-            "pi-hole.test_192.0.2.11": "sensor.phe_192_0_2_11_consultas_dns",
+            "pi-hole.test_192.0.2.10": "sensor.phe_192_0_2_10_dns_queries",
+            "pi-hole.test_192.0.2.11": "sensor.phe_192_0_2_11_dns_queries",
         },
     )
     calls = []
     monitor.async_add_listener(lambda: calls.append(1))
     data = {
         "series": {
-            "sensor.phe_192_0_2_10_consultas_dns": _series(True, runs=[{"start": 5.0, "end": 9.0}]),
-            "sensor.phe_192_0_2_11_consultas_dns": _series(False),
+            "sensor.phe_192_0_2_10_dns_queries": _series(True, runs=[{"start": 5.0, "end": 9.0}]),
+            "sensor.phe_192_0_2_11_dns_queries": _series(False),
         }
     }
     with (
@@ -92,10 +92,10 @@ async def test_monitor_stores_a_result_per_client_and_notifies() -> None:
     # One Recorder read covering both counters, scored with the medium defaults.
     assert read.await_count == 1
     assert read.await_args.args[1] == {
-        "sensor.phe_192_0_2_10_consultas_dns",
-        "sensor.phe_192_0_2_11_consultas_dns",
+        "sensor.phe_192_0_2_10_dns_queries",
+        "sensor.phe_192_0_2_11_dns_queries",
     }
-    assert read.await_args.args[4]["sensor.phe_192_0_2_10_consultas_dns"] == params_for("medium")
+    assert read.await_args.args[4]["sensor.phe_192_0_2_10_dns_queries"] == params_for("medium")
 
 
 async def test_monitor_keeps_previous_results_when_the_recorder_fails() -> None:
@@ -146,14 +146,14 @@ def test_sensor_exposes_rates_and_start() -> None:
 
 
 def test_sensor_requests_its_phe_entity_id_up_front() -> None:
-    assert _sensor({}).entity_id == "binary_sensor.phe_192_0_2_10_actividad_inusual"
+    assert _sensor({}).entity_id == "binary_sensor.phe_192_0_2_10_unusual_activity"
 
 
 def test_sensor_id_is_normalised_under_phe() -> None:
     entity = SimpleNamespace(domain="binary_sensor", unique_id="pi-hole.test_192.0.2.10_unusual_activity")
     assert (
         _canonical_entity_id(ENTRY, entity)
-        == "binary_sensor.phe_192_0_2_10_actividad_inusual"
+        == "binary_sensor.phe_192_0_2_10_unusual_activity"
     )
 
 

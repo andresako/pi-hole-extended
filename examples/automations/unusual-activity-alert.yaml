@@ -4,9 +4,9 @@ mode: single
 triggers:
   - trigger: state
     entity_id:
-      - binary_sensor.phe_192_0_2_21_actividad_inusual
-      - binary_sensor.phe_192_0_2_34_actividad_inusual
-      - binary_sensor.phe_192_0_2_47_actividad_inusual
+      - binary_sensor.phe_192_0_2_21_unusual_activity
+      - binary_sensor.phe_192_0_2_34_unusual_activity
+      - binary_sensor.phe_192_0_2_47_unusual_activity
     to: "on"
     for: "00:10:00"
 actions:

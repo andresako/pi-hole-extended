@@ -106,12 +106,6 @@
       "queries_last_minute": {
         "name": "Queries (last minute)"
       },
-      "legacy_allowed": {
-        "name": "Allowed (legacy history)"
-      },
-      "legacy_blocked": {
-        "name": "Blocked (legacy history)"
-      },
       "allowed_v1": {
         "name": "Allowed queries"
       },

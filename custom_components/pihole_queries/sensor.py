@@ -24,10 +24,13 @@ from .classification import CLASSIFIER_VERSION
 from .const import (
     DOMAIN,
     OTHER_CLIENTS_NAME,
+    UNKNOWN_CLIENT_IP,
+    UNKNOWN_CLIENT_NAME,
 )
 from .coordinator import PiHoleQueryCoordinator
 from .entity_ids import client_device_identifier as _client_device_identifier
 from .entity_ids import client_entity_unique_id as _client_entity_unique_id
+from .entity_ids import diagnostic_entity_id
 
 SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
@@ -40,7 +43,7 @@ SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         key="queries_last_minute",
         translation_key="queries_last_minute",
         icon="mdi:speedometer",
-        native_unit_of_measurement="consultas/min",
+        native_unit_of_measurement="queries/min",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
     ),
@@ -113,21 +116,24 @@ _EPOCH_CLASS_KEYS = {"allowed", "blocked", "provisional"}
 
 
 
+_SPANISH_DEVICE_NAMES = {
+    UNKNOWN_CLIENT_NAME: "Cliente desconocido",
+    OTHER_CLIENTS_NAME: "Otros dispositivos",
+}
+
+
 def client_device_info(
     coordinator: PiHoleQueryCoordinator, entry: ConfigEntry, client_key: str
 ) -> DeviceInfo:
     """Describe the per-client device shared by every entity of that client."""
     data = coordinator.client_data.get(client_key, {})
-    client_name = str(data.get("client_name") or "Cliente desconocido")[:MAX_DEVICE_NAME_LENGTH]
+    client_name = str(data.get("client_name") or UNKNOWN_CLIENT_NAME)[:MAX_DEVICE_NAME_LENGTH]
     client_ip = str(data.get("client_ip") or "")
-    if client_name == "Cliente desconocido":
-        language = coordinator.hass.config.language.split("-")[0]
-        client_name = "Unknown client" if language == "en" else "Cliente desconocido"
-    if client_name == OTHER_CLIENTS_NAME and coordinator.hass.config.language.startswith("en"):
-        client_name = "Other devices"
+    if coordinator.hass.config.language.split("-")[0] == "es":
+        client_name = _SPANISH_DEVICE_NAMES.get(client_name, client_name)
     name = (
         f"{client_name} ({client_ip})"
-        if client_ip and client_ip != "Desconocida"
+        if client_ip and client_ip != UNKNOWN_CLIENT_IP
         else client_name
     )
     return DeviceInfo(
@@ -319,6 +325,8 @@ class PiHoleDiagnosticSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEn
         self.entity_description = description
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        # Fixed English ID: otherwise Home Assistant derives it from the translated name.
+        self.entity_id = diagnostic_entity_id(entry, description.key)
 
     @property
     def available(self) -> bool:

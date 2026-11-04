@@ -117,7 +117,7 @@ class PiHoleClient:
                     raise PiHoleAuthenticationError
                 if response.status >= 400:
                     raise PiHoleConnectionError(
-                        f"/api/auth respondió HTTP {response.status}"
+                        f"/api/auth returned HTTP {response.status}"
                     )
                 payload = await response.json(content_type=None)
         except PiHoleAuthenticationError:
@@ -126,22 +126,22 @@ class PiHoleClient:
             raise
         except aiohttp.ClientConnectorCertificateError as err:
             raise PiHoleCertificateError(
-                "No se pudo verificar el certificado HTTPS de Pi-hole"
+                "Could not verify the Pi-hole HTTPS certificate"
             ) from err
         except TimeoutError as err:
-            raise PiHoleConnectionError("tiempo de espera agotado al llamar a /api/auth") from err
+            raise PiHoleConnectionError("timed out calling /api/auth") from err
         except aiohttp.ClientError as err:
             raise PiHoleConnectionError(
-                f"fallo de red al llamar a /api/auth ({type(err).__name__})"
+                f"network failure calling /api/auth ({type(err).__name__})"
             ) from err
         except ValueError as err:
-            raise PiHoleConnectionError("Pi-hole devolvió JSON no válido en /api/auth") from err
+            raise PiHoleConnectionError("Pi-hole returned invalid JSON from /api/auth") from err
 
         session = payload.get("session") if isinstance(payload, dict) else None
         if not isinstance(session, dict):
-            raise PiHoleConnectionError("Respuesta de /api/auth no válida")
+            raise PiHoleConnectionError("Invalid response from /api/auth")
         if "valid" not in session or not isinstance(session["valid"], bool):
-            raise PiHoleConnectionError("Respuesta de /api/auth no válida")
+            raise PiHoleConnectionError("Invalid response from /api/auth")
         if not session["valid"]:
             raise PiHoleAuthenticationError
         sid = session.get("sid")
@@ -150,7 +150,7 @@ class PiHoleClient:
             or not sid.strip()
             or any(character.isspace() or not character.isprintable() for character in sid)
         ):
-            raise PiHoleConnectionError("Respuesta de /api/auth no válida")
+            raise PiHoleConnectionError("Invalid response from /api/auth")
         self._sid = sid
 
     async def _async_get(self, path: str, params: dict[str, int] | None = None) -> Any:
@@ -172,7 +172,7 @@ class PiHoleClient:
                             continue
                         raise PiHoleAuthenticationError
                     if response.status >= 400:
-                        raise PiHoleConnectionError(f"{path} respondió HTTP {response.status}")
+                        raise PiHoleConnectionError(f"{path} returned HTTP {response.status}")
                     return await response.json(content_type=None)
             except PiHoleAuthenticationError:
                 raise
@@ -180,16 +180,16 @@ class PiHoleClient:
                 raise
             except aiohttp.ClientConnectorCertificateError as err:
                 raise PiHoleCertificateError(
-                    "No se pudo verificar el certificado HTTPS de Pi-hole"
+                    "Could not verify the Pi-hole HTTPS certificate"
                 ) from err
             except TimeoutError as err:
-                raise PiHoleConnectionError(f"tiempo de espera agotado al llamar a {path}") from err
+                raise PiHoleConnectionError(f"timed out calling {path}") from err
             except aiohttp.ClientError as err:
                 raise PiHoleConnectionError(
-                    f"fallo de red al llamar a {path} ({type(err).__name__})"
+                    f"network failure calling {path} ({type(err).__name__})"
                 ) from err
             except ValueError as err:
-                raise PiHoleConnectionError(f"Pi-hole devolvió JSON no válido en {path}") from err
+                raise PiHoleConnectionError(f"Pi-hole returned invalid JSON from {path}") from err
         raise PiHoleAuthenticationError
 
     async def async_get_queries(self, *, length: int, cursor: int | None = None) -> dict[str, Any]:
@@ -199,7 +199,7 @@ class PiHoleClient:
             params["cursor"] = cursor
         payload = await self._async_get("/api/queries", params)
         if not isinstance(payload, dict) or not isinstance(payload.get("queries"), list):
-            raise PiHoleConnectionError("Respuesta de /api/queries no válida")
+            raise PiHoleConnectionError("Invalid response from /api/queries")
         return payload
 
     async def async_get_local_hosts(self) -> dict[str, str]:
@@ -209,9 +209,9 @@ class PiHoleClient:
         try:
             records = payload["config"]["dns"]["hosts"]
         except (KeyError, TypeError) as err:
-            raise PiHoleConnectionError(f"Respuesta de {path} no válida") from err
+            raise PiHoleConnectionError(f"Invalid response from {path}") from err
         if not isinstance(records, list):
-            raise PiHoleConnectionError(f"Respuesta de {path} no válida")
+            raise PiHoleConnectionError(f"Invalid response from {path}")
         hosts: dict[str, str] = {}
         for record in records:
             fields = record.split() if isinstance(record, str) else []

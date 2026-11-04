@@ -61,8 +61,8 @@ def test_absent_status_is_provisional_and_retains_raw_value() -> None:
     name, message = _query_description({"domain": "missing.example.test"})
 
     assert name.startswith("Pi-hole ·")
-    assert "Consulta provisional" in message
-    assert "Estado: ausente" in message
+    assert "Provisional query" in message
+    assert "Status: missing" in message
 
 
 @pytest.mark.asyncio
@@ -219,8 +219,8 @@ async def test_missing_and_null_status_are_provisional_in_ingestion_and_store(fr
         "provisional": 2,
     }
     assert "recent_queries" not in summary
-    assert "Estado: ausente" in coordinator.hass.services.calls[0]["message"]
-    assert "Estado: None" in coordinator.hass.services.calls[1]["message"]
+    assert "Status: missing" in coordinator.hass.services.calls[0]["message"]
+    assert "Status: None" in coordinator.hass.services.calls[1]["message"]
     assert coordinator.store.value["clients"]["192.0.2.10"]["classifier_counts"]["1"]["provisional"] == 2
 
     total = PiHoleClientSensor(

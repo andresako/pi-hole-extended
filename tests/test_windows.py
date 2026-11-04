@@ -204,7 +204,7 @@ def test_last_minute_sensor_preserves_zero_and_missing_values() -> None:
 
     assert sensor.native_value == 4
     assert sensor.entity_description.state_class is SensorStateClass.MEASUREMENT
-    assert sensor.entity_description.native_unit_of_measurement == "consultas/min"
+    assert sensor.entity_description.native_unit_of_measurement == "queries/min"
     assert sensor.extra_state_attributes["window_seconds"] == 60
     assert sensor.extra_state_attributes["timestamp_source"] == (
         "Pi-hole query.time, with HA observation fallback"

@@ -8,25 +8,25 @@ views:
       # in the card editor instead.
       - type: custom:phe-activity-card
         entities:
-          - sensor.phe_192_0_2_21_consultas_dns
-          - sensor.phe_192_0_2_34_consultas_dns
-          - sensor.phe_192_0_2_47_consultas_dns
+          - sensor.phe_192_0_2_21_dns_queries
+          - sensor.phe_192_0_2_34_dns_queries
+          - sensor.phe_192_0_2_47_dns_queries
         bucket: 30m
         span: 1d
         chart_type: line
       - type: entities
         title: Unusual activity
         entities:
-          - binary_sensor.phe_192_0_2_21_actividad_inusual
-          - binary_sensor.phe_192_0_2_34_actividad_inusual
-          - binary_sensor.phe_192_0_2_47_actividad_inusual
+          - binary_sensor.phe_192_0_2_21_unusual_activity
+          - binary_sensor.phe_192_0_2_34_unusual_activity
+          - binary_sensor.phe_192_0_2_47_unusual_activity
       - type: history-graph
         title: Queries per minute · last 6 hours
         hours_to_show: 6
         entities:
-          - sensor.phe_192_0_2_21_consultas_en_el_ultimo_minuto
-          - sensor.phe_192_0_2_34_consultas_en_el_ultimo_minuto
-          - sensor.phe_192_0_2_47_consultas_en_el_ultimo_minuto
+          - sensor.phe_192_0_2_21_queries_last_minute
+          - sensor.phe_192_0_2_34_queries_last_minute
+          - sensor.phe_192_0_2_47_queries_last_minute
   - title: Diagnostics
     path: diagnostics
     icon: mdi:heart-pulse
@@ -36,13 +36,13 @@ views:
       - type: entities
         title: Integration status
         entities:
-          - entity: sensor.pi_hole_192_0_2_2_diagnostico_estado_de_comunicacion
+          - entity: sensor.pi_hole_192_0_2_2_diagnostics_communication_status
             name: Communication status
-          - entity: sensor.pi_hole_192_0_2_2_diagnostico_ultima_lectura_correcta
+          - entity: sensor.pi_hole_192_0_2_2_diagnostics_last_successful_read
             name: Last successful read
-          - entity: sensor.pi_hole_192_0_2_2_diagnostico_ultima_consulta_observada
+          - entity: sensor.pi_hole_192_0_2_2_diagnostics_last_query_observed
             name: Last query observed
-          - entity: sensor.pi_hole_192_0_2_2_diagnostico_cobertura_de_ingesta
+          - entity: sensor.pi_hole_192_0_2_2_diagnostics_ingestion_coverage
             name: Ingestion coverage
   - title: Device
     path: device
@@ -53,5 +53,5 @@ views:
       # all it needs. Everything else is optional and can be set in the card editor,
       # which only writes the options you change.
       - type: custom:phe-live-card
-        entity: sensor.phe_192_0_2_21_consultas_dns
+        entity: sensor.phe_192_0_2_21_dns_queries
         title: Kitchen speaker

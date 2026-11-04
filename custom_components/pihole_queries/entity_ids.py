@@ -64,21 +64,17 @@ def canonical_entity_id(entry: ConfigEntry, domain: str, unique_id: str) -> str 
     if domain not in ("sensor", "binary_sensor"):
         return None
     versioned_classes = {
-        "allowed": "permitidas",
-        "blocked": "bloqueadas",
-        "provisional": "provisionales",
+        "allowed": "allowed",
+        "blocked": "blocked",
+        "provisional": "provisional",
     }
     versioned_match = re.search(
         r"_(allowed|blocked|provisional)_v(\d+)$", unique_id
     )
     metric_suffixes = {
-        "_allowed": "permitidas",
-        "_blocked": "bloqueadas",
-        "_queries_last_minute": "consultas_en_el_ultimo_minuto",
-        "_unusual_activity": "actividad_inusual",
-        "_allowed_last_minute": "permitidas_en_el_ultimo_minuto",
-        "_blocked_last_minute": "bloqueadas_en_el_ultimo_minuto",
-        "": "consultas_dns",
+        "_queries_last_minute": "queries_last_minute",
+        "_unusual_activity": "unusual_activity",
+        "": "dns_queries",
     }
     if versioned_match:
         classifier, version = versioned_match.groups()
@@ -101,3 +97,9 @@ def canonical_entity_id(entry: ConfigEntry, domain: str, unique_id: str) -> str 
         else f"{entry.data[CONF_SOURCE_GENERATION]}_{client_key}"
     )
     return f"{domain}.phe_{slugify(entity_client)}_{metric_name}"
+
+
+def diagnostic_entity_id(entry: ConfigEntry, key: str) -> str:
+    """Return the entity ID of a diagnostic sensor, independent of the HA language."""
+    metric = "ingestion_coverage" if key == "coverage" else key
+    return f"sensor.{slugify(entry.title)}_diagnostics_{metric}"

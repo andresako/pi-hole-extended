@@ -4,18 +4,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 from types import SimpleNamespace
-from uuid import UUID
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import device_registry as device_registry_module
-from homeassistant.helpers import entity_registry as entity_registry_module
 
 from custom_components.pihole_queries import (
     _canonical_entity_id,
     _identity_storage_key,
     _IdentityStore,
-    async_migrate_entry,
 )
 from custom_components.pihole_queries.const import (
     CONF_SOURCE_GENERATION,
@@ -71,26 +67,6 @@ class _DeviceRegistry:
         return None
 
 
-def _migration_hass(entry, monkeypatch, entities=()):
-    registry = _EntityRegistry(entities)
-
-    def update_entry(target, *, data=None, version=None):
-        if data is not None:
-            target.data = data
-        if version is not None:
-            target.version = version
-
-    hass = SimpleNamespace(config_entries=SimpleNamespace(async_update_entry=update_entry))
-    monkeypatch.setattr(entity_registry_module, "async_get", lambda _hass: registry)
-    monkeypatch.setattr(
-        entity_registry_module,
-        "async_entries_for_config_entry",
-        lambda _registry, entry_id: registry.for_entry(entry_id),
-    )
-    monkeypatch.setattr(device_registry_module, "async_get", lambda _hass: _DeviceRegistry())
-    return hass, registry
-
-
 def _coordinator_for_store(store):
     coordinator = object.__new__(PiHoleQueryCoordinator)
     coordinator.store = store
@@ -105,29 +81,6 @@ def _coordinator_for_store(store):
     coordinator._client_store_invalid = False
     coordinator._store_state_invalid = False
     return coordinator
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("old_version", range(1, 8))
-async def test_every_distributed_config_entry_version_migrates_directly_to_v8(
-    old_version: int, monkeypatch
-) -> None:
-    entry = SimpleNamespace(
-        entry_id=f"entry-{old_version}",
-        unique_id=f"http://pihole-{old_version}.example.test:80",
-        version=old_version,
-        data={"host": "pihole.example.test"},
-    )
-    hass, _registry = _migration_hass(entry, monkeypatch)
-
-    assert await async_migrate_entry(hass, entry)
-    source_id = entry.data[CONF_SOURCE_ID]
-    assert str(UUID(source_id)) == source_id
-    assert entry.data[CONF_SOURCE_GENERATION] == LEGACY_SOURCE_GENERATION
-    assert entry.version == 8
-
-    assert await async_migrate_entry(hass, entry)
-    assert entry.data[CONF_SOURCE_ID] == source_id
 
 
 @pytest.mark.asyncio
@@ -234,7 +187,7 @@ async def test_v2_store_with_different_identity_is_rejected() -> None:
     )
     store = _IdentityStore(current, _Store({"cursor": 1}), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", LEGACY_SOURCE_GENERATION)
 
-    with pytest.raises(HomeAssistantError, match="no coincide"):
+    with pytest.raises(HomeAssistantError, match="does not match"):
         await store.async_load()
 
 
@@ -256,7 +209,7 @@ async def test_v2_store_with_non_mapping_payload_is_rejected(payload) -> None:
         LEGACY_SOURCE_GENERATION,
     )
 
-    with pytest.raises(HomeAssistantError, match="esquema"):
+    with pytest.raises(HomeAssistantError, match="schema"):
         await store.async_load()
 
 
@@ -278,7 +231,7 @@ async def test_v2_store_requires_integer_schema_version(schema_version) -> None:
         LEGACY_SOURCE_GENERATION,
     )
 
-    with pytest.raises(HomeAssistantError, match="esquema"):
+    with pytest.raises(HomeAssistantError, match="schema"):
         await store.async_load()
 
 
@@ -483,19 +436,19 @@ def test_replacement_generation_scopes_entity_ids_and_devices() -> None:
     assert _client_device_identifier(entry, "192.0.2.10") == (DOMAIN, expected)
     entity = SimpleNamespace(
         domain="sensor",
-        unique_id=f"{expected}_allowed",
+        unique_id=f"{expected}_allowed_v1",
     )
     assert _canonical_entity_id(entry, entity) == (
-        f"sensor.phe_{generation.replace('-', '_')}_192_0_2_10_permitidas"
+        f"sensor.phe_{generation.replace('-', '_')}_192_0_2_10_allowed_v1"
     )
 
 
 @pytest.mark.parametrize(
     ("classification", "localized"),
     [
-        ("allowed", "permitidas"),
-        ("blocked", "bloqueadas"),
-        ("provisional", "provisionales"),
+        ("allowed", "allowed"),
+        ("blocked", "blocked"),
+        ("provisional", "provisional"),
     ],
 )
 def test_versioned_class_entities_get_metric_and_epoch_in_canonical_id(
@@ -640,28 +593,3 @@ def test_store_version_constants_keep_v1_reader_for_migration() -> None:
     assert STORAGE_KEY_PREFIX == f"{DOMAIN}_cursor"
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("old_version", range(1, 8))
-async def test_identity_upgrade_preserves_registered_custom_entity_id_from_every_version(
-    old_version: int, monkeypatch
-) -> None:
-    entity = SimpleNamespace(
-        entity_id="sensor.my_custom_dns_total",
-        unique_id="https://pihole.example.test:443_192.0.2.10",
-        config_entry_id=f"entry-custom-{old_version}",
-        domain="sensor",
-        device_id="device-custom",
-    )
-    entry = SimpleNamespace(
-        entry_id=f"entry-custom-{old_version}",
-        unique_id="https://pihole.example.test:443",
-        version=old_version,
-        data={"host": "pihole.example.test"},
-    )
-    hass, registry = _migration_hass(entry, monkeypatch, [entity])
-
-    assert await async_migrate_entry(hass, entry)
-
-    assert registry.async_get("sensor.my_custom_dns_total") is entity
-    assert entity.unique_id == "https://pihole.example.test:443_192.0.2.10"
-    assert entity.device_id == "device-custom"

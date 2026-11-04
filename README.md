@@ -71,12 +71,12 @@ For every client, grouped under its own device:
 
 | Entity | Description |
 |---|---|
-| `sensor.phe_<client>_consultas_dns` | **DNS queries**: cumulative queries observed. |
-| `sensor.phe_<client>_consultas_en_el_ultimo_minuto` | **Queries (last minute)**: rolling count by Pi-hole's query time. |
-| `sensor.phe_<client>_permitidas_v1` | **Allowed queries**, cumulative. |
-| `sensor.phe_<client>_bloqueadas_v1` | **Blocked queries**, cumulative. |
-| `sensor.phe_<client>_provisionales_v1` | **Provisional queries**: result not yet recognized. |
-| `binary_sensor.phe_<client>_actividad_inusual` | **Unusual activity**, see below. |
+| `sensor.phe_<client>_dns_queries` | **DNS queries**: cumulative queries observed. |
+| `sensor.phe_<client>_queries_last_minute` | **Queries (last minute)**: rolling count by Pi-hole's query time. |
+| `sensor.phe_<client>_allowed_v1` | **Allowed queries**, cumulative. |
+| `sensor.phe_<client>_blocked_v1` | **Blocked queries**, cumulative. |
+| `sensor.phe_<client>_provisional_v1` | **Provisional queries**: result not yet recognized. |
+| `binary_sensor.phe_<client>_unusual_activity` | **Unusual activity**, see below. |
 
 Per Pi-hole entry, four diagnostic sensors: **Communication status**, **Last successful read**, **Last query observed** and **Ingestion coverage**. `<client>` is the client's address with underscores, for example `192_0_2_21`; the entity registry shows the exact IDs.
 
@@ -100,15 +100,15 @@ Choose the devices, block size, range, chart type and other settings in the card
 type: custom:phe-activity-card
 title: Network activity
 entities:
-  - sensor.phe_192_0_2_21_consultas_dns
-  - sensor.phe_192_0_2_34_consultas_dns
+  - sensor.phe_192_0_2_21_dns_queries
+  - sensor.phe_192_0_2_34_dns_queries
 bucket: 30m
 span: 1d
 chart_type: bar
 log_scale: false
 show_overview: true
 names:
-  sensor.phe_192_0_2_21_consultas_dns: Living-room TV
+  sensor.phe_192_0_2_21_dns_queries: Living-room TV
 ```
 
 | Option | Values | Default |
@@ -132,7 +132,7 @@ The card is loaded automatically. Add it to a dashboard with **Edit dashboard â†
 
 ```yaml
 type: custom:phe-live-card
-entity: sensor.phe_192_0_2_21_consultas_dns
+entity: sensor.phe_192_0_2_21_dns_queries
 ```
 
 ![Live device card showing one unusual device](docs/images/live-card-en.png)
@@ -141,7 +141,7 @@ It shows one device right now: a gauge with the current queries per minute, the 
 
 ```yaml
 type: custom:phe-live-card
-entity: sensor.phe_192_0_2_21_consultas_dns
+entity: sensor.phe_192_0_2_21_dns_queries
 title: Smart camera
 show_legend: false
 animate: true
@@ -175,7 +175,7 @@ automation:
   - alias: Pi-hole Â· unusual device activity
     triggers:
       - trigger: state
-        entity_id: binary_sensor.phe_192_0_2_47_actividad_inusual
+        entity_id: binary_sensor.phe_192_0_2_47_unusual_activity
         to: "on"
         for: "00:10:00"
     actions:

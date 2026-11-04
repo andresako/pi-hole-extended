@@ -11,7 +11,7 @@ from custom_components.pihole_queries import activity_data as data
 from custom_components.pihole_queries import websocket as ws
 from custom_components.pihole_queries.const import DOMAIN
 
-ENTITY = "sensor.phe_192_0_2_10_consultas_dns"
+ENTITY = "sensor.phe_192_0_2_10_dns_queries"
 
 
 def _registry(entries: dict[str, SimpleNamespace]):

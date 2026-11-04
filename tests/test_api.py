@@ -75,7 +75,7 @@ async def test_malformed_authentication_response_is_connection_error(
     api_config[CONF_PORT] = server.server.port
     async with aiohttp.ClientSession() as session:
         client = PiHoleClient(session, api_config)
-        with pytest.raises(PiHoleConnectionError, match="Respuesta de /api/auth no válida"):
+        with pytest.raises(PiHoleConnectionError, match="Invalid response from /api/auth"):
             await client.async_authenticate()
 
 
@@ -119,7 +119,7 @@ async def test_invalid_json_is_translated(
     api_config[CONF_PORT] = server.server.port
     async with aiohttp.ClientSession() as session:
         client = PiHoleClient(session, api_config)
-        with pytest.raises(PiHoleConnectionError, match="JSON no válido"):
+        with pytest.raises(PiHoleConnectionError, match="invalid JSON"):
             await client.async_get_queries(length=1)
 
 
