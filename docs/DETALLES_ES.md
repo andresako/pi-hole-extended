@@ -33,7 +33,7 @@ La integración envía una acción pública `logbook.log` por cada consulta regi
 2. Reinicia Home Assistant.
 3. Ve a **Ajustes → Dispositivos y servicios → Añadir integración**, busca **Pi-hole Extended** y completa el formulario.
 
-El repositorio está en [andresako/pi-hole-extended](https://github.com/andresako/pi-hole-extended). Puede añadirse como repositorio personalizado desde **HACS → Integraciones → ⋮ → Repositorios personalizados**, categoría **Integración**. La inclusión en el catálogo predeterminado de HACS queda pausada hasta verificar la integración; la solicitud anterior está cerrada. Para instalación manual, copia la carpeta indicada arriba y reinicia Home Assistant. Después de actualizar los archivos, reinicia Home Assistant.
+El repositorio está en [andresako/pi-hole-extended](https://github.com/andresako/pi-hole-extended). Está en el catálogo predeterminado de HACS: busca **Pi-hole Extended** en HACS. Si la búsqueda no la encuentra, añádela como repositorio personalizado desde **HACS → ⋮ → Repositorios personalizados**, categoría **Integración**. Para instalación manual, copia la carpeta indicada arriba y reinicia Home Assistant. Después de actualizar los archivos, reinicia Home Assistant.
 
 ## Configuración
 

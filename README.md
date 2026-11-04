@@ -29,9 +29,11 @@
 
 ### HACS (recommended)
 
-1. Select the button at the top of this page, or in HACS open **⋮ → Custom repositories**, add `https://github.com/Andresako/pi-hole-extended` and choose **Integration**.
-2. Install **Pi-hole Extended** and restart Home Assistant.
+1. In HACS, search for **Pi-hole Extended**, or select the button at the top of this page to open it directly.
+2. Install it and restart Home Assistant.
 3. Open **Settings → Devices & services → Add integration**, search for **Pi-hole Extended** and follow the form.
+
+If the search does not find it, add it as a custom repository: in HACS open **⋮ → Custom repositories**, add `https://github.com/Andresako/pi-hole-extended`, choose **Integration** and continue from step 2.
 
 ### Manual
 

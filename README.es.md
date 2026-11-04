@@ -29,9 +29,11 @@
 
 ### HACS (recomendada)
 
-1. Pulsa el botón de arriba o, en HACS, abre **⋮ → Repositorios personalizados**, añade `https://github.com/Andresako/pi-hole-extended` y elige **Integración**.
-2. Instala **Pi-hole Extended** y reinicia Home Assistant.
+1. En HACS, busca **Pi-hole Extended** o pulsa el botón de arriba para abrirla directamente.
+2. Instálala y reinicia Home Assistant.
 3. Abre **Ajustes → Dispositivos y servicios → Añadir integración**, busca **Pi-hole Extended** y sigue el formulario.
+
+Si la búsqueda no la encuentra, añádela como repositorio personalizado: en HACS, abre **⋮ → Repositorios personalizados**, añade `https://github.com/Andresako/pi-hole-extended`, elige **Integración** y sigue desde el paso 2.
 
 ### Manual
 
