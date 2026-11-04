@@ -52,12 +52,20 @@ def _validate_card(card: dict) -> None:
 
 def test_dashboard_views_and_card_options_are_valid() -> None:
     views = _dashboard()["views"]
-    assert [view["path"] for view in views] == ["activity", "diagnostics"]
+    assert [view["path"] for view in views] == ["activity", "diagnostics", "device"]
     cards = [card for view in views for card in view["cards"]]
     activity = [card for card in cards if card["type"] == "custom:phe-activity-card"]
     assert len(activity) == 1
     _validate_card(activity[0])
-    assert {card["type"] for card in cards} <= {"custom:phe-activity-card", "entities", "history-graph"}
+    live = [card for card in cards if card["type"] == "custom:phe-live-card"]
+    assert len(live) == 1
+    assert ENTITY_ID.fullmatch(live[0]["entity"])
+    assert {card["type"] for card in cards} <= {
+        "custom:phe-activity-card",
+        "custom:phe-live-card",
+        "entities",
+        "history-graph",
+    }
 
 
 def test_examples_only_use_documentation_addresses_and_known_entities() -> None:
