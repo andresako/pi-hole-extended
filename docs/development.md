@@ -29,8 +29,6 @@ The test configuration disables sockets except for loopback. Tests use a local
 HTTP server and synthetic `example.test` query records; no Pi-hole, Home
 Assistant installation, private DNS data, or credentials are needed.
 
-`tests/benchmark_driver.py` is a manual benchmark helper, not a test.
-
 Backend tests do not validate the Home Assistant frontend; the JS tests cover
 the card logic only.
 

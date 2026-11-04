@@ -101,17 +101,14 @@ async def test_expired_sid_is_renewed_once(
 
 
 @pytest.mark.asyncio
-async def test_invalid_json_is_translated(
-    aiohttp_client, pi_hole_app, api_config, api_plan
-):
+async def test_invalid_json_is_translated(aiohttp_client, pi_hole_app, api_config, api_plan):
     async def invalid_json(_request: web.Request) -> web.Response:
         return web.Response(text="not-json", content_type="application/json")
 
     app = web.Application()
+
     async def authenticate(_request: web.Request) -> web.Response:
-        return web.json_response(
-            {"session": {"valid": True, "sid": "sid-invalid-json"}}
-        )
+        return web.json_response({"session": {"valid": True, "sid": "sid-invalid-json"}})
 
     app.router.add_post("/api/auth", authenticate)
     app.router.add_get("/api/queries", invalid_json)
@@ -124,9 +121,7 @@ async def test_invalid_json_is_translated(
 
 
 @pytest.mark.asyncio
-async def test_self_signed_certificate_is_rejected(
-    aiohttp_server, pi_hole_app, api_config
-):
+async def test_self_signed_certificate_is_rejected(aiohttp_server, pi_hole_app, api_config):
     ca = trustme.CA()
     cert = ca.issue_cert("127.0.0.1")
     server_ssl = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)

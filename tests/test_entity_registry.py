@@ -27,9 +27,7 @@ from custom_components.pihole_queries.sensor import (
 
 
 @pytest.mark.asyncio
-async def test_new_registry_entity_is_normalized_on_the_event_loop(
-    tmp_path, monkeypatch
-) -> None:
+async def test_new_registry_entity_is_normalized_on_the_event_loop(tmp_path, monkeypatch) -> None:
     """Creating a real registry entity dispatches normalization safely."""
     import custom_components.pihole_queries as integration
 
@@ -116,9 +114,7 @@ async def test_new_sensor_setup_adds_restored_minute_sensor_and_four_diagnostics
     )
 
     class Coordinator:
-        client_data = {
-            "192.0.2.10": {"client_name": "Synthetic", "client_ip": "192.0.2.10"}
-        }
+        client_data = {"192.0.2.10": {"client_name": "Synthetic", "client_ip": "192.0.2.10"}}
 
         def async_add_listener(self, _listener):
             return lambda: None
@@ -134,13 +130,17 @@ async def test_new_sensor_setup_adds_restored_minute_sensor_and_four_diagnostics
 
     client_keys = {entity.entity_description.key for entity in added[:5]}
     diagnostic_keys = {entity.entity_description.key for entity in added[5:]}
-    assert client_keys == {description.key for description in SENSOR_DESCRIPTIONS} == {
-        "queries",
-        "queries_last_minute",
-        "allowed",
-        "blocked",
-        "provisional",
-    }
+    assert (
+        client_keys
+        == {description.key for description in SENSOR_DESCRIPTIONS}
+        == {
+            "queries",
+            "queries_last_minute",
+            "allowed",
+            "blocked",
+            "provisional",
+        }
+    )
     assert diagnostic_keys == {description.key for description in DIAGNOSTIC_DESCRIPTIONS}
     assert len(added) == 9
     minute_sensor = next(

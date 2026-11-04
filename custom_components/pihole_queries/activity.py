@@ -135,9 +135,7 @@ def _profile(values: Sequence[float]) -> tuple[float, float]:
     return mid, median(abs(v - mid) for v in values)
 
 
-def _typical_daily_peak(
-    points: Sequence[Mapping[str, float]], bucket_seconds: int
-) -> float:
+def _typical_daily_peak(points: Sequence[Mapping[str, float]], bucket_seconds: int) -> float:
     """Median of the daily maximum rate; 0 when fewer than three usable days.
 
     A device that bursts every day has a high typical peak, so its regular bursts

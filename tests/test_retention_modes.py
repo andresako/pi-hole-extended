@@ -36,9 +36,7 @@ class StreamingApi:
         self.responses = responses
         self.calls: list[tuple[int, int | None]] = []
 
-    async def async_get_queries(
-        self, *, length: int, cursor: int | None = None
-    ) -> dict[str, Any]:
+    async def async_get_queries(self, *, length: int, cursor: int | None = None) -> dict[str, Any]:
         self.calls.append((length, cursor))
         return deepcopy(self.responses.get(cursor, {"queries": []}))
 
@@ -47,7 +45,9 @@ class Services:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    async def async_call(self, _domain: str, _service: str, data: dict[str, Any], **_kwargs: Any) -> None:
+    async def async_call(
+        self, _domain: str, _service: str, data: dict[str, Any], **_kwargs: Any
+    ) -> None:
         self.calls.append(data)
 
 
@@ -79,7 +79,9 @@ def _summary() -> dict[str, Any]:
 
 
 def _aggregate_coordinator(
-    responses: dict[int | None, dict[str, Any]], *, pending: dict[str, Any] | None = None,
+    responses: dict[int | None, dict[str, Any]],
+    *,
+    pending: dict[str, Any] | None = None,
     recovery_cursor: int | None = None,
 ) -> PiHoleQueryCoordinator:
     coordinator = object.__new__(PiHoleQueryCoordinator)
@@ -243,9 +245,7 @@ async def test_recovery_merges_overlapping_activity_buckets_before_store_scrub(
 async def test_truncated_aggregate_recovery_resumes_batches_and_keeps_latest_time(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "custom_components.pihole_queries.coordinator.QUERY_BATCH_SIZE", 2
-    )
+    monkeypatch.setattr("custom_components.pihole_queries.coordinator.QUERY_BATCH_SIZE", 2)
     base = 1_735_689_600
     rows = {query_id: _row(query_id, "FORWARDED") for query_id in range(101, 105)}
     rows[103]["time"] = base + 20  # Older ID responses must not replace the high-water time.
@@ -435,7 +435,9 @@ async def test_aggregate_scrubs_opaque_rates_and_pending_payloads() -> None:
                         "allowed": 1,
                         "blocked": 0,
                         "provisional": 0,
-                        "rows": [{"id": 123, "status": "GRAVITY", "domain": "private-query.example.test"}],
+                        "rows": [
+                            {"id": 123, "status": "GRAVITY", "domain": "private-query.example.test"}
+                        ],
                     }
                 ],
                 "domain": "private-query.example.test",
@@ -475,30 +477,28 @@ async def test_aggregate_scrubs_opaque_rates_and_pending_payloads() -> None:
 @pytest.mark.asyncio
 async def test_aggregate_preserves_valid_bounded_pending_aggregates() -> None:
     source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    data = (
-        {
-            "cursor": 100,
-            "clients": {"192.0.2.10": _summary()},
-            "aggregate_pending": {
-                "192.0.2.10": {
-                    "client_name": "Test client",
-                    "client_ip": "192.0.2.10",
-                    "counts": {"allowed": 1, "blocked": 0, "provisional": 0},
-                    "buckets": [
-                        {
-                            "second": 1_735_689_600,
-                            "allowed": 1,
-                            "blocked": 0,
-                            "provisional": 0,
-                        }
-                    ],
-                }
-            },
-            "aggregate_pending_cursor": 101,
-            "aggregate_pending_time": 1_735_689_600,
-            "recovery_cursor": 100,
-        }
-    )
+    data = {
+        "cursor": 100,
+        "clients": {"192.0.2.10": _summary()},
+        "aggregate_pending": {
+            "192.0.2.10": {
+                "client_name": "Test client",
+                "client_ip": "192.0.2.10",
+                "counts": {"allowed": 1, "blocked": 0, "provisional": 0},
+                "buckets": [
+                    {
+                        "second": 1_735_689_600,
+                        "allowed": 1,
+                        "blocked": 0,
+                        "provisional": 0,
+                    }
+                ],
+            }
+        },
+        "aggregate_pending_cursor": 101,
+        "aggregate_pending_time": 1_735_689_600,
+        "recovery_cursor": 100,
+    }
     current = MemoryStore(
         {"schema_version": 1, "source_id": source_id, "source_generation": "first", "data": data}
     )
@@ -519,24 +519,22 @@ async def test_aggregate_discards_pending_checkpoint_outside_confirmed_cursor_in
     recovery_cursor: int,
 ) -> None:
     source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    data = (
-        {
-            "cursor": 100,
-            "coverage": "complete",
-            "clients": {"192.0.2.10": _summary()},
-            "aggregate_pending": {
-                "192.0.2.10": {
-                    "client_name": "Test client",
-                    "client_ip": "192.0.2.10",
-                    "counts": {"allowed": 2, "blocked": 0, "provisional": 0},
-                    "buckets": [],
-                }
-            },
-            "aggregate_pending_cursor": 103,
-            "aggregate_pending_time": None,
-            "recovery_cursor": recovery_cursor,
-        }
-    )
+    data = {
+        "cursor": 100,
+        "coverage": "complete",
+        "clients": {"192.0.2.10": _summary()},
+        "aggregate_pending": {
+            "192.0.2.10": {
+                "client_name": "Test client",
+                "client_ip": "192.0.2.10",
+                "counts": {"allowed": 2, "blocked": 0, "provisional": 0},
+                "buckets": [],
+            }
+        },
+        "aggregate_pending_cursor": 103,
+        "aggregate_pending_time": None,
+        "recovery_cursor": recovery_cursor,
+    }
     current = MemoryStore(
         {"schema_version": 1, "source_id": source_id, "source_generation": "first", "data": data}
     )
@@ -590,7 +588,9 @@ async def test_switch_from_aggregate_pending_to_detail_rereads_from_confirmed_cu
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("activity_mode,expected_events", [("all", 3), ("blocked", 1), ("none", 0)])
-async def test_activity_filter_does_not_change_accounting(activity_mode: str, expected_events: int) -> None:
+async def test_activity_filter_does_not_change_accounting(
+    activity_mode: str, expected_events: int
+) -> None:
     api = StreamingApi(
         {
             None: {"queries": [_row(103, status="GRAVITY"), _row(102, status="FORWARDED")]},

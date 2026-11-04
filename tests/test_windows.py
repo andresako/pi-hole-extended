@@ -52,7 +52,9 @@ def test_minute_windows_use_bounded_numeric_buckets() -> None:
     assert all(isinstance(bucket["second"], int) for bucket in summary["activity_buckets"])
 
 
-@pytest.mark.parametrize("origin_time", [None, "invalid", float("inf"), float("nan"), 1_735_689_661])
+@pytest.mark.parametrize(
+    "origin_time", [None, "invalid", float("inf"), float("nan"), 1_735_689_661]
+)
 def test_new_query_updates_numeric_buckets_without_retaining_query_details(
     origin_time: Any, frozen_time
 ) -> None:
@@ -169,7 +171,11 @@ def test_ha_sensor_exposes_ingestion_window_and_class_statistics() -> None:
         def async_add_listener(self, _listener):
             return lambda: None
 
-    entry = SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"})
+    entry = SimpleNamespace(
+        unique_id="entry",
+        entry_id="entry",
+        data={"source_id": "source", "source_generation": "first"},
+    )
     descriptions = {description.key: description for description in SENSOR_DESCRIPTIONS}
     total = PiHoleClientSensor(_Coordinator(), entry, "192.0.2.10", descriptions["queries"])
     provisional = PiHoleClientSensor(
@@ -191,7 +197,11 @@ def test_last_minute_sensor_preserves_zero_and_missing_values() -> None:
             return lambda: None
 
     coordinator = _Coordinator()
-    entry = SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"})
+    entry = SimpleNamespace(
+        unique_id="entry",
+        entry_id="entry",
+        data={"source_id": "source", "source_generation": "first"},
+    )
     description = next(
         description
         for description in SENSOR_DESCRIPTIONS
@@ -226,7 +236,11 @@ def test_last_minute_sensor_stays_unavailable_until_fresh_complete_window() -> N
             return lambda: None
 
     coordinator = _Coordinator()
-    entry = SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"})
+    entry = SimpleNamespace(
+        unique_id="entry",
+        entry_id="entry",
+        data={"source_id": "source", "source_generation": "first"},
+    )
     description = next(
         description
         for description in SENSOR_DESCRIPTIONS

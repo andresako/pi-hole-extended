@@ -187,16 +187,20 @@ def test_first_generation_ids_use_the_source_and_keep_entity_ids_short() -> None
     entry = SimpleNamespace(
         entry_id="entry-a",
         unique_id="https://pihole.example.test:443",
-        data={CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION},
+        data={
+            CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION,
+        },
     )
     prefix = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa_first_192.0.2.10"
 
     assert _client_entity_unique_id(entry, "192.0.2.10", "queries") == prefix
     assert _client_entity_unique_id(entry, "192.0.2.10", "allowed") == f"{prefix}_allowed"
     assert _client_device_identifier(entry, "192.0.2.10") == (DOMAIN, prefix)
-    assert _canonical_entity_id(
-        entry, SimpleNamespace(domain="sensor", unique_id=prefix)
-    ) == "sensor.phe_192_0_2_10_dns_queries"
+    assert (
+        _canonical_entity_id(entry, SimpleNamespace(domain="sensor", unique_id=prefix))
+        == "sensor.phe_192_0_2_10_dns_queries"
+    )
 
 
 def test_replacement_generation_scopes_entity_ids_and_devices() -> None:
@@ -243,9 +247,7 @@ def test_class_entities_get_their_metric_in_canonical_id(
     source_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     entity = SimpleNamespace(
         domain="sensor",
-        unique_id=(
-            f"{source_id}_{generation}_192.0.2.10_{classification}"
-        ),
+        unique_id=(f"{source_id}_{generation}_192.0.2.10_{classification}"),
     )
 
     assert _canonical_entity_id(entry, entity) == (
@@ -258,12 +260,18 @@ def test_two_sources_with_same_client_ip_have_distinct_entity_and_device_ids() -
         SimpleNamespace(
             entry_id="entry-a",
             unique_id="http://one.example.test:80",
-            data={CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION},
+            data={
+                CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION,
+            },
         ),
         SimpleNamespace(
             entry_id="entry-b",
             unique_id="http://two.example.test:80",
-            data={CONF_SOURCE_ID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION},
+            data={
+                CONF_SOURCE_ID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION,
+            },
         ),
     ]
     entity_ids = {_client_entity_unique_id(entry, "192.0.2.10", "queries") for entry in entries}
@@ -321,14 +329,17 @@ def test_same_ip_registry_ids_survive_reverse_reload_order() -> None:
         unique_id = _client_entity_unique_id(entry, "192.0.2.10", "queries")
         assert registry[unique_id] == before[unique_id]
     assert len(set(registry.values())) == 2
-    assert len(
-        {
-            _identity_storage_key(
-                entry.data[CONF_SOURCE_ID], entry.data[CONF_SOURCE_GENERATION]
-            )
-            for entry in entries
-        }
-    ) == 2
+    assert (
+        len(
+            {
+                _identity_storage_key(
+                    entry.data[CONF_SOURCE_ID], entry.data[CONF_SOURCE_GENERATION]
+                )
+                for entry in entries
+            }
+        )
+        == 2
+    )
 
 
 @pytest.mark.asyncio
@@ -353,7 +364,9 @@ async def test_same_ip_sources_keep_independent_store_payloads() -> None:
             source_id,
             generation,
         )
-        for (source_id, generation), cursor, count in zip(identities, (100, 900), (5, 9), strict=True)
+        for (source_id, generation), cursor, count in zip(
+            identities, (100, 900), (5, 9), strict=True
+        )
     ]
 
     loaded = [await store.async_load() for store in stores]
@@ -361,5 +374,3 @@ async def test_same_ip_sources_keep_independent_store_payloads() -> None:
     assert [data["cursor"] for data in loaded] == [100, 900]
     assert [data["clients"]["192.0.2.10"]["query_count"] for data in loaded] == [5, 9]
     assert len({_identity_storage_key(*identity) for identity in identities}) == 2
-
-

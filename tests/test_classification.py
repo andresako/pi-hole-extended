@@ -98,7 +98,9 @@ class _Services:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    async def async_call(self, _domain: str, _service: str, data: dict[str, Any], **_kwargs: Any) -> None:
+    async def async_call(
+        self, _domain: str, _service: str, data: dict[str, Any], **_kwargs: Any
+    ) -> None:
         self.calls.append(data)
 
 
@@ -176,7 +178,9 @@ async def test_unknown_first_observation_is_not_reclassified_or_recaptured(froze
 @pytest.mark.asyncio
 async def test_overlapping_api_pages_count_and_log_each_id_once(frozen_time) -> None:
     class _OverlappingApi:
-        async def async_get_queries(self, *, length: int, cursor: int | None = None) -> dict[str, Any]:
+        async def async_get_queries(
+            self, *, length: int, cursor: int | None = None
+        ) -> dict[str, Any]:
             if cursor is None:
                 return {"queries": [_row(102, "GRAVITY"), _row(101, "UNKNOWN")]}
             assert cursor == 100
@@ -222,7 +226,11 @@ async def test_missing_and_null_status_are_provisional_in_ingestion_and_store(fr
 
     total = PiHoleClientSensor(
         coordinator,
-        SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"}),
+        SimpleNamespace(
+            unique_id="entry",
+            entry_id="entry",
+            data={"source_id": "source", "source_generation": "first"},
+        ),
         "192.0.2.10",
         next(description for description in SENSOR_DESCRIPTIONS if description.key == "queries"),
     )
@@ -247,7 +255,11 @@ async def test_ha_state_machine_keeps_total_and_class_counters_monotonic(tmp_pat
         def async_add_listener(self, _listener):
             return lambda: None
 
-    entry = SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"})
+    entry = SimpleNamespace(
+        unique_id="entry",
+        entry_id="entry",
+        data={"source_id": "source", "source_generation": "first"},
+    )
     coordinator = _Coordinator()
     descriptions = {description.key: description for description in SENSOR_DESCRIPTIONS}
     total = PiHoleClientSensor(coordinator, entry, "192.0.2.10", descriptions["queries"])
@@ -265,7 +277,7 @@ async def test_ha_state_machine_keeps_total_and_class_counters_monotonic(tmp_pat
             config_entry=entry,
             component_translations={},
             platform_translations={},
-                default_language_platform_translations={},
+            default_language_platform_translations={},
         )
         entity.platform_data = entity.platform
         await entity.async_internal_added_to_hass()

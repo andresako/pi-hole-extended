@@ -67,13 +67,17 @@ def _coordinator() -> SimpleNamespace:
 
 async def test_diagnostics_redact_credentials_and_clients() -> None:
     entry = _entry()
-    hass = SimpleNamespace(
-        data={DOMAIN: {entry.entry_id: {"coordinator": _coordinator()}}}
-    )
+    hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: {"coordinator": _coordinator()}}})
     result = await async_get_config_entry_diagnostics(hass, entry)
 
     text = repr(result)
-    for secret in ("synthetic-test-password", "192.0.2.2", "192.0.2.10", "secret-laptop", SOURCE_ID):
+    for secret in (
+        "synthetic-test-password",
+        "192.0.2.2",
+        "192.0.2.10",
+        "secret-laptop",
+        SOURCE_ID,
+    ):
         assert secret not in text
     assert result["coordinator"]["cursor"] == 42
     assert result["coordinator"]["coverage_reason"] == "no_baseline"
@@ -91,7 +95,16 @@ def _removal_coordinator(*clients: str) -> PiHoleQueryCoordinator:
 
 
 def _device(entry: SimpleNamespace, key: str) -> SimpleNamespace:
-    return SimpleNamespace(identifiers={(DOMAIN, f"{SOURCE_ID}_first_{key}" if key != "diagnostics" else f"{entry.entry_id}_diagnostics")})
+    return SimpleNamespace(
+        identifiers={
+            (
+                DOMAIN,
+                f"{SOURCE_ID}_first_{key}"
+                if key != "diagnostics"
+                else f"{entry.entry_id}_diagnostics",
+            )
+        }
+    )
 
 
 async def test_known_client_device_is_removed_and_forgotten() -> None:

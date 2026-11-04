@@ -92,15 +92,25 @@ class _IdentityStore:
         }
         for field, valid in (
             ("cursor", _valid_query_id(data.get("cursor"))),
-            ("coverage", isinstance(data.get("coverage"), str)
-                and data.get("coverage") in {"unknown", "complete", "partial"}),
-            ("coverage_reason", data.get("coverage_reason") is None
-                or (isinstance(data.get("coverage_reason"), str)
-                    and data.get("coverage_reason") in coverage_reasons)),
+            (
+                "coverage",
+                isinstance(data.get("coverage"), str)
+                and data.get("coverage") in {"unknown", "complete", "partial"},
+            ),
+            (
+                "coverage_reason",
+                data.get("coverage_reason") is None
+                or (
+                    isinstance(data.get("coverage_reason"), str)
+                    and data.get("coverage_reason") in coverage_reasons
+                ),
+            ),
             ("last_query_time", _valid_timestamp(data.get("last_query_time"))),
             ("awaiting_generation", isinstance(data.get("awaiting_generation"), bool)),
-            ("recovery_cursor", data.get("recovery_cursor") is None
-                or _valid_query_id(data.get("recovery_cursor"))),
+            (
+                "recovery_cursor",
+                data.get("recovery_cursor") is None or _valid_query_id(data.get("recovery_cursor")),
+            ),
         ):
             if field in data and not valid:
                 data.pop(field)
@@ -125,16 +135,12 @@ class _IdentityStore:
                 return False
             seen: set[int] = set()
             for bucket in value:
-                if (
-                    not isinstance(bucket, dict)
-                    or set(bucket)
-                    != {
-                        "second",
-                        "allowed",
-                        "blocked",
-                        "provisional",
-                    }
-                ):
+                if not isinstance(bucket, dict) or set(bucket) != {
+                    "second",
+                    "allowed",
+                    "blocked",
+                    "provisional",
+                }:
                     return False
                 second = bucket["second"]
                 if (
@@ -154,7 +160,6 @@ class _IdentityStore:
                 seen.add(second)
             return True
 
-
         def valid_pending(value: Any) -> bool:
             if not isinstance(value, dict):
                 return False
@@ -165,9 +170,8 @@ class _IdentityStore:
                     or len(key) > 255
                     or not isinstance(item, dict)
                     or not {"client_name", "client_ip", "counts", "buckets"}.issubset(item)
-                    or set(item) - {
-                        "client_name", "client_ip", "counts", "buckets", "query_time_buckets"
-                    }
+                    or set(item)
+                    - {"client_name", "client_ip", "counts", "buckets", "query_time_buckets"}
                     or any(
                         item[name] is not None and not isinstance(item[name], str)
                         for name in ("client_name", "client_ip")
@@ -223,7 +227,9 @@ class _IdentityStore:
         }
         pending = data.get("aggregate_pending")
         has_pending_metadata = any(field in data for field in pending_fields)
-        pending_valid = valid_pending(pending) if "aggregate_pending" in data else not has_pending_metadata
+        pending_valid = (
+            valid_pending(pending) if "aggregate_pending" in data else not has_pending_metadata
+        )
         if pending_valid and pending:
             pending_cursor = data.get("aggregate_pending_cursor")
             pending_time = data.get("aggregate_pending_time")
@@ -271,7 +277,6 @@ class _IdentityStore:
             except (OverflowError, TypeError, ValueError):
                 return False
 
-
         if "cursor" in data and not valid_id(data["cursor"]):
             data.pop("cursor")
             malformed = True
@@ -281,23 +286,25 @@ class _IdentityStore:
         ):
             data.pop("coverage")
             malformed = True
-        if "coverage_reason" in data and data["coverage_reason"] is not None and not isinstance(
-            data["coverage_reason"], str
+        if (
+            "coverage_reason" in data
+            and data["coverage_reason"] is not None
+            and not isinstance(data["coverage_reason"], str)
         ):
             data.pop("coverage_reason")
             malformed = True
         for field in ("last_query_time",):
             raw = data.get(field)
-            if field in data and raw is not None and (
-                not finite_number(raw)
-            ):
+            if field in data and raw is not None and (not finite_number(raw)):
                 data.pop(field)
                 malformed = True
         if "awaiting_generation" in data and not isinstance(data["awaiting_generation"], bool):
             data.pop("awaiting_generation")
             malformed = True
-        if "recovery_cursor" in data and data["recovery_cursor"] is not None and not valid_id(
-            data["recovery_cursor"]
+        if (
+            "recovery_cursor" in data
+            and data["recovery_cursor"] is not None
+            and not valid_id(data["recovery_cursor"])
         ):
             data.pop("recovery_cursor")
             malformed = True

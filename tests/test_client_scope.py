@@ -89,7 +89,9 @@ def test_other_devices_name_comes_from_the_catalog() -> None:
     coordinator = _coordinator(CLIENT_SCOPE_LOCAL_DNS, {})
     coordinator._update_client(_query("192.0.2.20"), 1, count_as_new=True)
     entry = SimpleNamespace(
-        entry_id="entry", unique_id="unique", data={"source_id": "source", "source_generation": "first"}
+        entry_id="entry",
+        unique_id="unique",
+        data={"source_id": "source", "source_generation": "first"},
     )
 
     info = client_device_info(coordinator, entry, OTHER_CLIENTS_KEY)

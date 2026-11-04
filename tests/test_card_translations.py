@@ -11,7 +11,9 @@ CARD = (COMPONENT / "frontend" / "phe-activity-card.js").read_text(encoding="utf
 
 
 def _catalog(language: str) -> dict[str, str]:
-    catalog = json.loads((COMPONENT / "translations" / f"{language}.json").read_text(encoding="utf-8"))
+    catalog = json.loads(
+        (COMPONENT / "translations" / f"{language}.json").read_text(encoding="utf-8")
+    )
     return catalog["selector"]["card"]["options"]
 
 

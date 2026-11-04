@@ -48,6 +48,7 @@ from .validation import valid_class_counts, valid_query_time_buckets
 
 _LOGGER = logging.getLogger(__name__)
 
+
 @dataclass
 class _Checkpoint:
     """Coordinator state captured before a poll, used to roll back a failed commit."""
@@ -119,11 +120,7 @@ def _add_query_time_bucket(summary: dict[str, Any], query_time: float, observed_
     if not isinstance(buckets, list):
         buckets = []
     bucket = next(
-        (
-            item
-            for item in buckets
-            if isinstance(item, dict) and item.get("second") == second
-        ),
+        (item for item in buckets if isinstance(item, dict) and item.get("second") == second),
         None,
     )
     if bucket is None:
@@ -138,8 +135,6 @@ def _add_query_time_bucket(summary: dict[str, Any], query_time: float, observed_
         and isinstance(item.get("second"), int)
         and item["second"] >= cutoff
     ][-61:]
-
-
 
 
 def _blocked(status: Any) -> bool:
@@ -188,8 +183,6 @@ def _query_description(query: dict[str, Any]) -> tuple[str, str]:
 def _normalize_client_name(value: Any) -> str:
     """Normalize a fallback client name without changing its display label."""
     return " ".join(str(value or "").casefold().split())
-
-
 
 
 def _client_key(query: dict[str, Any]) -> tuple[str, str, str]:
@@ -280,23 +273,27 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     or len(key) > 255
                     or not isinstance(item, dict)
                     or not {"client_name", "client_ip", "counts", "buckets"}.issubset(item)
-                    or set(item) - {
-                        "client_name", "client_ip", "counts", "buckets", "query_time_buckets"
-                    }
+                    or set(item)
+                    - {"client_name", "client_ip", "counts", "buckets", "query_time_buckets"}
                     or not valid_query_time_buckets(item.get("query_time_buckets", []))
                 ):
                     self._store_state_invalid = True
                     break
                 counts = item.get("counts")
-                if not isinstance(counts, dict) or set(counts) != {
-                    "allowed",
-                    "blocked",
-                    "provisional",
-                } or any(
-                    isinstance(counts.get(name), bool)
-                    or not isinstance(counts.get(name), int)
-                    or counts[name] < 0
-                    for name in ("allowed", "blocked", "provisional")
+                if (
+                    not isinstance(counts, dict)
+                    or set(counts)
+                    != {
+                        "allowed",
+                        "blocked",
+                        "provisional",
+                    }
+                    or any(
+                        isinstance(counts.get(name), bool)
+                        or not isinstance(counts.get(name), int)
+                        or counts[name] < 0
+                        for name in ("allowed", "blocked", "provisional")
+                    )
                 ):
                     self._store_state_invalid = True
                     break
@@ -365,8 +362,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             _LOGGER.warning("Ignored an invalid local Pi-hole cursor")
         coverage = saved.get("coverage")
         if "coverage" in saved and (
-            not isinstance(coverage, str)
-            or coverage not in {"unknown", "complete", "partial"}
+            not isinstance(coverage, str) or coverage not in {"unknown", "complete", "partial"}
         ):
             self._store_state_invalid = True
             self.coverage = "unknown"
@@ -380,8 +376,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 self.coverage_reason = CoverageReason.INVALID_STORE_STATE
             else:
                 self.coverage_reason = saved_reason
-        elif "coverage_reason" in saved and saved.get("coverage_reason") is not None and not isinstance(
-            saved.get("coverage_reason"), str
+        elif (
+            "coverage_reason" in saved
+            and saved.get("coverage_reason") is not None
+            and not isinstance(saved.get("coverage_reason"), str)
         ):
             self._store_state_invalid = True
             self.coverage = "unknown"
@@ -394,9 +392,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.awaiting_generation = awaiting_generation is True
         raw_recovery_cursor = saved.get("recovery_cursor")
         self.recovery_cursor = (
-            None
-            if raw_recovery_cursor is None
-            else _query_id({"id": raw_recovery_cursor})
+            None if raw_recovery_cursor is None else _query_id({"id": raw_recovery_cursor})
         )
         if (
             "recovery_cursor" in saved
@@ -414,7 +410,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             or self.recovery_cursor >= self.aggregate_pending_cursor
         ):
             self._store_state_invalid = True
-        if self.aggregate_pending and getattr(self, "retention_mode", RETENTION_DETAIL) != RETENTION_AGGREGATE:
+        if (
+            self.aggregate_pending
+            and getattr(self, "retention_mode", RETENTION_DETAIL) != RETENTION_AGGREGATE
+        ):
             # The confirmed cursor never advanced for these deltas. Re-read them
             # under the newly selected detailed policy instead of applying a
             # hidden aggregate checkpoint to the Activity path.
@@ -591,7 +590,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         if getattr(self, "client_scope", DEFAULT_CLIENT_SCOPE) != CLIENT_SCOPE_LOCAL_DNS:
             return
         now = time.monotonic()
-        if self.local_hosts is not None and now - self._local_hosts_read_at < LOCAL_HOSTS_REFRESH_SECONDS:
+        if (
+            self.local_hosts is not None
+            and now - self._local_hosts_read_at < LOCAL_HOSTS_REFRESH_SECONDS
+        ):
             return
         try:
             self.local_hosts = await self.client.async_get_local_hosts()
@@ -628,9 +630,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             await self._async_refresh_local_hosts()
             if getattr(self, "retention_mode", RETENTION_DETAIL) == RETENTION_AGGREGATE:
                 return await self._async_update_aggregate_data(checkpoint=checkpoint)
-            pages: list[dict[str, Any]] = [
-                await self._async_get_queries(length=QUERY_BATCH_SIZE)
-            ]
+            pages: list[dict[str, Any]] = [await self._async_get_queries(length=QUERY_BATCH_SIZE)]
             if getattr(self, "_client_store_invalid", False) or getattr(
                 self, "_store_state_invalid", False
             ):
@@ -640,9 +640,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     if getattr(self, "_store_state_invalid", False)
                     else CoverageReason.INVALID_CLIENT_SUMMARIES
                 )
-                raise UpdateFailed(
-                    "Cannot update the counters because the local data is not valid"
-                )
+                raise UpdateFailed("Cannot update the counters because the local data is not valid")
             if self.awaiting_generation:
                 # Keep checking API health, but attach a new source generation
                 # before these IDs can enter cumulative series.
@@ -652,8 +650,11 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 # Seed client entities from the current page, without logging or
                 # counting old queries as newly observed.
                 rows = pages[0].get("queries", [])
-                ids = [(query_id, row) for row in rows if isinstance(row, dict)
-                       and (query_id := _query_id(row)) is not None]
+                ids = [
+                    (query_id, row)
+                    for row in rows
+                    if isinstance(row, dict) and (query_id := _query_id(row)) is not None
+                ]
                 self._seed_clients(rows)
                 if not ids:
                     self.coverage = "unknown"
@@ -673,12 +674,16 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 self.coverage = (
                     "unknown"
                     if invalid_saved_state
-                    else "complete" if ids and len(ids) == len(rows) else "unknown"
+                    else "complete"
+                    if ids and len(ids) == len(rows)
+                    else "unknown"
                 )
                 self.coverage_reason = (
                     None
                     if self.coverage == "complete"
-                    else self.coverage_reason if invalid_saved_state else CoverageReason.BASELINE_UNVERIFIED
+                    else self.coverage_reason
+                    if invalid_saved_state
+                    else CoverageReason.BASELINE_UNVERIFIED
                 )
                 newest = max(ids, default=(None, None), key=lambda item: item[0])[1]
                 self.last_query_time = _timestamp_number(newest.get("time")) if newest else None
@@ -695,11 +700,15 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     length=QUERY_BATCH_SIZE, cursor=self.recovery_cursor
                 )
                 probe_rows = probe.get("queries", [])
-                probe_ids = [
-                    query_id
-                    for row in probe_rows
-                    if isinstance(row, dict) and (query_id := _query_id(row)) is not None
-                ] if isinstance(probe_rows, list) else []
+                probe_ids = (
+                    [
+                        query_id
+                        for row in probe_rows
+                        if isinstance(row, dict) and (query_id := _query_id(row)) is not None
+                    ]
+                    if isinstance(probe_rows, list)
+                    else []
+                )
                 if not probe_ids or min(probe_ids) > starting_cursor:
                     if probe_ids:
                         next_recovery_cursor = min(probe_ids) - 1
@@ -763,9 +772,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if isinstance(row, dict)
             ]
             identified = [
-                (query_id, row)
-                for row in rows
-                if (query_id := _query_id(row)) is not None
+                (query_id, row) for row in rows if (query_id := _query_id(row)) is not None
             ]
             # Pages may overlap at their inclusive cursor boundary. Keep the
             # first response for each ID so counters, Activity, and rates agree.
@@ -788,9 +795,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             if self.cursor is not None and newest_id < self.cursor:
                 # Attach a new source generation before ingestion can
                 # resume; otherwise cumulative series would combine databases.
-                _LOGGER.warning(
-                    "The Pi-hole query ID was reset; starting a new cursor"
-                )
+                _LOGGER.warning("The Pi-hole query ID was reset; starting a new cursor")
                 self.cursor = newest_id
                 self.coverage = "unknown"
                 self.coverage_reason = CoverageReason.QUERY_ID_RESET
@@ -832,7 +837,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 reached_cursor
                 and self.coverage != "partial"
                 and self.coverage_reason
-                not in {CoverageReason.INVALID_CLIENT_SUMMARIES, CoverageReason.MISSING_CLIENT_SUMMARIES}
+                not in {
+                    CoverageReason.INVALID_CLIENT_SUMMARIES,
+                    CoverageReason.MISSING_CLIENT_SUMMARIES,
+                }
             ):
                 # A prior unknown cursor becomes a baseline only once
                 # this API walk demonstrably reaches it.
@@ -852,11 +860,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 return self._data_snapshot()
 
             new_rows = sorted(
-                (
-                    (query_id, row)
-                    for query_id, row in identified
-                    if query_id > (self.cursor or 0)
-                ),
+                ((query_id, row) for query_id, row in identified if query_id > (self.cursor or 0)),
                 key=lambda pair: pair[0],
             )
             try:
@@ -993,7 +997,11 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self, "_store_state_invalid", False
         ):
             self.coverage = "unknown"
-            self.coverage_reason = CoverageReason.INVALID_STORE_STATE if self._store_state_invalid else CoverageReason.INVALID_CLIENT_SUMMARIES
+            self.coverage_reason = (
+                CoverageReason.INVALID_STORE_STATE
+                if self._store_state_invalid
+                else CoverageReason.INVALID_CLIENT_SUMMARIES
+            )
             raise UpdateFailed("Cannot update the counters because the local data is not valid")
 
         latest = await self._async_get_queries(length=1)
@@ -1082,9 +1090,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         while processed < QUERY_BATCH_SIZE:
             if response is None:
                 try:
-                    response = await self._async_get_queries(
-                        length=1, cursor=request_cursor
-                    )
+                    response = await self._async_get_queries(length=1, cursor=request_cursor)
                 except (PiHoleAuthenticationError, PiHoleConnectionError):
                     self.recovery_cursor = request_cursor
                     self.coverage = "unknown"
@@ -1134,11 +1140,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 _add_query_time_bucket(item, query_time, observed_at)
             observed_second = int(observed_at)
             bucket = next(
-                (
-                    value
-                    for value in item["buckets"]
-                    if value["second"] == observed_second
-                ),
+                (value for value in item["buckets"] if value["second"] == observed_second),
                 None,
             )
             if bucket is None:
@@ -1149,9 +1151,9 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 item["buckets"].append(bucket)
             bucket[classification] += 1
             cutoff = observed_second - 60
-            item["buckets"] = [
-                value for value in item["buckets"] if value["second"] >= cutoff
-            ][-61:]
+            item["buckets"] = [value for value in item["buckets"] if value["second"] >= cutoff][
+                -61:
+            ]
             if pending_cursor is None or query_id > pending_cursor:
                 # Cursor order, rather than response iteration order, selects
                 # the timestamp associated with the confirmed high-water ID.
@@ -1280,9 +1282,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         else:
             if getattr(self, "_query_time_window_started_at", None) is None:
                 self._query_time_window_started_at = sampled_at
-            self.query_time_window_ready = (
-                sampled_at - self._query_time_window_started_at > 60
-            )
+            self.query_time_window_ready = sampled_at - self._query_time_window_started_at > 60
         self._update_bucket_minute_counts(sampled_at)
 
     def _update_bucket_minute_counts(self, sampled_at: float) -> None:
@@ -1338,9 +1338,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 and bucket["count"] >= 0
             ][-61:]
             summary["query_time_buckets"] = source_buckets
-            summary["queries_last_minute"] = sum(
-                bucket["count"] for bucket in source_buckets
-            )
+            summary["queries_last_minute"] = sum(bucket["count"] for bucket in source_buckets)
             summary["class_rates"] = rates
 
     def _should_log_query(self, query: dict[str, Any]) -> bool:
@@ -1398,11 +1396,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             second = int(observed_at)
             buckets = summary.setdefault("activity_buckets", [])
             bucket = next(
-                (
-                    item
-                    for item in buckets
-                    if item.get("second") == second
-                ),
+                (item for item in buckets if item.get("second") == second),
                 None,
             )
             if bucket is None:
@@ -1449,7 +1443,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     "clients": self.client_data,
                     **(
                         {
-                        "aggregate_pending": aggregate_pending,
+                            "aggregate_pending": aggregate_pending,
                             "aggregate_pending_cursor": self.aggregate_pending_cursor,
                             "aggregate_pending_time": self.aggregate_pending_time,
                         }

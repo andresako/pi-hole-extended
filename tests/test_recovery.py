@@ -38,7 +38,9 @@ class _Services:
         self.fail_at = fail_at
         self.cancel_at = cancel_at
 
-    async def async_call(self, _domain: str, _service: str, data: dict[str, Any], **_kwargs: Any) -> None:
+    async def async_call(
+        self, _domain: str, _service: str, data: dict[str, Any], **_kwargs: Any
+    ) -> None:
         self.calls.append(data)
         if len(self.calls) == self.cancel_at:
             raise asyncio.CancelledError
@@ -59,7 +61,9 @@ class _Api:
         return deepcopy(response)
 
 
-def _row(query_id: int, *, time: float = 1_735_689_600, status: str = "FORWARDED") -> dict[str, Any]:
+def _row(
+    query_id: int, *, time: float = 1_735_689_600, status: str = "FORWARDED"
+) -> dict[str, Any]:
     return {
         "id": query_id,
         "time": time,

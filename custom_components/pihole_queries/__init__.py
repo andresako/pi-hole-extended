@@ -45,14 +45,6 @@ from .websocket import async_register as websocket_api_register
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
-
-
-
-
-
-
-
-
 def _valid_uuid(value: Any) -> str | None:
     """Return a canonical UUID string, if the stored value is valid."""
     if not isinstance(value, str):
@@ -61,8 +53,6 @@ def _valid_uuid(value: Any) -> str | None:
         return str(UUID(value))
     except ValueError:
         return None
-
-
 
 
 def _identity_storage_key(source_id: str, generation: str) -> str:
@@ -87,7 +77,9 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
         [
             StaticPathConfig(CARD_URL_BASE, str(Path(__file__).parent / "frontend"), False),
             # The card reads its strings from the integration's own catalogs.
-            StaticPathConfig(TRANSLATIONS_URL_BASE, str(Path(__file__).parent / "translations"), False),
+            StaticPathConfig(
+                TRANSLATIONS_URL_BASE, str(Path(__file__).parent / "translations"), False
+            ),
         ]
     )
     url = f"{CARD_URL_BASE}/{CARD_FILENAME}"
@@ -97,8 +89,6 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
 def _canonical_entity_id(entry: ConfigEntry, entity: er.RegistryEntry) -> str | None:
     """Build the stable recorder-friendly ID for a Pi-hole client metric."""
     return canonical_entity_id(entry, entity.domain, entity.unique_id)
-
-
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -118,7 +108,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         Store(
             hass,
             STORAGE_VERSION,
-    TRANSLATIONS_URL_BASE,
+            TRANSLATIONS_URL_BASE,
             _identity_storage_key(source_id, generation),
         ),
         source_id,

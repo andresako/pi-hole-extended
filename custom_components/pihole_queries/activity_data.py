@@ -32,20 +32,14 @@ BASE_SECONDS = {"5minute": 300, "hour": 3600}
 def is_queries_sensor(hass: HomeAssistant, entity_id: str) -> bool:
     """Return whether the entity is a per-client DNS queries counter of this integration."""
     entry = er.async_get(hass).async_get(entity_id)
-    return (
-        entry is not None
-        and entry.platform == DOMAIN
-        and entry.translation_key == "queries"
-    )
+    return entry is not None and entry.platform == DOMAIN and entry.translation_key == "queries"
 
 
 def params_for_entity(hass: HomeAssistant, entity_id: str) -> DetectionParams:
     """Use the sensitivity chosen in the owning config entry's options."""
     registry_entry = er.async_get(hass).async_get(entity_id)
     config_entry_id = getattr(registry_entry, "config_entry_id", None)
-    config_entry = (
-        hass.config_entries.async_get_entry(config_entry_id) if config_entry_id else None
-    )
+    config_entry = hass.config_entries.async_get_entry(config_entry_id) if config_entry_id else None
     level = (
         config_entry.options.get(CONF_UNUSUAL_ACTIVITY, DEFAULT_UNUSUAL_ACTIVITY)
         if config_entry is not None
@@ -62,9 +56,7 @@ def _fetch(
     period: str,
 ) -> dict[str, list[dict[str, Any]]]:
     """Read recorder statistics; runs in the recorder executor."""
-    return statistics_during_period(
-        hass, start, end, entity_ids, period, None, {"change"}
-    )
+    return statistics_during_period(hass, start, end, entity_ids, period, None, {"change"})
 
 
 async def async_client_series(

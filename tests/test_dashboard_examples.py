@@ -12,7 +12,17 @@ DASHBOARD_PATH = ROOT / "examples/dashboards/pihole-extended.yaml"
 AUTOMATION_PATH = ROOT / "examples/automations/unusual-activity-alert.yaml"
 GUIDE_PATH = ROOT / "docs/dashboard-examples.md"
 READMES = [ROOT / "README.md", ROOT / "README.es.md"]
-CARD_KEYS = {"type", "title", "entities", "bucket", "span", "chart_type", "log_scale", "show_overview", "names"}
+CARD_KEYS = {
+    "type",
+    "title",
+    "entities",
+    "bucket",
+    "span",
+    "chart_type",
+    "log_scale",
+    "show_overview",
+    "names",
+}
 ENTITY_ID = re.compile(
     r"(sensor|binary_sensor)\.(phe_192_0_2_\d+_(dns_queries|queries_last_minute|unusual_activity)"
     r"|pi_hole_192_0_2_2_diagnostics_[a-z_]+)"
@@ -69,15 +79,21 @@ def test_dashboard_views_and_card_options_are_valid() -> None:
 
 
 def test_examples_only_use_documentation_addresses_and_known_entities() -> None:
-    text = (DASHBOARD_PATH.read_text(encoding="utf-8") + AUTOMATION_PATH.read_text(encoding="utf-8")).lower()
+    text = (
+        DASHBOARD_PATH.read_text(encoding="utf-8") + AUTOMATION_PATH.read_text(encoding="utf-8")
+    ).lower()
     assert not re.search(r"\b(?:10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)", text)
-    ids = _entity_ids(_dashboard()) | _entity_ids(yaml.safe_load(AUTOMATION_PATH.read_text(encoding="utf-8")))
+    ids = _entity_ids(_dashboard()) | _entity_ids(
+        yaml.safe_load(AUTOMATION_PATH.read_text(encoding="utf-8"))
+    )
     assert ids
     assert all(ENTITY_ID.fullmatch(entity_id) for entity_id in ids), ids
 
 
 def test_automation_only_reads_attributes_the_sensor_exposes() -> None:
-    sensor_source = (ROOT / "custom_components/pihole_queries/binary_sensor.py").read_text(encoding="utf-8")
+    sensor_source = (ROOT / "custom_components/pihole_queries/binary_sensor.py").read_text(
+        encoding="utf-8"
+    )
     automation = AUTOMATION_PATH.read_text(encoding="utf-8")
     used = set(re.findall(r"attributes\.([a-z_]+)", automation))
     assert used
@@ -91,7 +107,11 @@ def test_readme_card_examples_use_supported_options() -> None:
     for readme in READMES:
         blocks = re.findall(r"```yaml\n(.*?)```", readme.read_text(encoding="utf-8"), re.S)
         cards = [yaml.safe_load(block) for block in blocks]
-        cards = [card for card in cards if isinstance(card, dict) and card.get("type") == "custom:phe-activity-card"]
+        cards = [
+            card
+            for card in cards
+            if isinstance(card, dict) and card.get("type") == "custom:phe-activity-card"
+        ]
         assert cards, readme
         for card in cards:
             _validate_card(card)

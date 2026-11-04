@@ -173,8 +173,7 @@ def _endpoint_is_configured(
 ) -> bool:
     """Check actual stored endpoints, independent of potentially historical unique IDs."""
     return any(
-        entry.entry_id != exclude_entry_id
-        and _entry_endpoint_unique_id(entry.data) == endpoint
+        entry.entry_id != exclude_entry_id and _entry_endpoint_unique_id(entry.data) == endpoint
         for entry in hass.config_entries.async_entries(DOMAIN)
     )
 
@@ -264,9 +263,7 @@ class PiHoleQueriesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 endpoint = endpoint_unique_id(
                     host, user_input[CONF_PORT], user_input[CONF_USE_HTTPS]
                 )
-                if _endpoint_is_configured(
-                    self.hass, endpoint, exclude_entry_id=entry.entry_id
-                ):
+                if _endpoint_is_configured(self.hass, endpoint, exclude_entry_id=entry.entry_id):
                     errors["base"] = "already_configured"
                 else:
                     password = user_input.get(CONF_PASSWORD)
@@ -357,7 +354,9 @@ class PiHoleQueriesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     @staticmethod
-    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> PiHoleQueriesOptionsFlow:
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> PiHoleQueriesOptionsFlow:
         """Return interval options flow."""
         return PiHoleQueriesOptionsFlow()
 

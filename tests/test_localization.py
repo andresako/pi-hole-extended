@@ -59,7 +59,11 @@ def test_all_client_and_diagnostic_sensor_names_have_both_translations() -> None
 
 
 def test_translation_changes_do_not_change_client_unique_ids() -> None:
-    entry = SimpleNamespace(unique_id="stable-entry", entry_id="entry-id", data={"source_id": "source", "source_generation": "first"})
+    entry = SimpleNamespace(
+        unique_id="stable-entry",
+        entry_id="entry-id",
+        data={"source_id": "source", "source_generation": "first"},
+    )
     expected = {
         "queries": "source_first_192.0.2.10",
         "queries_last_minute": "source_first_192.0.2.10_queries_last_minute",
@@ -69,13 +73,18 @@ def test_translation_changes_do_not_change_client_unique_ids() -> None:
     }
 
     for description in SENSOR_DESCRIPTIONS:
-        assert _client_entity_unique_id(entry, "192.0.2.10", description.key) == expected[
-            description.key
-        ]
+        assert (
+            _client_entity_unique_id(entry, "192.0.2.10", description.key)
+            == expected[description.key]
+        )
 
 
 def test_unknown_client_device_fallback_uses_home_assistant_language() -> None:
-    entry = SimpleNamespace(unique_id="stable-entry", entry_id="entry-id", data={"source_id": "source", "source_generation": "first"})
+    entry = SimpleNamespace(
+        unique_id="stable-entry",
+        entry_id="entry-id",
+        data={"source_id": "source", "source_generation": "first"},
+    )
     description = SENSOR_DESCRIPTIONS[0]
     actual_ids = set()
 
@@ -94,7 +103,10 @@ def test_unknown_client_device_fallback_uses_home_assistant_language() -> None:
 
 def test_entity_ids_are_english_and_ignore_the_language() -> None:
     entry = SimpleNamespace(
-        unique_id="stable-entry", entry_id="entry-id", title="Pi-hole 192.0.2.2", data={"source_id": "source", "source_generation": "first"}
+        unique_id="stable-entry",
+        entry_id="entry-id",
+        title="Pi-hole 192.0.2.2",
+        data={"source_id": "source", "source_generation": "first"},
     )
 
     assert {
@@ -115,8 +127,10 @@ def test_entity_ids_are_english_and_ignore_the_language() -> None:
         "sensor.phe_192_0_2_10_provisional",
         "binary_sensor.phe_192_0_2_10_unusual_activity",
     }
-    assert {description.key: diagnostic_entity_id(entry, description.key)
-            for description in DIAGNOSTIC_DESCRIPTIONS} == {
+    assert {
+        description.key: diagnostic_entity_id(entry, description.key)
+        for description in DIAGNOSTIC_DESCRIPTIONS
+    } == {
         "communication_status": "sensor.pi_hole_192_0_2_2_diagnostics_communication_status",
         "last_successful_read": "sensor.pi_hole_192_0_2_2_diagnostics_last_successful_read",
         "last_query_observed": "sensor.pi_hole_192_0_2_2_diagnostics_last_query_observed",

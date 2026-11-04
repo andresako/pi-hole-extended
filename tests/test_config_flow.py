@@ -68,7 +68,9 @@ def test_host_rejects_urls_paths_ports_and_invalid_addresses(value: str) -> None
 
 def test_endpoint_key_brackets_ipv6_and_keeps_explicit_port() -> None:
     assert endpoint_unique_id("2001:db8::10", 8443, True) == "https://[2001:db8::10]:8443"
-    assert endpoint_unique_id("PiHole.Example.Test", 8080, False) == "http://pihole.example.test:8080"
+    assert (
+        endpoint_unique_id("PiHole.Example.Test", 8080, False) == "http://pihole.example.test:8080"
+    )
 
 
 @pytest.mark.asyncio
@@ -115,7 +117,9 @@ def test_reconfigure_schema_requires_an_explicit_server_identity_action() -> Non
     }
     assert schema(valid)[CONF_PORT] == 8443
     with pytest.raises(vol.Invalid):
-        schema({key: value for key, value in valid.items() if key != CONF_RECONFIGURE_SOURCE_ACTION})
+        schema(
+            {key: value for key, value in valid.items() if key != CONF_RECONFIGURE_SOURCE_ACTION}
+        )
 
 
 def test_config_translation_files_have_matching_keys() -> None:
@@ -351,7 +355,9 @@ async def test_concurrent_user_flows_cannot_add_released_endpoint_twice(monkeypa
 
     assert len(created) == 1
     assert sum(result["type"] == "create_entry" for result in results) == 1
-    assert sum(result.get("errors", {}).get("base") == "already_configured" for result in results) == 1
+    assert (
+        sum(result.get("errors", {}).get("base") == "already_configured" for result in results) == 1
+    )
 
 
 @pytest.mark.asyncio
@@ -566,7 +572,9 @@ async def test_concurrent_reconfigure_flows_cannot_claim_same_endpoint(monkeypat
 
     assert len(updates) == 1
     assert sum(result["type"] == "abort" for result in results) == 1
-    assert sum(result.get("errors", {}).get("base") == "already_configured" for result in results) == 1
+    assert (
+        sum(result.get("errors", {}).get("base") == "already_configured" for result in results) == 1
+    )
 
 
 @pytest.mark.asyncio

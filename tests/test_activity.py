@@ -21,10 +21,7 @@ START = 1_735_689_600  # 2025-01-01T00:00:00Z
 
 def _rows(rates: list[float], base: int = 300, start: int = START):
     """Build recorder rows from queries/min values."""
-    return [
-        {"start": start + i * base, "change": rate * base / 60}
-        for i, rate in enumerate(rates)
-    ]
+    return [{"start": start + i * base, "change": rate * base / 60} for i, rate in enumerate(rates)]
 
 
 def _series(rates: list[float], bucket: int = 300):

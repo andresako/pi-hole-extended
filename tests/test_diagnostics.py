@@ -46,7 +46,9 @@ def _coordinator(
 
 
 def _entry() -> SimpleNamespace:
-    return SimpleNamespace(entry_id="synthetic-entry", title="Pi-hole test", async_on_unload=lambda _unload: None)
+    return SimpleNamespace(
+        entry_id="synthetic-entry", title="Pi-hole test", async_on_unload=lambda _unload: None
+    )
 
 
 def _sensor(coordinator: SimpleNamespace, key: str) -> PiHoleDiagnosticSensor:
@@ -79,11 +81,15 @@ def test_communication_states_cover_bootstrap_failure_and_recovery(monkeypatch) 
     sensor = _sensor(coordinator, "communication_status")
     assert sensor.native_value == "unknown"
 
-    coordinator.last_api_attempt_successful = False  # Includes rejected credentials/API auth failure.
+    coordinator.last_api_attempt_successful = (
+        False  # Includes rejected credentials/API auth failure.
+    )
     assert sensor.native_value == "error"
     coordinator.last_successful_read = now
     coordinator.last_api_attempt_successful = True
-    coordinator.last_update_success = False  # A later Activity or Store failure is not an API error.
+    coordinator.last_update_success = (
+        False  # A later Activity or Store failure is not an API error.
+    )
     assert sensor.native_value == "connected"
 
 
@@ -150,7 +156,11 @@ async def test_setup_adds_a_fixed_small_diagnostic_set() -> None:
 
     await async_setup_entry(hass, _entry(), added.extend)
 
-    diagnostics = [entity for entity in added if entity.entity_description.entity_category == EntityCategory.DIAGNOSTIC]
+    diagnostics = [
+        entity
+        for entity in added
+        if entity.entity_description.entity_category == EntityCategory.DIAGNOSTIC
+    ]
     assert {entity.entity_description.key for entity in diagnostics} == {
         "communication_status",
         "last_successful_read",
@@ -189,7 +199,9 @@ async def test_successful_read_timestamp_advances_only_after_success(monkeypatch
     assert coordinator.last_api_attempt_successful is True
 
     previous = coordinator.last_successful_read
-    coordinator.client.async_get_queries = AsyncMock(side_effect=RuntimeError("synthetic auth failure"))
+    coordinator.client.async_get_queries = AsyncMock(
+        side_effect=RuntimeError("synthetic auth failure")
+    )
     with pytest.raises(RuntimeError, match="synthetic auth failure"):
         await coordinator._async_get_queries(length=1000)
     assert coordinator.last_successful_read == previous

@@ -51,9 +51,7 @@ def normalize_host(value: Any) -> str:
         raise ValueError("Pi-hole host is not a valid hostname")
     labels = ascii_host.split(".")
     if any(
-        not label
-        or len(label) > 63
-        or not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", label)
+        not label or len(label) > 63 or not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", label)
         for label in labels
     ):
         raise ValueError("Pi-hole host is not a valid hostname")
@@ -116,18 +114,14 @@ class PiHoleClient:
                 if response.status == 401:
                     raise PiHoleAuthenticationError
                 if response.status >= 400:
-                    raise PiHoleConnectionError(
-                        f"/api/auth returned HTTP {response.status}"
-                    )
+                    raise PiHoleConnectionError(f"/api/auth returned HTTP {response.status}")
                 payload = await response.json(content_type=None)
         except PiHoleAuthenticationError:
             raise
         except PiHoleConnectionError:
             raise
         except aiohttp.ClientConnectorCertificateError as err:
-            raise PiHoleCertificateError(
-                "Could not verify the Pi-hole HTTPS certificate"
-            ) from err
+            raise PiHoleCertificateError("Could not verify the Pi-hole HTTPS certificate") from err
         except TimeoutError as err:
             raise PiHoleConnectionError("timed out calling /api/auth") from err
         except aiohttp.ClientError as err:

@@ -24,9 +24,7 @@ def _msg(**overrides):
 
 
 async def _run(msg, entries, stats=None):
-    recorder = SimpleNamespace(
-        async_add_executor_job=AsyncMock(return_value=stats or {})
-    )
+    recorder = SimpleNamespace(async_add_executor_job=AsyncMock(return_value=stats or {}))
     with (
         patch.object(data.er, "async_get", return_value=_registry(entries)),
         patch.object(data, "get_instance", return_value=recorder),

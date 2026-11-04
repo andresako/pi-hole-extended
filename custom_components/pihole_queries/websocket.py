@@ -52,9 +52,7 @@ async def async_client_activity(hass: HomeAssistant, msg: dict[str, Any]) -> dic
 @websocket_api.websocket_command(
     {
         vol.Required("type"): WS_CLIENT_ACTIVITY,
-        vol.Required("entity_ids"): vol.All(
-            [cv.entity_id], vol.Length(min=1, max=MAX_ENTITIES)
-        ),
+        vol.Required("entity_ids"): vol.All([cv.entity_id], vol.Length(min=1, max=MAX_ENTITIES)),
         vol.Required("bucket"): vol.In(list(BUCKET_SECONDS)),
         vol.Required("span"): vol.In(list(SPAN_SECONDS)),
     }

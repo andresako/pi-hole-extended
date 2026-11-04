@@ -82,9 +82,7 @@ class UnusualActivityMonitor:
             async_call_later(self._hass, FIRST_EVALUATION_DELAY, self._async_evaluate)
         )
         self._entry.async_on_unload(
-            async_track_time_interval(
-                self._hass, self._async_evaluate, EVALUATION_INTERVAL
-            )
+            async_track_time_interval(self._hass, self._async_evaluate, EVALUATION_INTERVAL)
         )
 
     def _counter_entity_ids(self) -> dict[str, str]:

@@ -58,7 +58,9 @@ def canonical_entity_id(entry: ConfigEntry, domain: str, unique_id: str) -> str 
         return None
     client_key = unique_id.removeprefix(unique_prefix).removesuffix(suffix)
     generation = entry.data[CONF_SOURCE_GENERATION]
-    entity_client = client_key if generation == FIRST_SOURCE_GENERATION else f"{generation}_{client_key}"
+    entity_client = (
+        client_key if generation == FIRST_SOURCE_GENERATION else f"{generation}_{client_key}"
+    )
     return f"{domain}.phe_{slugify(entity_client)}_{metric_suffixes[suffix]}"
 
 

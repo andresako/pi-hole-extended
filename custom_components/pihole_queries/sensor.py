@@ -103,9 +103,6 @@ MAX_DEVICE_NAME_LENGTH = 100
 _CLASS_KEYS = {"allowed", "blocked", "provisional"}
 
 
-
-
-
 def client_device_info(
     coordinator: PiHoleQueryCoordinator, entry: ConfigEntry, client_key: str
 ) -> DeviceInfo:
@@ -114,9 +111,13 @@ def client_device_info(
     identifiers = {_client_device_identifier(entry, client_key)}
     client_name = str(data.get("client_name") or UNKNOWN_CLIENT_NAME)[:MAX_DEVICE_NAME_LENGTH]
     if client_key == OTHER_CLIENTS_KEY:
-        return DeviceInfo(identifiers=identifiers, translation_key="other_devices", manufacturer="Pi-hole")
+        return DeviceInfo(
+            identifiers=identifiers, translation_key="other_devices", manufacturer="Pi-hole"
+        )
     if client_name == UNKNOWN_CLIENT_NAME:
-        return DeviceInfo(identifiers=identifiers, translation_key="unknown_client", manufacturer="Pi-hole")
+        return DeviceInfo(
+            identifiers=identifiers, translation_key="unknown_client", manufacturer="Pi-hole"
+        )
     client_ip = str(data.get("client_ip") or "")
     name = (
         f"{client_name} ({client_ip})"
@@ -158,9 +159,7 @@ async def async_setup_entry(
         for description in DIAGNOSTIC_DESCRIPTIONS
     )
     entry.async_on_unload(coordinator.async_add_listener(add_new_clients))
-    entry.async_on_unload(
-        coordinator.async_add_client_removed_listener(added_clients.discard)
-    )
+    entry.async_on_unload(coordinator.async_add_client_removed_listener(added_clients.discard))
 
 
 class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity):
@@ -244,9 +243,7 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
             return {
                 "window_seconds": 60,
                 "timestamp_source": "Pi-hole query.time, with HA observation fallback",
-                "last_successful_read": getattr(
-                    self.coordinator, "last_successful_read", None
-                ),
+                "last_successful_read": getattr(self.coordinator, "last_successful_read", None),
             }
         if self.entity_description.key != "queries":
             return None

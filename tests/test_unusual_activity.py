@@ -121,7 +121,9 @@ async def test_monitor_without_registered_counters_does_nothing() -> None:
 
 
 def _sensor(results):
-    coordinator = SimpleNamespace(client_data={"192.0.2.10": {"client_name": "tv.home", "client_ip": "192.0.2.10"}})
+    coordinator = SimpleNamespace(
+        client_data={"192.0.2.10": {"client_name": "tv.home", "client_ip": "192.0.2.10"}}
+    )
     monitor = SimpleNamespace(results=results, evaluated_at=datetime(2026, 1, 1, tzinfo=UTC))
     return PiHoleUnusualActivitySensor(coordinator, monitor, ENTRY, "192.0.2.10")
 
@@ -151,18 +153,20 @@ def test_sensor_requests_its_phe_entity_id_up_front() -> None:
 
 
 def test_sensor_id_is_normalised_under_phe() -> None:
-    entity = SimpleNamespace(domain="binary_sensor", unique_id="source_first_192.0.2.10_unusual_activity")
-    assert (
-        _canonical_entity_id(ENTRY, entity)
-        == "binary_sensor.phe_192_0_2_10_unusual_activity"
+    entity = SimpleNamespace(
+        domain="binary_sensor", unique_id="source_first_192.0.2.10_unusual_activity"
     )
+    assert _canonical_entity_id(ENTRY, entity) == "binary_sensor.phe_192_0_2_10_unusual_activity"
 
 
 def test_options_default_to_medium_and_validate_levels() -> None:
     schema = _schema(include_connection=False, include_retention=True)
     assert schema({"scan_interval": 15})[CONF_UNUSUAL_ACTIVITY] == "medium"
     for level in ("off", "low", "medium", "high"):
-        assert schema({"scan_interval": 15, CONF_UNUSUAL_ACTIVITY: level})[CONF_UNUSUAL_ACTIVITY] == level
+        assert (
+            schema({"scan_interval": 15, CONF_UNUSUAL_ACTIVITY: level})[CONF_UNUSUAL_ACTIVITY]
+            == level
+        )
     with pytest.raises(vol.Invalid):
         schema({"scan_interval": 15, CONF_UNUSUAL_ACTIVITY: "extreme"})
 
@@ -183,8 +187,8 @@ async def test_platform_creates_one_sensor_per_client_unless_off() -> None:
     def run(options):
         coordinator = SimpleNamespace(
             client_data={"192.0.2.10": {}, "192.0.2.11": {}},
-            async_add_listener=lambda listener: (lambda: None),
-            async_add_client_removed_listener=lambda listener: (lambda: None),
+            async_add_listener=lambda listener: lambda: None,
+            async_add_client_removed_listener=lambda listener: lambda: None,
         )
         hass = SimpleNamespace(data={DOMAIN: {"entry-1": {"coordinator": coordinator}}})
         entry = SimpleNamespace(**{**ENTRY.__dict__, "options": options})
