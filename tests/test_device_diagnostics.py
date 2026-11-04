@@ -14,7 +14,7 @@ from custom_components.pihole_queries.const import (
     CONF_SOURCE_GENERATION,
     CONF_SOURCE_ID,
     DOMAIN,
-    LEGACY_SOURCE_GENERATION,
+    FIRST_SOURCE_GENERATION,
     CoverageReason,
 )
 from custom_components.pihole_queries.coordinator import PiHoleQueryCoordinator
@@ -33,7 +33,7 @@ def _entry() -> SimpleNamespace:
             CONF_HOST: "192.0.2.2",
             CONF_PASSWORD: "synthetic-test-password",
             CONF_SOURCE_ID: SOURCE_ID,
-            CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION,
+            CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION,
         },
         options={"scan_interval": 15},
     )
@@ -60,7 +60,6 @@ def _coordinator() -> SimpleNamespace:
                 "client_ip": "192.0.2.10",
                 "query_count": 7,
                 "queries_last_minute": 2,
-                "classifier_version": 1,
             }
         },
     )
@@ -92,7 +91,7 @@ def _removal_coordinator(*clients: str) -> PiHoleQueryCoordinator:
 
 
 def _device(entry: SimpleNamespace, key: str) -> SimpleNamespace:
-    return SimpleNamespace(identifiers={(DOMAIN, f"{entry.entry_id}_{key}")})
+    return SimpleNamespace(identifiers={(DOMAIN, f"{SOURCE_ID}_first_{key}" if key != "diagnostics" else f"{entry.entry_id}_diagnostics")})
 
 
 async def test_known_client_device_is_removed_and_forgotten() -> None:

@@ -85,16 +85,17 @@ async def test_clients_without_a_record_share_the_other_device() -> None:
     assert "192.0.2.21" not in coordinator.client_data
 
 
-@pytest.mark.parametrize(("language", "name"), [("en", "Other devices"), ("es", "Otros dispositivos")])
-def test_other_device_name_follows_the_language(language: str, name: str) -> None:
+def test_other_devices_name_comes_from_the_catalog() -> None:
     coordinator = _coordinator(CLIENT_SCOPE_LOCAL_DNS, {})
-    coordinator.hass = SimpleNamespace(config=SimpleNamespace(language=language))
     coordinator._update_client(_query("192.0.2.20"), 1, count_as_new=True)
-    entry = SimpleNamespace(entry_id="entry", unique_id="unique", data={})
+    entry = SimpleNamespace(
+        entry_id="entry", unique_id="unique", data={"source_id": "source", "source_generation": "first"}
+    )
 
     info = client_device_info(coordinator, entry, OTHER_CLIENTS_KEY)
 
-    assert info["translation_placeholders"] == {"client_name": name}
+    assert info["translation_key"] == "other_devices"
+    assert "translation_placeholders" not in info
 
 
 async def test_hosts_are_read_once_per_refresh_period() -> None:

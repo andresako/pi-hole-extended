@@ -106,13 +106,13 @@
       "queries_last_minute": {
         "name": "Queries (last minute)"
       },
-      "allowed_v1": {
+      "allowed": {
         "name": "Allowed queries"
       },
-      "blocked_v1": {
+      "blocked": {
         "name": "Blocked queries"
       },
-      "provisional_v1": {
+      "provisional": {
         "name": "Provisional queries"
       }
     },
@@ -155,6 +155,70 @@
         "all": "All clients",
         "local_dns": "Local DNS records only"
       }
+    },
+    "card": {
+      "options": {
+        "unusual": "unusual",
+        "no_devices": "No Pi-hole Extended devices found.",
+        "no_selection": "Pick one or more devices.",
+        "loading": "Loading…",
+        "error": "Could not load data",
+        "unusual_now": "Unusual activity",
+        "rate": "queries/min",
+        "base": "usual",
+        "no_base": "not enough history for a baseline",
+        "unavailable": "Not available: 5/15/30 min blocks need a range of 10 days or less.",
+        "too_many": "Too many blocks for this range.",
+        "bigger_than_range": "The block is larger than the range.",
+        "times": "x usual",
+        "hide": "Hide from chart",
+        "show": "Show in chart",
+        "history": "Open history",
+        "edit_title": "Title",
+        "edit_devices": "Devices",
+        "edit_bucket": "Block size",
+        "edit_span": "Range",
+        "edit_log": "Logarithmic scale",
+        "edit_chart_type": "Chart type",
+        "edit_line": "Lines",
+        "edit_bar": "Bars",
+        "edit_overview": "Warn about unusual activity",
+        "edit_overview_help": "Lists any device (even if not in the chart) that has been unusually active in the last two hours, and shows a red counter. Nothing is shown while all devices are normal.",
+        "edit_devices_help": "Up to 12. Leave empty to show the three busiest.",
+        "edit_invalid": "That block size is not available for this range; the card will use a larger one.",
+        "card_name": "Pi-hole Extended activity",
+        "card_description": "Per-device DNS activity with unusual-activity detection",
+        "allowed": "Allowed",
+        "blocked": "Blocked",
+        "provisional": "Provisional",
+        "live_normal": "Normal",
+        "live_ago": "last query {n} s ago",
+        "live_partial": "Incomplete data",
+        "card_live_name": "Pi-hole Extended live device",
+        "card_live_description": "Live pulse of one device: rate, usual range, allowed and blocked queries",
+        "edit_device": "Device",
+        "edit_show_title": "Title",
+        "edit_show_badge": "Status badge",
+        "edit_show_gauge": "Rate gauge",
+        "edit_show_ring": "Allowed and blocked ring",
+        "edit_show_legend": "Legend",
+        "edit_show_strip": "60-second bars",
+        "edit_show_status": "Connection status",
+        "edit_animate": "Smooth animations",
+        "edit_animate_help": "Move the gauge and the ring smoothly. Off by default.",
+        "edit_device_help": "Pick the device. This is its DNS queries counter; the card finds the rest by itself.",
+        "edit_title_help": "Optional. Leave empty to use the device name.",
+        "edit_display": "What to show",
+        "edit_behavior": "Behaviour",
+        "edit_show_title_help": "The device name, or your title, at the top of the card.",
+        "edit_show_badge_help": "Shows Normal, or Unusual activity with how many times the usual rate.",
+        "edit_show_gauge_help": "Queries per minute right now, with the alert threshold and, when known, the usual rate.",
+        "edit_show_ring_help": "The ring around the gauge with the share of allowed, blocked and provisional queries.",
+        "edit_show_legend_help": "The totals of allowed, blocked and provisional queries.",
+        "edit_show_strip_help": "One bar per second for the last minute, as queries arrive.",
+        "edit_show_status_help": "A coloured dot and the time since the last query. Amber or red when the data may be stale or incomplete.",
+        "live_threshold": "alert at {n}"
+      }
     }
   },
   "device": {
@@ -163,6 +227,12 @@
     },
     "pihole_instance": {
       "name": "{entry_title} · Diagnostics"
+    },
+    "unknown_client": {
+      "name": "Unknown client"
+    },
+    "other_devices": {
+      "name": "Other devices"
     }
   }
 }

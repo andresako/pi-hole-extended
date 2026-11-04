@@ -25,11 +25,11 @@ from .const import (
     CONF_SOURCE_GENERATION,
     CONF_SOURCE_ID,
     DOMAIN,
-    LEGACY_SOURCE_GENERATION,
-    LEGACY_STORAGE_VERSION,
+    FIRST_SOURCE_GENERATION,
     PLATFORMS,
     STORAGE_KEY_PREFIX,
     STORAGE_VERSION,
+    TRANSLATIONS_URL_BASE,
 )
 from .coordinator import PiHoleQueryCoordinator
 from .entity_ids import (
@@ -83,9 +83,12 @@ async def _async_register_frontend(hass: HomeAssistant) -> None:
     if getattr(hass, "http", None) is None or "frontend" not in hass.config.components:
         return
     version = (await async_get_integration(hass, DOMAIN)).version
-    # Serve the whole folder: the card script plus its translations/*.json files.
     await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL_BASE, str(Path(__file__).parent / "frontend"), False)]
+        [
+            StaticPathConfig(CARD_URL_BASE, str(Path(__file__).parent / "frontend"), False),
+            # The card reads its strings from the integration's own catalogs.
+            StaticPathConfig(TRANSLATIONS_URL_BASE, str(Path(__file__).parent / "translations"), False),
+        ]
     )
     url = f"{CARD_URL_BASE}/{CARD_FILENAME}"
     add_extra_js_url(hass, f"{url}?v={version}")
@@ -105,7 +108,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     generation_value = entry.data.get(CONF_SOURCE_GENERATION)
     generation = (
         generation_value
-        if generation_value == LEGACY_SOURCE_GENERATION
+        if generation_value == FIRST_SOURCE_GENERATION
         else _valid_uuid(generation_value)
     )
     if source_id is None or generation is None:
@@ -115,12 +118,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         Store(
             hass,
             STORAGE_VERSION,
+    TRANSLATIONS_URL_BASE,
             _identity_storage_key(source_id, generation),
-        ),
-        Store(
-            hass,
-            LEGACY_STORAGE_VERSION,
-            f"{STORAGE_KEY_PREFIX}_{entry.entry_id}",
         ),
         source_id,
         generation,

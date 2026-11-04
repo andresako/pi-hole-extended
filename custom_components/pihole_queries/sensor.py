@@ -20,10 +20,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .classification import CLASSIFIER_VERSION
 from .const import (
     DOMAIN,
-    OTHER_CLIENTS_NAME,
+    OTHER_CLIENTS_KEY,
     UNKNOWN_CLIENT_IP,
     UNKNOWN_CLIENT_NAME,
 )
@@ -47,35 +46,26 @@ SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
     ),
+    SensorEntityDescription(
+        key="allowed",
+        translation_key="allowed",
+        icon="mdi:check-circle-outline",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    SensorEntityDescription(
+        key="blocked",
+        translation_key="blocked",
+        icon="mdi:cancel",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    SensorEntityDescription(
+        key="provisional",
+        translation_key="provisional",
+        icon="mdi:help-circle-outline",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
 )
 
-
-def _classifier_descriptions(version: int) -> tuple[SensorEntityDescription, ...]:
-    """Create distinct HA entities for one immutable classifier epoch."""
-    suffix = f"v{version}"
-    return (
-        SensorEntityDescription(
-            key=f"allowed_{suffix}",
-            translation_key=f"allowed_{suffix}",
-            icon="mdi:check-circle-outline",
-            state_class=SensorStateClass.TOTAL_INCREASING,
-        ),
-        SensorEntityDescription(
-            key=f"blocked_{suffix}",
-            translation_key=f"blocked_{suffix}",
-            icon="mdi:cancel",
-            state_class=SensorStateClass.TOTAL_INCREASING,
-        ),
-        SensorEntityDescription(
-            key=f"provisional_{suffix}",
-            translation_key=f"provisional_{suffix}",
-            icon="mdi:help-circle-outline",
-            state_class=SensorStateClass.TOTAL_INCREASING,
-        ),
-    )
-
-
-SENSOR_DESCRIPTIONS = SENSOR_DESCRIPTIONS + _classifier_descriptions(CLASSIFIER_VERSION)
 
 DIAGNOSTIC_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
@@ -110,16 +100,10 @@ _COUNT_KEYS = {
 }
 
 MAX_DEVICE_NAME_LENGTH = 100
-_EPOCH_CLASS_KEYS = {"allowed", "blocked", "provisional"}
+_CLASS_KEYS = {"allowed", "blocked", "provisional"}
 
 
 
-
-
-_SPANISH_DEVICE_NAMES = {
-    UNKNOWN_CLIENT_NAME: "Cliente desconocido",
-    OTHER_CLIENTS_NAME: "Otros dispositivos",
-}
 
 
 def client_device_info(
@@ -127,17 +111,20 @@ def client_device_info(
 ) -> DeviceInfo:
     """Describe the per-client device shared by every entity of that client."""
     data = coordinator.client_data.get(client_key, {})
+    identifiers = {_client_device_identifier(entry, client_key)}
     client_name = str(data.get("client_name") or UNKNOWN_CLIENT_NAME)[:MAX_DEVICE_NAME_LENGTH]
+    if client_key == OTHER_CLIENTS_KEY:
+        return DeviceInfo(identifiers=identifiers, translation_key="other_devices", manufacturer="Pi-hole")
+    if client_name == UNKNOWN_CLIENT_NAME:
+        return DeviceInfo(identifiers=identifiers, translation_key="unknown_client", manufacturer="Pi-hole")
     client_ip = str(data.get("client_ip") or "")
-    if coordinator.hass.config.language.split("-")[0] == "es":
-        client_name = _SPANISH_DEVICE_NAMES.get(client_name, client_name)
     name = (
         f"{client_name} ({client_ip})"
         if client_ip and client_ip != UNKNOWN_CLIENT_IP
         else client_name
     )
     return DeviceInfo(
-        identifiers={_client_device_identifier(entry, client_key)},
+        identifiers=identifiers,
         translation_key="client_device",
         translation_placeholders={"client_name": name},
         manufacturer="Pi-hole",
@@ -213,21 +200,9 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
         """Return this entity's accumulated count."""
         data = self._client_data
         metric = self.entity_description.key
-        versioned = metric.rsplit("_v", maxsplit=1)
-        if len(versioned) == 2 and versioned[1].isdigit():
-            base, version_text = versioned
-            version = version_text
-            if base in _EPOCH_CLASS_KEYS:
-                counts = data.get("classifier_counts", {})
-                if not isinstance(counts, dict):
-                    return 0
-                epoch = counts.get(version, {})
-                if not isinstance(epoch, dict):
-                    return 0
-                try:
-                    return int(epoch.get(base, 0))
-                except (TypeError, ValueError):
-                    return 0
+        if metric in _CLASS_KEYS:
+            counts = data.get("class_counts", {})
+            return counts.get(metric, 0) if isinstance(counts, dict) else 0
         if metric == "queries_last_minute":
             value = data.get(_COUNT_KEYS[metric])
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -276,32 +251,17 @@ class PiHoleClientSensor(CoordinatorEntity[PiHoleQueryCoordinator], SensorEntity
         if self.entity_description.key != "queries":
             return None
         data = self._client_data
-        version = str(data.get("classifier_version", CLASSIFIER_VERSION))
-        counts = data.get("classifier_counts", {})
-        active_counts = counts.get(version, {}) if isinstance(counts, dict) else {}
-        if not isinstance(active_counts, dict):
-            active_counts = {}
-        rates = data.get("classifier_rates", {})
-        active_rates = rates.get(version, {}) if isinstance(rates, dict) else {}
-        if not isinstance(active_rates, dict):
-            active_rates = {}
-        try:
-            allowed = int(active_counts.get("allowed", 0))
-            blocked = int(active_counts.get("blocked", 0))
-            provisional = int(active_counts.get("provisional", 0))
-        except (TypeError, ValueError):
-            allowed = blocked = provisional = 0
+        counts = data.get("class_counts") or {}
+        allowed = counts.get("allowed", 0)
+        blocked = counts.get("blocked", 0)
+        provisional = counts.get("provisional", 0)
         classified = allowed + blocked
         attributes = {
             "client_name": data.get("client_name"),
             "client_ip": data.get("client_ip"),
             "queries_observed": self.native_value,
-            "legacy_allowed_count": data.get("allowed_count", 0),
-            "legacy_blocked_count": data.get("blocked_count", 0),
-            "active_classifier_version": data.get("classifier_version", CLASSIFIER_VERSION),
-            "classifier_counts": data.get("classifier_counts", {}),
             "queries_observed_last_minute": data.get("queries_observed_last_minute", 0),
-            "classifier_rates_last_minute": active_rates,
+            "class_rates_last_minute": data.get("class_rates", {}),
             "classified_count": classified,
             "blocked_percentage": (100 * blocked / classified) if classified else None,
             "provisional_count": provisional,

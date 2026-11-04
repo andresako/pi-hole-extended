@@ -23,7 +23,7 @@ from custom_components.pihole_queries.const import (
     CONF_USE_HTTPS,
     CONF_VERIFY_SSL,
     DOMAIN,
-    LEGACY_SOURCE_GENERATION,
+    FIRST_SOURCE_GENERATION,
     RECONFIGURE_NEW_SOURCE,
     RECONFIGURE_SAME_SOURCE,
 )
@@ -120,7 +120,7 @@ def test_reconfigure_schema_requires_an_explicit_server_identity_action() -> Non
 
 def test_config_translation_files_have_matching_keys() -> None:
     root = Path(__file__).parents[1] / "custom_components" / DOMAIN
-    files = [root / "strings.json", root / "translations" / "en.json", root / "translations" / "es.json"]
+    files = [root / "translations" / "en.json", root / "translations" / "es.json"]
 
     def keys(value):
         if isinstance(value, dict):
@@ -128,7 +128,7 @@ def test_config_translation_files_have_matching_keys() -> None:
         return None
 
     translations = [json.loads(path.read_text(encoding="utf-8")) for path in files]
-    assert keys(translations[0]) == keys(translations[1]) == keys(translations[2])
+    assert keys(translations[0]) == keys(translations[1])
 
 
 class _Entries:
@@ -142,7 +142,7 @@ class _Entries:
         return self.entries
 
 
-def _entry(*, generation: str = LEGACY_SOURCE_GENERATION) -> SimpleNamespace:
+def _entry(*, generation: str = FIRST_SOURCE_GENERATION) -> SimpleNamespace:
     return SimpleNamespace(
         entry_id="entry-1",
         unique_id="http://old.example.test:80",
@@ -243,7 +243,7 @@ async def test_user_flow_canonicalizes_ipv6_and_keeps_explicit_https_port(monkey
     assert captured["unique_id"] == "https://[2001:db8::10]:8443"
     assert captured["data"][CONF_HOST] == "2001:db8::10"
     assert captured["data"][CONF_PORT] == 8443
-    assert captured["data"][CONF_SOURCE_GENERATION] == LEGACY_SOURCE_GENERATION
+    assert captured["data"][CONF_SOURCE_GENERATION] == FIRST_SOURCE_GENERATION
     assert str(UUID(captured["data"][CONF_SOURCE_ID])) == captured["data"][CONF_SOURCE_ID]
 
 
@@ -257,8 +257,6 @@ async def test_user_flow_can_readd_endpoint_released_by_reconfigure(monkeypatch)
 
     async def set_unique_id(unique_id):
         captured.setdefault("unique_ids", []).append(unique_id)
-        if unique_id == "http://old.example.test:80":
-            return released_endpoint_owner
         return None
 
     monkeypatch.setattr(flow, "async_set_unique_id", set_unique_id)
@@ -286,7 +284,7 @@ async def test_user_flow_can_readd_endpoint_released_by_reconfigure(monkeypatch)
 
     assert result["type"] == "create_entry"
     assert captured["unique_ids"][0] == "http://old.example.test:80"
-    assert captured["unique_ids"][1] == f"source:{captured['data'][CONF_SOURCE_ID]}"
+    assert captured["unique_ids"] == ["http://old.example.test:80"]
     assert captured["data"][CONF_HOST] == "old.example.test"
 
 
@@ -357,11 +355,11 @@ async def test_concurrent_user_flows_cannot_add_released_endpoint_twice(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_user_flow_detects_endpoint_duplicate_even_with_legacy_ipv6_unique_id(
+async def test_user_flow_detects_endpoint_duplicate_even_with_other_ipv6_unique_id(
     monkeypatch,
 ) -> None:
-    legacy_entry = SimpleNamespace(
-        entry_id="entry-legacy-ipv6",
+    other_entry = SimpleNamespace(
+        entry_id="entry-other-ipv6",
         unique_id="https://2001:db8::10:8443",
         data={
             CONF_HOST: "2001:db8::10",
@@ -370,7 +368,7 @@ async def test_user_flow_detects_endpoint_duplicate_even_with_legacy_ipv6_unique
         },
     )
     flow = config_flow.PiHoleQueriesConfigFlow()
-    flow.hass = SimpleNamespace(config_entries=_Entries([legacy_entry]))
+    flow.hass = SimpleNamespace(config_entries=_Entries([other_entry]))
     monkeypatch.setattr(
         flow,
         "async_show_form",
@@ -428,7 +426,7 @@ async def test_same_pi_hole_reconfigure_preserves_identity_and_blank_password(
     assert saved[CONF_USE_HTTPS] is True
     assert saved[CONF_PASSWORD] == "old-secret-fixture"
     assert saved[CONF_SOURCE_ID] == entry.data[CONF_SOURCE_ID]
-    assert saved[CONF_SOURCE_GENERATION] == LEGACY_SOURCE_GENERATION
+    assert saved[CONF_SOURCE_GENERATION] == FIRST_SOURCE_GENERATION
     assert updates[0]["entry"].unique_id == "http://old.example.test:80"
     assert validated[0][CONF_PORT] == 8443
 
@@ -437,7 +435,7 @@ async def test_same_pi_hole_reconfigure_preserves_identity_and_blank_password(
 async def test_replacement_reconfigure_creates_generation_and_archives_old_entities(
     monkeypatch,
 ) -> None:
-    entry = _entry(generation="legacy")
+    entry = _entry()
     flow, updates = _reconfigure_flow(entry, monkeypatch)
     archived: list[SimpleNamespace] = []
 
@@ -463,7 +461,7 @@ async def test_replacement_reconfigure_creates_generation_and_archives_old_entit
     assert archived == [entry]
     saved = updates[0]["data"]
     assert saved[CONF_SOURCE_ID] == entry.data[CONF_SOURCE_ID]
-    assert saved[CONF_SOURCE_GENERATION] != "legacy"
+    assert saved[CONF_SOURCE_GENERATION] != "first"
     assert str(UUID(saved[CONF_SOURCE_GENERATION])) == saved[CONF_SOURCE_GENERATION]
     assert saved[CONF_PASSWORD] == "new-secret-fixture"
 
@@ -575,7 +573,7 @@ async def test_concurrent_reconfigure_flows_cannot_claim_same_endpoint(monkeypat
 async def test_concurrent_reconfigure_of_same_entry_cannot_restore_stale_generation(
     monkeypatch,
 ) -> None:
-    entry = _entry(generation=LEGACY_SOURCE_GENERATION)
+    entry = _entry(generation=FIRST_SOURCE_GENERATION)
     entries = _Entries([entry])
     flows = [config_flow.PiHoleQueriesConfigFlow() for _ in range(2)]
     updates: list[dict] = []
@@ -637,7 +635,7 @@ async def test_concurrent_reconfigure_of_same_entry_cannot_restore_stale_generat
     results = await asyncio.gather(*tasks)
 
     assert len(updates) == 1
-    assert updates[0]["data"][CONF_SOURCE_GENERATION] != LEGACY_SOURCE_GENERATION
+    assert updates[0]["data"][CONF_SOURCE_GENERATION] != FIRST_SOURCE_GENERATION
     assert archived == [entry]
     assert sum(result["type"] == "abort" for result in results) == 2
     assert sum(result.get("reason") == "reconfigure_entry_changed" for result in results) == 1
@@ -693,17 +691,17 @@ async def test_connection_validation_closes_authenticated_sid_after_query_failur
 def test_archive_helper_disables_only_current_generation_client_sensors(monkeypatch) -> None:
     from homeassistant.helpers.entity_registry import RegistryEntryDisabler
 
-    entry = _entry(generation="legacy")
+    entry = _entry()
     entities = [
         SimpleNamespace(
             entity_id="sensor.old_client",
-            unique_id="http://old.example.test:80_192.0.2.10",
+            unique_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa_first_192.0.2.10",
             platform=DOMAIN,
             domain="sensor",
         ),
         SimpleNamespace(
             entity_id="sensor.user_disabled",
-            unique_id="http://old.example.test:80_192.0.2.12",
+            unique_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa_first_192.0.2.12",
             platform=DOMAIN,
             domain="sensor",
             disabled_by=RegistryEntryDisabler.USER,
@@ -716,7 +714,7 @@ def test_archive_helper_disables_only_current_generation_client_sensors(monkeypa
         ),
         SimpleNamespace(
             entity_id="sensor.other",
-            unique_id="http://old.example.test:80_192.0.2.11",
+            unique_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa_first_192.0.2.11",
             platform="other",
             domain="sensor",
         ),

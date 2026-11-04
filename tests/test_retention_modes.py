@@ -68,14 +68,13 @@ def _summary() -> dict[str, Any]:
         "query_count": 5,
         "allowed_count": 4,
         "blocked_count": 1,
-        "classifier_version": 1,
-        "classifier_counts": {"1": {"allowed": 4, "blocked": 1, "provisional": 0}},
-        "classifier_rates": {"1": {"allowed": 0, "blocked": 0, "provisional": 0}},
+        "class_counts": {"allowed": 4, "blocked": 1, "provisional": 0},
+        "class_rates": {"allowed": 0, "blocked": 0, "provisional": 0},
         "queries_observed_last_minute": 0,
         "last_query_id": 100,
         "last_query": {"id": 100, "domain": "old.example.test"},
         "recent_queries": [{"id": 100, "domain": "old.example.test"}],
-        "recent_activity": [{"observed_at": 1_735_689_600, "classifier_version": 1, "classification": "allowed"}],
+        "recent_activity": [{"observed_at": 1_735_689_600, "classification": "allowed"}],
     }
 
 
@@ -121,7 +120,7 @@ async def test_aggregate_streams_rows_and_keeps_no_query_details() -> None:
     saved = coordinator.store.value
 
     assert summary["query_count"] == 8
-    assert summary["classifier_counts"]["1"] == {
+    assert summary["class_counts"] == {
         "allowed": 5,
         "blocked": 2,
         "provisional": 1,
@@ -170,7 +169,7 @@ async def test_incomplete_aggregate_recovery_persists_only_numeric_pending_total
     summary = coordinator.client_data["192.0.2.10"]
     assert coordinator.cursor == 103
     assert summary["query_count"] == 8
-    assert summary["classifier_counts"]["1"] == {
+    assert summary["class_counts"] == {
         "allowed": 5,
         "blocked": 2,
         "provisional": 1,
@@ -196,7 +195,6 @@ async def test_recovery_merges_overlapping_activity_buckets_before_store_scrub(
     same_second = 1_735_689_600 + 150
     initial_bucket = {
         "second": same_second,
-        "classifier_version": 1,
         "allowed": 4,
         "blocked": 0,
         "provisional": 0,
@@ -218,20 +216,24 @@ async def test_recovery_merges_overlapping_activity_buckets_before_store_scrub(
     assert merged == [
         {
             "second": same_second,
-            "classifier_version": 1,
             "allowed": 7,
             "blocked": 0,
             "provisional": 0,
         }
     ]
 
-    current = MemoryStore(None)
-    legacy = MemoryStore(coordinator.store.value)
+    current = MemoryStore(
+        {
+            "schema_version": 1,
+            "source_id": "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd",
+            "source_generation": "first",
+            "data": coordinator.store.value,
+        }
+    )
     store = _IdentityStore(
         current,
-        legacy,
         "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd",
-        "legacy",
+        "first",
     )
     loaded = await store.async_load()
     assert loaded["clients"]["192.0.2.10"]["activity_buckets"] == buckets
@@ -316,7 +318,7 @@ async def test_aggregate_pending_survives_restart_and_resumes_at_saved_page() ->
     summary = restarted.client_data["192.0.2.10"]
     assert restarted.cursor == 103
     assert summary["query_count"] == 8
-    assert summary["classifier_counts"]["1"] == {
+    assert summary["class_counts"] == {
         "allowed": 5,
         "blocked": 2,
         "provisional": 1,
@@ -385,73 +387,13 @@ async def test_malformed_aggregate_store_fails_closed(corrupt: dict[str, Any]) -
 
 
 @pytest.mark.asyncio
-async def test_aggregate_store_transition_removes_only_query_details_from_v1_and_v2() -> None:
+async def test_aggregate_scrubs_malformed_clients_and_unknown_root_fields() -> None:
     source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    generation = "legacy"
-    legacy_data = {"cursor": 100, "clients": {"client": _summary()}, "extension": "secret.example.test"}
-    legacy = MemoryStore(legacy_data)
     current = MemoryStore(
         {
-            "schema_version": 2,
+            "schema_version": 1,
             "source_id": source_id,
-            "source_generation": generation,
-            "data": deepcopy(legacy_data),
-        }
-    )
-    store = _IdentityStore(current, legacy, source_id, generation)
-
-    await store.async_load()
-
-    detail_fields = {"last_query", "last_query_id", "recent_queries", "recent_activity"}
-    current_summary = current.value["data"]["clients"]["client"]
-    legacy_summary = legacy.value["clients"]["client"]
-    assert not detail_fields & current_summary.keys()
-    assert not detail_fields & legacy_summary.keys()
-    assert current.value["data"]["cursor"] == legacy.value["cursor"] == 100
-    assert "extension" not in current.value["data"]
-    assert "extension" not in legacy.value
-    assert current_summary["query_count"] == legacy_summary["query_count"] == 5
-
-
-@pytest.mark.asyncio
-async def test_aggregate_import_from_v1_sanitizes_only_details_before_v2_copy() -> None:
-    source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    legacy_data = {"cursor": 100, "clients": {"client": _summary()}, "extension": "secret.example.test"}
-    legacy = MemoryStore(legacy_data)
-    current = MemoryStore(None)
-    store = _IdentityStore(
-        current,
-        legacy,
-        source_id,
-        "legacy",
-    )
-
-    prepared = await store.async_load()
-
-    forbidden = {"last_query", "last_query_id", "recent_queries", "recent_activity"}
-    assert not forbidden & prepared["clients"]["client"].keys()
-    assert not forbidden & current.value["data"]["clients"]["client"].keys()
-    assert not forbidden & legacy.value["clients"]["client"].keys()
-    assert "extension" not in current.value["data"]
-    assert "extension" not in legacy.value
-    assert prepared["clients"]["client"]["query_count"] == 5
-
-
-@pytest.mark.asyncio
-async def test_aggregate_scrubs_malformed_clients_and_unknown_root_fields_from_both_stores() -> None:
-    source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    legacy = MemoryStore(
-        {
-            "cursor": 100,
-            "clients": "secret.example.test",
-            "private_extension": {"query": "secret.example.test"},
-        }
-    )
-    current = MemoryStore(
-        {
-            "schema_version": 2,
-            "source_id": source_id,
-            "source_generation": "legacy",
+            "source_generation": "first",
             "data": {
                 "cursor": 100,
                 "clients": ["secret.example.test"],
@@ -459,38 +401,18 @@ async def test_aggregate_scrubs_malformed_clients_and_unknown_root_fields_from_b
             },
         }
     )
-    store = _IdentityStore(current, legacy, source_id, "legacy")
+    store = _IdentityStore(current, source_id, "first")
 
     loaded = await store.async_load()
 
     assert loaded["cursor"] == 100
     assert "clients" not in loaded
     assert "secret.example.test" not in repr(current.value)
-    assert "secret.example.test" not in repr(legacy.value)
     assert "private_extension" not in current.value["data"]
-    assert "private_extension" not in legacy.value
 
 
 @pytest.mark.asyncio
-async def test_uninspectable_legacy_root_is_replaced_with_diagnostic_marker() -> None:
-    source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    legacy = MemoryStore([{"query": "secret.example.test"}])
-    current = MemoryStore(None)
-    store = _IdentityStore(current, legacy, source_id, "legacy")
-
-    loaded = await store.async_load()
-
-    assert isinstance(loaded, list)
-    assert legacy.value == {
-        "coverage": "unknown",
-        "coverage_reason": "invalid_legacy_store",
-    }
-    assert "secret.example.test" not in repr(legacy.value)
-    assert current.value is None
-
-
-@pytest.mark.asyncio
-async def test_aggregate_scrubs_opaque_epochs_and_pending_payloads_in_both_stores() -> None:
+async def test_aggregate_scrubs_opaque_rates_and_pending_payloads() -> None:
     source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
     data = {
         "cursor": 100,
@@ -498,21 +420,8 @@ async def test_aggregate_scrubs_opaque_epochs_and_pending_payloads_in_both_store
         "clients": {
             "192.0.2.10": {
                 **_summary(),
-                "classifier_counts": {
-                    "1": {"allowed": 4, "blocked": 1, "provisional": 0},
-                    "private-query.example.test": {
-                        "allowed": 1,
-                        "blocked": 0,
-                        "provisional": 0,
-                    },
-                },
-                "classifier_rates": {
-                    "private-query.example.test": {
-                        "allowed": 1,
-                        "blocked": 0,
-                        "provisional": 0,
-                    }
-                },
+                "class_counts": {"allowed": 4, "blocked": 1, "provisional": 0},
+                "class_rates": {"private-query.example.test": 1},
             }
         },
         "aggregate_pending": {
@@ -523,7 +432,6 @@ async def test_aggregate_scrubs_opaque_epochs_and_pending_payloads_in_both_store
                 "buckets": [
                     {
                         "second": 1_735_689_600,
-                        "classifier_version": 1,
                         "allowed": 1,
                         "blocked": 0,
                         "provisional": 0,
@@ -537,24 +445,22 @@ async def test_aggregate_scrubs_opaque_epochs_and_pending_payloads_in_both_store
         "aggregate_pending_time": 1_735_689_600,
         "recovery_cursor": 122,
     }
-    legacy = MemoryStore(data)
+
     current = MemoryStore(
         {
-            "schema_version": 2,
+            "schema_version": 1,
             "source_id": source_id,
-            "source_generation": "legacy",
+            "source_generation": "first",
             "data": data,
         }
     )
-    store = _IdentityStore(current, legacy, source_id, "legacy")
+    store = _IdentityStore(current, source_id, "first")
 
     loaded = await store.async_load()
 
     summary = loaded["clients"]["192.0.2.10"]
-    assert summary["classifier_counts"] == {
-        "1": {"allowed": 4, "blocked": 1, "provisional": 0}
-    }
-    assert "classifier_rates" not in summary
+    assert summary["class_counts"] == {"allowed": 4, "blocked": 1, "provisional": 0}
+    assert "class_rates" not in summary
     assert "aggregate_pending" not in loaded
     assert "aggregate_pending_cursor" not in loaded
     assert "aggregate_pending_time" not in loaded
@@ -563,14 +469,13 @@ async def test_aggregate_scrubs_opaque_epochs_and_pending_payloads_in_both_store
     assert loaded["coverage_reason"] == "invalid_store_state"
     assert "private-query.example.test" not in repr(loaded)
     assert "private-query.example.test" not in repr(current.value)
-    assert "private-query.example.test" not in repr(legacy.value)
-    assert current.saves and legacy.saves
+    assert current.saves
 
 
 @pytest.mark.asyncio
 async def test_aggregate_preserves_valid_bounded_pending_aggregates() -> None:
     source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    legacy = MemoryStore(
+    data = (
         {
             "cursor": 100,
             "clients": {"192.0.2.10": _summary()},
@@ -582,7 +487,6 @@ async def test_aggregate_preserves_valid_bounded_pending_aggregates() -> None:
                     "buckets": [
                         {
                             "second": 1_735_689_600,
-                            "classifier_version": 1,
                             "allowed": 1,
                             "blocked": 0,
                             "provisional": 0,
@@ -595,8 +499,10 @@ async def test_aggregate_preserves_valid_bounded_pending_aggregates() -> None:
             "recovery_cursor": 100,
         }
     )
-    current = MemoryStore(None)
-    store = _IdentityStore(current, legacy, source_id, "legacy")
+    current = MemoryStore(
+        {"schema_version": 1, "source_id": source_id, "source_generation": "first", "data": data}
+    )
+    store = _IdentityStore(current, source_id, "first")
 
     loaded = await store.async_load()
 
@@ -605,7 +511,6 @@ async def test_aggregate_preserves_valid_bounded_pending_aggregates() -> None:
     assert len(loaded["aggregate_pending"]["192.0.2.10"]["buckets"]) == 1
     assert "old.example.test" not in repr(loaded)
     assert "old.example.test" not in repr(current.value)
-    assert "old.example.test" not in repr(legacy.value)
 
 
 @pytest.mark.asyncio
@@ -614,7 +519,7 @@ async def test_aggregate_discards_pending_checkpoint_outside_confirmed_cursor_in
     recovery_cursor: int,
 ) -> None:
     source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    legacy = MemoryStore(
+    data = (
         {
             "cursor": 100,
             "coverage": "complete",
@@ -632,8 +537,10 @@ async def test_aggregate_discards_pending_checkpoint_outside_confirmed_cursor_in
             "recovery_cursor": recovery_cursor,
         }
     )
-    current = MemoryStore(None)
-    store = _IdentityStore(current, legacy, source_id, "legacy")
+    current = MemoryStore(
+        {"schema_version": 1, "source_id": source_id, "source_generation": "first", "data": data}
+    )
+    store = _IdentityStore(current, source_id, "first")
 
     loaded = await store.async_load()
 
@@ -643,65 +550,7 @@ async def test_aggregate_discards_pending_checkpoint_outside_confirmed_cursor_in
     assert "recovery_cursor" not in loaded
     assert loaded["coverage"] == "unknown"
     assert loaded["coverage_reason"] == "invalid_store_state"
-    assert "aggregate_pending" not in legacy.value
     assert current.value["data"]["coverage_reason"] == "invalid_store_state"
-
-
-@pytest.mark.asyncio
-async def test_v2_scrubbing_retry_completes_legacy_store_after_second_write_failure() -> None:
-    source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    generation = "legacy"
-    legacy = MemoryStore({"cursor": 100, "clients": {"client": _summary()}})
-    current = MemoryStore(
-        {
-            "schema_version": 2,
-            "source_id": source_id,
-            "source_generation": generation,
-            "data": {"cursor": 100, "clients": {"client": _summary()}},
-        }
-    )
-    legacy.save_error = OSError("synthetic legacy Store failure")
-    store = _IdentityStore(current, legacy, source_id, generation)
-
-    with pytest.raises(OSError, match="legacy Store"):
-        await store.async_load()
-
-    # The current Store write succeeded, the legacy write did not. Startup
-    # receives an error rather than a successful partial migration.
-    assert not {"last_query", "last_query_id", "recent_queries", "recent_activity"} & current.value["data"]["clients"]["client"].keys()
-    assert "old.example.test" in repr(legacy.value)
-
-    legacy.save_error = None
-    await store.async_load()
-    assert "old.example.test" not in repr(legacy.value)
-    assert not {"last_query", "last_query_id", "recent_queries", "recent_activity"} & current.value["data"]["clients"]["client"].keys()
-
-
-@pytest.mark.asyncio
-async def test_v1_import_retry_completes_current_store_after_second_write_failure() -> None:
-    source_id = "5be6fe2a-4c73-4798-ae2e-4f1de7de34cd"
-    legacy = MemoryStore({"cursor": 100, "clients": {"client": _summary()}})
-    current = MemoryStore(None)
-    current.save_error = OSError("synthetic current Store failure")
-    store = _IdentityStore(
-        current,
-        legacy,
-        source_id,
-        "legacy",
-    )
-
-    with pytest.raises(OSError, match="current Store"):
-        await store.async_load()
-
-    # The backup is safely scrubbed before the current envelope is written.
-    assert "old.example.test" not in repr(legacy.value)
-    assert current.value is None
-
-    current.save_error = None
-    prepared = await store.async_load()
-    assert current.value["data"]["clients"]["client"]["query_count"] == 5
-    assert "old.example.test" not in repr(current.value)
-    assert "old.example.test" not in repr(prepared)
 
 
 @pytest.mark.asyncio

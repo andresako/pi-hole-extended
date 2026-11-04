@@ -20,11 +20,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import PiHoleAuthenticationError, PiHoleClient, PiHoleConnectionError
-from .classification import (
-    CLASSIFIER_VERSION,
-    classify_status,
-    empty_classifier_counts,
-)
+from .classification import classify_status, empty_class_counts
 from .const import (
     ACTIVITY_ALL,
     ACTIVITY_BLOCKED,
@@ -48,7 +44,7 @@ from .const import (
     UNKNOWN_CLIENT_NAME,
     CoverageReason,
 )
-from .validation import valid_classifier_epoch, valid_query_time_buckets
+from .validation import valid_class_counts, valid_query_time_buckets
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,11 +60,6 @@ class _Checkpoint:
     bootstrapped: bool
     recovery_cursor: int | None
     awaiting_generation: bool
-
-
-def _classification(status: Any) -> str:
-    """Classify using the active immutable status map."""
-    return classify_status(status, CLASSIFIER_VERSION)
 
 
 def _origin_time(query: dict[str, Any]) -> datetime | None:
@@ -153,7 +144,7 @@ def _add_query_time_bucket(summary: dict[str, Any], query_time: float, observed_
 
 def _blocked(status: Any) -> bool:
     """Return whether the exact status is explicitly classified as blocked."""
-    return _classification(status) == "blocked"
+    return classify_status(status) == "blocked"
 
 
 def _query_description(query: dict[str, Any]) -> tuple[str, str]:
@@ -171,7 +162,7 @@ def _query_description(query: dict[str, Any]) -> tuple[str, str]:
     client_name = str(client.get("name") or client_ip)
     domain = str(query.get("domain") or "unknown domain")
     status = query.get("status") if "status" in query else "missing"
-    classification = _classification(status)
+    classification = classify_status(status)
     verdict = {
         "allowed": "Allowed",
         "blocked": "Blocked",
@@ -201,29 +192,14 @@ def _normalize_client_name(value: Any) -> str:
 
 
 
-def _client_key(
-    query: dict[str, Any], existing_clients: dict[str, dict[str, Any]] | None = None
-) -> tuple[str, str, str]:
+def _client_key(query: dict[str, Any]) -> tuple[str, str, str]:
     """Return a stable per-client key, display name, and IP address."""
     client = query.get("client") or {}
     if not isinstance(client, dict):
         client = {}
     client_ip = str(client.get("ip") or "").strip()
     client_name = str(client.get("name") or "").strip()
-    normalized_name = _normalize_client_name(client_name)
-    key = client_ip or normalized_name or "unknown"
-    if not client_ip and normalized_name and existing_clients:
-        # Keep the key already used by a migrated Store so its HA unique IDs
-        # remain stable, while matching future name case/spacing variants.
-        for existing_key, summary in existing_clients.items():
-            if not isinstance(summary, dict):
-                continue
-            if summary.get("client_ip") not in (None, "", UNKNOWN_CLIENT_IP):
-                continue
-            existing_name = summary.get("client_name") or existing_key
-            if _normalize_client_name(existing_name) == normalized_name:
-                key = str(existing_key)
-                break
+    key = client_ip or _normalize_client_name(client_name) or "unknown"
     return key, client_name or client_ip or UNKNOWN_CLIENT_NAME, client_ip or UNKNOWN_CLIENT_IP
 
 
@@ -290,7 +266,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             return
         if not isinstance(saved, dict):
             self.coverage = "unknown"
-            self.coverage_reason = CoverageReason.INVALID_LEGACY_STORE
+            self.coverage_reason = CoverageReason.INVALID_STORE_STATE
             _LOGGER.warning("Ignored a local Pi-hole Store with an invalid format")
             return
         pending = saved.get("aggregate_pending", {})
@@ -333,16 +309,12 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     or set(bucket)
                     != {
                         "second",
-                        "classifier_version",
                         "allowed",
                         "blocked",
                         "provisional",
                     }
                     or isinstance(bucket.get("second"), bool)
                     or not isinstance(bucket.get("second"), int)
-                    or isinstance(bucket.get("classifier_version"), bool)
-                    or not isinstance(bucket.get("classifier_version"), int)
-                    or not 1 <= bucket["classifier_version"] <= 2**31 - 1
                     or bucket["second"] < 0
                     or any(
                         isinstance(bucket.get(name), bool)
@@ -387,9 +359,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             saved_reason = saved.get("coverage_reason")
             self.coverage_reason = (
                 saved_reason
-                if isinstance(saved_reason, str)
-                and saved_reason in {CoverageReason.INVALID_LEGACY_STORE, CoverageReason.INVALID_STORE_STATE}
-                else CoverageReason.INVALID_LEGACY_CURSOR
+                if saved_reason == CoverageReason.INVALID_STORE_STATE
+                else CoverageReason.INVALID_CURSOR
             )
             _LOGGER.warning("Ignored an invalid local Pi-hole cursor")
         coverage = saved.get("coverage")
@@ -472,8 +443,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             clients = {}
             self.coverage = "unknown"
             if self.coverage_reason not in {
-                CoverageReason.INVALID_LEGACY_CURSOR,
-                CoverageReason.INVALID_LEGACY_STORE,
+                CoverageReason.INVALID_CURSOR,
                 CoverageReason.INVALID_STORE_STATE,
             }:
                 self.coverage_reason = CoverageReason.MISSING_CLIENT_SUMMARIES
@@ -502,53 +472,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 or raw_count < 0
             ):
                 self._client_store_invalid = True
-            classifier_counts = summary.get("classifier_counts")
-            if "classifier_counts" in summary:
-                if not isinstance(classifier_counts, dict) or not classifier_counts:
+            for field in ("class_counts", "class_rates"):
+                if field in summary and not valid_class_counts(summary[field]):
                     self._client_store_invalid = True
-                else:
-                    clean_counts = {}
-                    for epoch, epoch_counts in classifier_counts.items():
-                        if (
-                            not valid_classifier_epoch(epoch)
-                            or not isinstance(epoch_counts, dict)
-                            or set(epoch_counts) != {"allowed", "blocked", "provisional"}
-                            or any(
-                                isinstance(epoch_counts.get(name), bool)
-                                or not isinstance(epoch_counts.get(name), int)
-                                or epoch_counts[name] < 0
-                                for name in ("allowed", "blocked", "provisional")
-                            )
-                        ):
-                            self._client_store_invalid = True
-                            continue
-                        clean_counts[epoch] = epoch_counts
-                    if len(clean_counts) != len(classifier_counts):
-                        summary["classifier_counts"] = clean_counts
-            classifier_rates = summary.get("classifier_rates")
-            if "classifier_rates" in summary:
-                if not isinstance(classifier_rates, dict):
-                    self._client_store_invalid = True
-                    summary["classifier_rates"] = {}
-                else:
-                    clean_rates = {}
-                    for epoch, epoch_rates in classifier_rates.items():
-                        if (
-                            not valid_classifier_epoch(epoch)
-                            or not isinstance(epoch_rates, dict)
-                            or set(epoch_rates) != {"allowed", "blocked", "provisional"}
-                            or any(
-                                isinstance(epoch_rates.get(name), bool)
-                                or not isinstance(epoch_rates.get(name), int)
-                                or epoch_rates[name] < 0
-                                for name in ("allowed", "blocked", "provisional")
-                            )
-                        ):
-                            self._client_store_invalid = True
-                            continue
-                        clean_rates[epoch] = epoch_rates
-                    if len(clean_rates) != len(classifier_rates):
-                        summary["classifier_rates"] = clean_rates
+                    summary.pop(field)
             if "query_time_buckets" in summary and not valid_query_time_buckets(
                 summary["query_time_buckets"]
             ):
@@ -558,22 +485,19 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if not isinstance(buckets, list) or len(buckets) > 61:
                     self._client_store_invalid = True
                 else:
-                    seen_buckets: set[tuple[int, int]] = set()
+                    seen_buckets: set[int] = set()
                     for bucket in buckets:
                         if (
                             not isinstance(bucket, dict)
                             or set(bucket)
                             != {
                                 "second",
-                                "classifier_version",
                                 "allowed",
                                 "blocked",
                                 "provisional",
                             }
                             or isinstance(bucket.get("second"), bool)
                             or not isinstance(bucket.get("second"), int)
-                            or isinstance(bucket.get("classifier_version"), bool)
-                            or not isinstance(bucket.get("classifier_version"), int)
                             or any(
                                 isinstance(bucket.get(name), bool)
                                 or not isinstance(bucket.get(name), int)
@@ -583,11 +507,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                         ):
                             self._client_store_invalid = True
                             break
-                        bucket_key = (bucket["second"], bucket["classifier_version"])
-                        if bucket_key in seen_buckets:
+                        if bucket["second"] in seen_buckets:
                             self._client_store_invalid = True
                             break
-                        seen_buckets.add(bucket_key)
+                        seen_buckets.add(bucket["second"])
             summary.setdefault("activity_buckets", [])
             summary.setdefault("query_time_buckets", [])
             self.client_data[str(key)] = summary
@@ -602,17 +525,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             )
             _LOGGER.warning("Kept the Pi-hole counters because the local aggregates are not valid")
         for summary in self.client_data.values():
-            summary["classifier_version"] = CLASSIFIER_VERSION
-            counts = summary.get("classifier_counts")
-            if not isinstance(counts, dict):
-                counts = {}
-                summary["classifier_counts"] = counts
-            counts.setdefault(str(CLASSIFIER_VERSION), empty_classifier_counts())
-            rates = summary.get("classifier_rates")
-            if not isinstance(rates, dict):
-                rates = {}
-                summary["classifier_rates"] = rates
-            rates.setdefault(str(CLASSIFIER_VERSION), empty_classifier_counts())
+            summary.setdefault("class_counts", empty_class_counts())
+            summary.setdefault("class_rates", empty_class_counts())
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         """Fetch data and update summaries from the Pi-hole API."""
@@ -655,13 +569,10 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     def _data_snapshot(self) -> dict[str, dict[str, Any]]:
         """Copy the bounded numeric client summaries for Home Assistant."""
         snapshot: dict[str, dict[str, Any]] = {}
-        obsolete_fields = {"last_query", "last_query_id", "recent_queries", "recent_activity"}
         for key, summary in self.client_data.items():
             if not isinstance(summary, dict):
                 continue
-            snapshot[key] = deepcopy(
-                {field: value for field, value in summary.items() if field not in obsolete_fields}
-            )
+            snapshot[key] = deepcopy(summary)
         return snapshot
 
     async def _async_get_queries(self, *, length: int, cursor: int | None = None) -> dict[str, Any]:
@@ -697,7 +608,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
     def _resolve_client(self, query: dict[str, Any]) -> tuple[str, str, str]:
         """Return the client to count a query under, applying the client scope."""
-        key, client_name, client_ip = _client_key(query, self.client_data)
+        key, client_name, client_ip = _client_key(query)
         if getattr(self, "client_scope", DEFAULT_CLIENT_SCOPE) != CLIENT_SCOPE_LOCAL_DNS:
             return key, client_name, client_ip
         hostname = (self.local_hosts or {}).get(client_ip)
@@ -708,7 +619,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     async def _async_update_data_snapshot(self) -> dict[str, dict[str, Any]]:
         """Fetch new queries and return a snapshot of per-client summaries."""
         self.coverage = getattr(self, "coverage", "unknown")
-        self.coverage_reason = getattr(self, "coverage_reason", CoverageReason.LEGACY_CURSOR)
+        self.coverage_reason = getattr(self, "coverage_reason", CoverageReason.NO_BASELINE)
         self.last_query_time = getattr(self, "last_query_time", None)
         self.awaiting_generation = getattr(self, "awaiting_generation", False)
         self.recovery_cursor = getattr(self, "recovery_cursor", None)
@@ -747,27 +658,27 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if not ids:
                     self.coverage = "unknown"
                     if self.coverage_reason not in {
-                        CoverageReason.INVALID_LEGACY_CURSOR,
-                        CoverageReason.INVALID_LEGACY_STORE,
+                        CoverageReason.INVALID_CURSOR,
+                        CoverageReason.INVALID_STORE_STATE,
                     }:
                         self.coverage_reason = CoverageReason.BASELINE_UNVERIFIED
                     return self._data_snapshot()
                 self.cursor = max((query_id for query_id, _ in ids), default=0)
                 self._bootstrapped = True
                 self.recovery_cursor = None
-                invalid_legacy_cursor = self.coverage_reason in {
-                    CoverageReason.INVALID_LEGACY_CURSOR,
-                    CoverageReason.INVALID_LEGACY_STORE,
+                invalid_saved_state = self.coverage_reason in {
+                    CoverageReason.INVALID_CURSOR,
+                    CoverageReason.INVALID_STORE_STATE,
                 }
                 self.coverage = (
                     "unknown"
-                    if invalid_legacy_cursor
+                    if invalid_saved_state
                     else "complete" if ids and len(ids) == len(rows) else "unknown"
                 )
                 self.coverage_reason = (
                     None
                     if self.coverage == "complete"
-                    else self.coverage_reason if invalid_legacy_cursor else CoverageReason.BASELINE_UNVERIFIED
+                    else self.coverage_reason if invalid_saved_state else CoverageReason.BASELINE_UNVERIFIED
                 )
                 newest = max(ids, default=(None, None), key=lambda item: item[0])[1]
                 self.last_query_time = _timestamp_number(newest.get("time")) if newest else None
@@ -923,7 +834,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 and self.coverage_reason
                 not in {CoverageReason.INVALID_CLIENT_SUMMARIES, CoverageReason.MISSING_CLIENT_SUMMARIES}
             ):
-                # A prior unknown legacy cursor becomes a baseline only once
+                # A prior unknown cursor becomes a baseline only once
                 # this API walk demonstrably reaches it.
                 self.coverage = "complete"
                 self.coverage_reason = None
@@ -1207,12 +1118,12 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 {
                     "client_name": client_name,
                     "client_ip": client_ip,
-                    "counts": empty_classifier_counts(),
+                    "counts": empty_class_counts(),
                     "buckets": [],
                     "query_time_buckets": [],
                 },
             )
-            classification = _classification(row.get("status"))
+            classification = classify_status(row.get("status"))
             item["counts"][classification] += 1
             observed_at = time.time()
             query_time = _query_time_for_minute_window(row, observed_at)
@@ -1227,15 +1138,13 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     value
                     for value in item["buckets"]
                     if value["second"] == observed_second
-                    and value["classifier_version"] == CLASSIFIER_VERSION
                 ),
                 None,
             )
             if bucket is None:
                 bucket = {
                     "second": observed_second,
-                    "classifier_version": CLASSIFIER_VERSION,
-                    **empty_classifier_counts(),
+                    **empty_class_counts(),
                 }
                 item["buckets"].append(bucket)
             bucket[classification] += 1
@@ -1279,11 +1188,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     "client_name": item["client_name"],
                     "client_ip": item["client_ip"],
                     "query_count": 0,
-                    "allowed_count": 0,
-                    "blocked_count": 0,
-                    "classifier_version": CLASSIFIER_VERSION,
-                    "classifier_counts": {str(CLASSIFIER_VERSION): empty_classifier_counts()},
-                    "classifier_rates": {str(CLASSIFIER_VERSION): empty_classifier_counts()},
+                    "class_counts": empty_class_counts(),
+                    "class_rates": empty_class_counts(),
                     "queries_observed_last_minute": 0,
                     "queries_last_minute": 0,
                     "query_time_buckets": [],
@@ -1292,15 +1198,12 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             )
             summary["client_name"] = item["client_name"]
             summary["client_ip"] = item["client_ip"]
-            counts = summary.setdefault("classifier_counts", {}).setdefault(
-                str(CLASSIFIER_VERSION), empty_classifier_counts()
-            )
+            counts = summary.setdefault("class_counts", empty_class_counts())
             for classification, count in item["counts"].items():
                 counts[classification] = int(counts.get(classification, 0)) + count
             summary["query_count"] = int(summary.get("query_count", 0)) + sum(
                 item["counts"].values()
             )
-            summary["classifier_version"] = CLASSIFIER_VERSION
             if "query_time_buckets" not in item:
                 self._query_time_window_started_at = None
                 self.query_time_window_ready = False
@@ -1324,23 +1227,21 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     summary["query_time_buckets"], key=lambda bucket: bucket["second"]
                 )[-61:]
             # Recovery can overlap the already observed 60-second window. Keep
-            # one bucket per second/version and add the anonymous totals so the
+            # one bucket per second and add the anonymous totals so the
             # Store scrub does not mistake valid data for a malformed duplicate.
             merged_buckets = {
-                (bucket["second"], bucket["classifier_version"]): dict(bucket)
+                bucket["second"]: dict(bucket)
                 for bucket in summary.setdefault("activity_buckets", [])
             }
             for bucket in item["buckets"]:
-                identity = (bucket["second"], bucket["classifier_version"])
-                existing = merged_buckets.get(identity)
+                existing = merged_buckets.get(bucket["second"])
                 if existing is None:
-                    merged_buckets[identity] = dict(bucket)
+                    merged_buckets[bucket["second"]] = dict(bucket)
                     continue
                 for classification in ("allowed", "blocked", "provisional"):
                     existing[classification] += bucket[classification]
             summary["activity_buckets"] = sorted(
-                merged_buckets.values(),
-                key=lambda bucket: (bucket["second"], bucket["classifier_version"]),
+                merged_buckets.values(), key=lambda bucket: bucket["second"]
             )[-61:]
         if pending_cursor is not None:
             self.cursor = max(self.cursor or 0, pending_cursor)
@@ -1393,25 +1294,18 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             if not isinstance(raw_buckets, list):
                 raw_buckets = []
             buckets: list[dict[str, int]] = []
-            rates = empty_classifier_counts()
-            try:
-                active_version = int(summary.get("classifier_version", CLASSIFIER_VERSION))
-            except (TypeError, ValueError):
-                active_version = CLASSIFIER_VERSION
+            rates = empty_class_counts()
             for bucket in raw_buckets:
                 if not isinstance(bucket, dict):
                     continue
                 second = bucket.get("second")
-                version = bucket.get("classifier_version")
                 if (
                     isinstance(second, bool)
                     or not isinstance(second, int)
                     or not window_start <= second <= window_end
-                    or isinstance(version, bool)
-                    or not isinstance(version, int)
                 ):
                     continue
-                clean = {"second": second, "classifier_version": version}
+                clean = {"second": second}
                 valid = True
                 for classification in ("allowed", "blocked", "provisional"):
                     count = bucket.get(classification)
@@ -1422,9 +1316,8 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if not valid:
                     continue
                 buckets.append(clean)
-                if version == active_version:
-                    for classification in rates:
-                        rates[classification] += clean[classification]
+                for classification in rates:
+                    rates[classification] += clean[classification]
             summary["activity_buckets"] = buckets[-61:]
             summary["queries_observed_last_minute"] = sum(
                 sum(bucket[name] for name in ("allowed", "blocked", "provisional"))
@@ -1448,11 +1341,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             summary["queries_last_minute"] = sum(
                 bucket["count"] for bucket in source_buckets
             )
-            saved_rates = summary.get("classifier_rates")
-            if not isinstance(saved_rates, dict):
-                saved_rates = {}
-            saved_rates[str(active_version)] = rates
-            summary["classifier_rates"] = saved_rates
+            summary["class_rates"] = rates
 
     def _should_log_query(self, query: dict[str, Any]) -> bool:
         """Apply the Activity policy without changing query accounting."""
@@ -1462,7 +1351,7 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         if activity_mode == ACTIVITY_ALL:
             return True
         if activity_mode == ACTIVITY_BLOCKED:
-            return _classification(query.get("status")) == "blocked"
+            return classify_status(query.get("status")) == "blocked"
         return False
 
     def _update_client(
@@ -1480,39 +1369,21 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 "client_name": client_name,
                 "client_ip": client_ip,
                 "query_count": 0,
-                "allowed_count": 0,
-                "blocked_count": 0,
                 "queries_last_minute": 0,
-                "allowed_last_minute": 0,
-                "blocked_last_minute": 0,
                 "activity_buckets": [],
                 "query_time_buckets": [],
-                "classifier_version": CLASSIFIER_VERSION,
-                "classifier_counts": {str(CLASSIFIER_VERSION): empty_classifier_counts()},
-                "classifier_rates": {str(CLASSIFIER_VERSION): empty_classifier_counts()},
+                "class_counts": empty_class_counts(),
+                "class_rates": empty_class_counts(),
                 "queries_observed_last_minute": 0,
             },
         )
         summary["client_name"] = client_name
         summary["client_ip"] = client_ip
-        summary["classifier_version"] = CLASSIFIER_VERSION
-        all_counts = summary.get("classifier_counts")
-        if not isinstance(all_counts, dict):
-            all_counts = {}
-            summary["classifier_counts"] = all_counts
-        active_counts = all_counts.setdefault(str(CLASSIFIER_VERSION), empty_classifier_counts())
-        if not isinstance(active_counts, dict):
-            active_counts = empty_classifier_counts()
-            all_counts[str(CLASSIFIER_VERSION)] = active_counts
-        for classification in ("allowed", "blocked", "provisional"):
-            try:
-                active_counts[classification] = max(0, int(active_counts.get(classification, 0)))
-            except (TypeError, ValueError):
-                active_counts[classification] = 0
+        active_counts = summary.setdefault("class_counts", empty_class_counts())
 
         if count_as_new:
             summary["query_count"] = int(summary.get("query_count", 0)) + 1
-            classification = _classification(query.get("status"))
+            classification = classify_status(query.get("status"))
             active_counts[classification] += 1
             observed_at = time.time()
             query_time = _query_time_for_minute_window(query, observed_at)
@@ -1531,15 +1402,13 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                     item
                     for item in buckets
                     if item.get("second") == second
-                    and item.get("classifier_version") == CLASSIFIER_VERSION
                 ),
                 None,
             )
             if bucket is None:
                 bucket = {
                     "second": second,
-                    "classifier_version": CLASSIFIER_VERSION,
-                    **empty_classifier_counts(),
+                    **empty_class_counts(),
                 }
                 buckets.append(bucket)
             bucket[classification] += 1
@@ -1572,7 +1441,6 @@ class PiHoleQueryCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             await self.store.async_save(
                 {
                     "cursor": self.cursor,
-                    "classifier_version": CLASSIFIER_VERSION,
                     "coverage": self.coverage,
                     "coverage_reason": self.coverage_reason,
                     "last_query_time": self.last_query_time,

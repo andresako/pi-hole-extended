@@ -28,7 +28,7 @@ Pi-hole /api/queries ──► api.PiHoleClient
 |---|---|
 | `api.py` | Pi-hole v6 client: session ID, one retry after a 401, logout on unload. |
 | `coordinator.py` | Polling, cursor walking, counters, rolling one-minute windows, rollback when the Store cannot confirm progress. |
-| `store.py` | Source-scoped persistent Store; imports and sanitizes the v1 layout. |
+| `store.py` | Source-scoped persistent Store; validates and sanitizes what it loads. |
 | `validation.py` | Validators shared by the Store and the coordinator. |
 | `classification.py` | Versioned mapping from Pi-hole query status to allowed / blocked / provisional. |
 | `entity_ids.py` | Unique IDs, device identifiers and the `phe_` entity IDs. |
@@ -67,18 +67,18 @@ the user confirms a new source in the reconfigure flow.
 
 ## Source identity
 
-Each entry has a `source_id` and a `source_generation`. Store keys and the
-unique IDs of replacement generations include both, so a new Pi-hole never
-merges its counters with a retired one. The first generation (`legacy`) keeps
-the original unique IDs.
+Each entry has a `source_id` and a `source_generation`. Store keys, unique IDs
+and device identifiers include both, so a new Pi-hole never merges its counters
+with a retired one. Entity IDs add the generation only after the first one.
 
 ## Conventions
 
 - Entity IDs are English and do not depend on the Home Assistant language:
   `phe_<client>_<metric>` (`dns_queries`, `unusual_activity`) for clients and
   `<entry>_diagnostics_<metric>` for diagnostics.
-- English is the base language: `strings.json` matches `translations/en.json`, and
-  logs and error messages are English.
+- Every translatable string lives in `translations/<language>.json`, the file Home
+  Assistant loads: adding that one file adds a language. The cards read their strings
+  from its `selector.card.options` section. Logs, errors and Logbook text are English.
 - Entity names come from translations only; never set `name=` on descriptions
   that have a `translation_key`.
 - Persisted coverage reasons are `CoverageReason` members; add new ones there

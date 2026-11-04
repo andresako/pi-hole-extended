@@ -7,12 +7,9 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from homeassistant.components.sensor import SensorEntityDescription, SensorStateClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityPlatformState
 
-from custom_components.pihole_queries import classification
-from custom_components.pihole_queries import coordinator as coordinator_module
 from custom_components.pihole_queries.classification import classify_status
 from custom_components.pihole_queries.coordinator import (
     PiHoleQueryCoordinator,
@@ -77,10 +74,10 @@ async def test_new_observations_partition_into_exactly_one_class(frozen_time) ->
     )
     coordinator.client_data = {}
 
-    # IDs are newer than the cursor and all belong to the same first epoch.
+    # IDs are newer than the cursor and all count once.
     result = await coordinator._async_update_data()
     summary = result["192.0.2.10"]
-    counts = summary["classifier_counts"]["1"]
+    counts = summary["class_counts"]
     assert summary["query_count"] == 3
     assert counts == {"allowed": 1, "blocked": 1, "provisional": 1}
     assert sum(counts.values()) == summary["query_count"]
@@ -158,7 +155,7 @@ async def test_unknown_first_observation_is_not_reclassified_or_recaptured(froze
     assert summary["query_count"] == 6
     assert summary["allowed_count"] == 4
     assert summary["blocked_count"] == 1
-    assert summary["classifier_counts"]["1"] == {
+    assert summary["class_counts"] == {
         "allowed": 0,
         "blocked": 0,
         "provisional": 1,
@@ -171,7 +168,7 @@ async def test_unknown_first_observation_is_not_reclassified_or_recaptured(froze
     second = await coordinator._async_update_data()
 
     assert second["192.0.2.10"]["query_count"] == 6
-    assert second["192.0.2.10"]["classifier_counts"]["1"]["provisional"] == 1
+    assert second["192.0.2.10"]["class_counts"]["provisional"] == 1
     assert "recent_queries" not in second["192.0.2.10"]
     assert len(coordinator.hass.services.calls) == 1
 
@@ -192,7 +189,7 @@ async def test_overlapping_api_pages_count_and_log_each_id_once(frozen_time) -> 
     summary = data["192.0.2.10"]
 
     assert summary["query_count"] == 7
-    assert summary["classifier_counts"]["1"] == {
+    assert summary["class_counts"] == {
         "allowed": 0,
         "blocked": 1,
         "provisional": 1,
@@ -213,7 +210,7 @@ async def test_missing_and_null_status_are_provisional_in_ingestion_and_store(fr
     data = await coordinator._async_update_data()
     summary = data["192.0.2.10"]
     assert summary["query_count"] == 7
-    assert summary["classifier_counts"]["1"] == {
+    assert summary["class_counts"] == {
         "allowed": 0,
         "blocked": 0,
         "provisional": 2,
@@ -221,11 +218,11 @@ async def test_missing_and_null_status_are_provisional_in_ingestion_and_store(fr
     assert "recent_queries" not in summary
     assert "Status: missing" in coordinator.hass.services.calls[0]["message"]
     assert "Status: None" in coordinator.hass.services.calls[1]["message"]
-    assert coordinator.store.value["clients"]["192.0.2.10"]["classifier_counts"]["1"]["provisional"] == 2
+    assert coordinator.store.value["clients"]["192.0.2.10"]["class_counts"]["provisional"] == 2
 
     total = PiHoleClientSensor(
         coordinator,
-        SimpleNamespace(unique_id="entry", entry_id="entry"),
+        SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"}),
         "192.0.2.10",
         next(description for description in SENSOR_DESCRIPTIONS if description.key == "queries"),
     )
@@ -233,91 +230,7 @@ async def test_missing_and_null_status_are_provisional_in_ingestion_and_store(fr
 
 
 @pytest.mark.asyncio
-async def test_classifier_change_starts_a_new_epoch_without_reclassifying_old_ids(
-    monkeypatch, frozen_time
-) -> None:
-    old = {
-        "cursor": 100,
-        "clients": {
-            "192.0.2.10": {
-                "client_name": "test-client",
-                "client_ip": "192.0.2.10",
-                "query_count": 10,
-                "allowed_count": 8,
-                "blocked_count": 2,
-                "classifier_version": 1,
-                "classifier_counts": {"1": {"allowed": 3, "blocked": 2, "provisional": 1}},
-            }
-        },
-    }
-    monkeypatch.setattr(coordinator_module, "CLASSIFIER_VERSION", 2)
-    monkeypatch.setattr(classification, "CLASSIFIER_VERSION", 2)
-    monkeypatch.setitem(classification.STATUS_CLASSIFIERS, 2, {"FORWARDED": "blocked"})
-    coordinator = _coordinator([_row(100, "FORWARDED"), _row(101, "FORWARDED")], stored=old)
-
-    data = await coordinator._async_update_data()
-    summary = data["192.0.2.10"]
-
-    assert summary["query_count"] == 11
-    assert summary["classifier_counts"]["1"] == {
-        "allowed": 3,
-        "blocked": 2,
-        "provisional": 1,
-    }
-    assert summary["classifier_counts"]["2"] == {
-        "allowed": 0,
-        "blocked": 1,
-        "provisional": 0,
-    }
-    assert summary["allowed_count"] == 8
-    assert summary["blocked_count"] == 2
-
-
-@pytest.mark.asyncio
-async def test_loading_legacy_epoch_activates_empty_current_epoch(monkeypatch) -> None:
-    monkeypatch.setattr(coordinator_module, "CLASSIFIER_VERSION", 2)
-    monkeypatch.setattr(classification, "CLASSIFIER_VERSION", 2)
-    store = _Store(
-        {
-            "cursor": 100,
-            "clients": {
-                "192.0.2.10": {
-                    "query_count": 20,
-                    "allowed_count": 18,
-                    "blocked_count": 2,
-                    "classifier_version": 1,
-                    "classifier_counts": {"1": {"allowed": 7, "blocked": 2, "provisional": 1}},
-                }
-            },
-        }
-    )
-    coordinator = object.__new__(PiHoleQueryCoordinator)
-    coordinator.store = store
-    coordinator.cursor = None
-    coordinator._bootstrapped = False
-    coordinator.client_data = {}
-
-    await coordinator.async_load_cursor()
-    summary = coordinator.client_data["192.0.2.10"]
-
-    assert summary["classifier_version"] == 2
-    assert summary["classifier_counts"]["1"] == {
-        "allowed": 7,
-        "blocked": 2,
-        "provisional": 1,
-    }
-    assert summary["classifier_counts"]["2"] == {
-        "allowed": 0,
-        "blocked": 0,
-        "provisional": 0,
-    }
-    assert summary["query_count"] == 20
-    assert summary["allowed_count"] == 18
-    assert summary["blocked_count"] == 2
-
-
-@pytest.mark.asyncio
-async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path) -> None:
+async def test_ha_state_machine_keeps_total_and_class_counters_monotonic(tmp_path) -> None:
     class _Coordinator:
         client_data = {
             "192.0.2.10": {
@@ -326,8 +239,7 @@ async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path)
                 "query_count": 50,
                 "allowed_count": 12,
                 "blocked_count": 4,
-                "classifier_version": 1,
-                "classifier_counts": {"1": {"allowed": 0, "blocked": 0, "provisional": 0}},
+                "class_counts": {"allowed": 0, "blocked": 0, "provisional": 0},
             }
         }
         last_update_success = True
@@ -335,27 +247,15 @@ async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path)
         def async_add_listener(self, _listener):
             return lambda: None
 
-    entry = SimpleNamespace(unique_id="entry", entry_id="entry")
+    entry = SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"})
     coordinator = _Coordinator()
     descriptions = {description.key: description for description in SENSOR_DESCRIPTIONS}
     total = PiHoleClientSensor(coordinator, entry, "192.0.2.10", descriptions["queries"])
-    epoch_one = PiHoleClientSensor(
-        coordinator, entry, "192.0.2.10", descriptions["allowed_v1"]
-    )
-    epoch_two = PiHoleClientSensor(
-        coordinator,
-        entry,
-        "192.0.2.10",
-        SensorEntityDescription(
-            key="allowed_v2",
-            name="Permitidas (v2)",
-            state_class=SensorStateClass.TOTAL_INCREASING,
-        ),
-    )
+    allowed = PiHoleClientSensor(coordinator, entry, "192.0.2.10", descriptions["allowed"])
 
     hass = HomeAssistant(str(tmp_path))
     await hass.async_start()
-    entities = (total, epoch_one, epoch_two)
+    entities = (total, allowed)
     for entity in entities:
         entity.hass = hass
         entity.entity_id = f"sensor.pihole_{entity.entity_description.key}"
@@ -372,33 +272,20 @@ async def test_ha_state_machine_keeps_total_and_class_epochs_monotonic(tmp_path)
         entity._platform_state = EntityPlatformState.ADDED
         entity.async_write_ha_state()
 
-    assert total.unique_id == "entry_192.0.2.10"
-    assert epoch_one.unique_id == "entry_192.0.2.10_allowed_v1"
-    assert epoch_two.unique_id == "entry_192.0.2.10_allowed_v2"
+    assert total.unique_id == "source_first_192.0.2.10"
+    assert allowed.unique_id == "source_first_192.0.2.10_allowed"
     assert hass.states.get(total.entity_id).attributes["state_class"] == "total_increasing"
-    assert hass.states.get(epoch_one.entity_id).attributes["state_class"] == "total_increasing"
-    assert hass.states.get(epoch_two.entity_id).attributes["state_class"] == "total_increasing"
+    assert hass.states.get(allowed.entity_id).attributes["state_class"] == "total_increasing"
     assert hass.states.get(total.entity_id).state == "50"
-    assert hass.states.get(epoch_one.entity_id).state == "0"
+    assert hass.states.get(allowed.entity_id).state == "0"
 
     data = coordinator.client_data["192.0.2.10"]
-    data["classifier_version"] = 2
     data["query_count"] = 51
-    data["classifier_counts"]["1"]["allowed"] = 1
-    data["classifier_counts"]["2"] = {"allowed": 0, "blocked": 0, "provisional": 0}
-    for entity in (total, epoch_one, epoch_two):
+    data["class_counts"]["allowed"] = 1
+    for entity in (total, allowed):
         entity.async_write_ha_state()
     assert hass.states.get(total.entity_id).state == "51"
-    assert hass.states.get(epoch_one.entity_id).state == "1"
-    assert hass.states.get(epoch_two.entity_id).state == "0"
-
-    data["query_count"] = 52
-    data["classifier_counts"]["2"]["allowed"] = 1
-    for entity in (total, epoch_one, epoch_two):
-        entity.async_write_ha_state()
-    assert hass.states.get(total.entity_id).state == "52"
-    assert hass.states.get(epoch_one.entity_id).state == "1"
-    assert hass.states.get(epoch_two.entity_id).state == "1"
+    assert hass.states.get(allowed.entity_id).state == "1"
     await hass.async_stop()
 
 
@@ -410,9 +297,9 @@ def test_sensor_cardinality_stays_within_all_supported_profiles() -> None:
     assert {description.key for description in SENSOR_DESCRIPTIONS} == {
         "queries",
         "queries_last_minute",
-        "allowed_v1",
-        "blocked_v1",
-        "provisional_v1",
+        "allowed",
+        "blocked",
+        "provisional",
     }
     assert len(DIAGNOSTIC_DESCRIPTIONS) == 4
     expected_totals = (29, 129, 504)

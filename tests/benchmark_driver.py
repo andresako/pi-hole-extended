@@ -49,7 +49,7 @@ CONF_USE_HTTPS = const.CONF_USE_HTTPS
 CONF_VERIFY_SSL = const.CONF_VERIFY_SSL
 DEFAULT_SCAN_INTERVAL = const.DEFAULT_SCAN_INTERVAL
 DOMAIN = const.DOMAIN
-LEGACY_SOURCE_GENERATION = getattr(const, "LEGACY_SOURCE_GENERATION", 0)
+FIRST_SOURCE_GENERATION = getattr(const, "FIRST_SOURCE_GENERATION", 0)
 STORAGE_KEY_PREFIX = const.STORAGE_KEY_PREFIX
 STORAGE_VERSION = const.STORAGE_VERSION
 
@@ -171,11 +171,11 @@ def make_entry(entry_id: str, port: int, mode: str) -> SimpleNamespace:
         entry_id=entry_id,
         unique_id=f"http://pihole.example.test:{port}",
         title="Pi-hole synthetic benchmark",
-        version=8,
+        version=1,
         minor_version=1,
         data={
             CONF_SOURCE_ID: SOURCE_ID,
-            CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION,
+            CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION,
             CONF_HOST: "127.0.0.1",
             CONF_PORT: port,
             CONF_PASSWORD: PASSWORD,
@@ -206,14 +206,12 @@ def make_store(hass: HomeAssistant, entry: Any, mode: str) -> Any:
         current = Store(
             hass,
             STORAGE_VERSION,
-            module._identity_storage_key(SOURCE_ID, LEGACY_SOURCE_GENERATION),
+            module._identity_storage_key(SOURCE_ID, FIRST_SOURCE_GENERATION),
         )
-        legacy = Store(hass, 1, key)
         store = identity_store(
             current,
-            legacy,
             SOURCE_ID,
-            LEGACY_SOURCE_GENERATION,
+            FIRST_SOURCE_GENERATION,
         )
         initial = {
             "cursor": 0,
@@ -437,18 +435,16 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     observed_class_counts: dict[str, int] | None = {
         "allowed": 0, "blocked": 0, "provisional": 0
     }
-    saw_classifier_counts = False
+    saw_class_counts = False
     observed_class_counts_by_client: dict[str, Any] = {}
     for summary in result.values():
-        class_epochs = summary.get("classifier_counts")
-        if isinstance(class_epochs, dict) and class_epochs:
-            saw_classifier_counts = True
-            observed_class_counts_by_client[str(len(observed_class_counts_by_client))] = class_epochs
-            for epoch in class_epochs.values():
-                if isinstance(epoch, dict):
-                    for name in observed_class_counts:
-                        observed_class_counts[name] += int(epoch.get(name, 0))
-    if not saw_classifier_counts:
+        class_counts = summary.get("class_counts")
+        if isinstance(class_counts, dict) and class_counts:
+            saw_class_counts = True
+            observed_class_counts_by_client[str(len(observed_class_counts_by_client))] = class_counts
+            for name in observed_class_counts:
+                observed_class_counts[name] += int(class_counts.get(name, 0))
+    if not saw_class_counts:
         observed_class_counts = None
         if not result:
             observed_class_counts = {"allowed": 0, "blocked": 0, "provisional": 0}

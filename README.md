@@ -73,9 +73,9 @@ For every client, grouped under its own device:
 |---|---|
 | `sensor.phe_<client>_dns_queries` | **DNS queries**: cumulative queries observed. |
 | `sensor.phe_<client>_queries_last_minute` | **Queries (last minute)**: rolling count by Pi-hole's query time. |
-| `sensor.phe_<client>_allowed_v1` | **Allowed queries**, cumulative. |
-| `sensor.phe_<client>_blocked_v1` | **Blocked queries**, cumulative. |
-| `sensor.phe_<client>_provisional_v1` | **Provisional queries**: result not yet recognized. |
+| `sensor.phe_<client>_allowed` | **Allowed queries**, cumulative. |
+| `sensor.phe_<client>_blocked` | **Blocked queries**, cumulative. |
+| `sensor.phe_<client>_provisional` | **Provisional queries**: result not yet recognized. |
 | `binary_sensor.phe_<client>_unusual_activity` | **Unusual activity**, see below. |
 
 Per Pi-hole entry, four diagnostic sensors: **Communication status**, **Last successful read**, **Last query observed** and **Ingestion coverage**. `<client>` is the client's address with underscores, for example `192_0_2_21`; the entity registry shows the exact IDs.

@@ -28,7 +28,6 @@ async def async_get_config_entry_diagnostics(
         {
             "query_count": summary.get("query_count"),
             "queries_last_minute": summary.get("queries_last_minute"),
-            "classifier_version": summary.get("classifier_version"),
         }
         for summary in coordinator.client_data.values()
     ]

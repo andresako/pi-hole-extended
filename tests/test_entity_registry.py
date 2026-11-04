@@ -15,7 +15,7 @@ from custom_components.pihole_queries.const import (
     CONF_SOURCE_GENERATION,
     CONF_SOURCE_ID,
     DOMAIN,
-    LEGACY_SOURCE_GENERATION,
+    FIRST_SOURCE_GENERATION,
 )
 from custom_components.pihole_queries.sensor import (
     DIAGNOSTIC_DESCRIPTIONS,
@@ -75,13 +75,13 @@ async def test_new_registry_entity_is_normalized_on_the_event_loop(
     unload_callbacks = []
     entry = SimpleNamespace(
         entry_id="registry-callback-test",
-        unique_id="legacy-pihole-endpoint",
+        unique_id="pihole-endpoint",
         title="Pi-hole test",
         pref_disable_new_entities=False,
         disabled_by=None,
         data={
             CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION,
+            CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION,
         },
         options={},
         async_on_unload=unload_callbacks.append,
@@ -93,11 +93,11 @@ async def test_new_registry_entity_is_normalized_on_the_event_loop(
     created = registry.async_get_or_create(
         "sensor",
         DOMAIN,
-        "legacy-pihole-endpoint_192.0.2.10_allowed_v1",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa_first_192.0.2.10_allowed",
         config_entry=entry,
     )
 
-    normalized = registry.async_get("sensor.phe_192_0_2_10_allowed_v1")
+    normalized = registry.async_get("sensor.phe_192_0_2_10_allowed")
     assert normalized is not None
     assert normalized.unique_id == created.unique_id
     assert len(unload_callbacks) == 2
@@ -111,7 +111,7 @@ async def test_new_sensor_setup_adds_restored_minute_sensor_and_four_diagnostics
         title="Pi-hole test",
         entry_id="new-install-entry",
         unique_id="new-install-endpoint",
-        data={CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION},
+        data={CONF_SOURCE_ID: "source", CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION},
         async_on_unload=lambda _callback: None,
     )
 
@@ -137,13 +137,13 @@ async def test_new_sensor_setup_adds_restored_minute_sensor_and_four_diagnostics
     assert client_keys == {description.key for description in SENSOR_DESCRIPTIONS} == {
         "queries",
         "queries_last_minute",
-        "allowed_v1",
-        "blocked_v1",
-        "provisional_v1",
+        "allowed",
+        "blocked",
+        "provisional",
     }
     assert diagnostic_keys == {description.key for description in DIAGNOSTIC_DESCRIPTIONS}
     assert len(added) == 9
     minute_sensor = next(
         entity for entity in added if entity.entity_description.key == "queries_last_minute"
     )
-    assert minute_sensor.unique_id == "new-install-endpoint_192.0.2.10_queries_last_minute"
+    assert minute_sensor.unique_id == "source_first_192.0.2.10_queries_last_minute"

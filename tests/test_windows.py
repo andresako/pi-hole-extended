@@ -1,4 +1,4 @@
-"""Tests for HA-ingestion windows, timestamp validation, and persisted epochs."""
+"""Tests for HA-ingestion windows, timestamp validation, and persisted counters."""
 
 from __future__ import annotations
 
@@ -26,11 +26,10 @@ def test_minute_windows_use_bounded_numeric_buckets() -> None:
     now = 1_735_689_600.0
     coordinator = _coordinator_with_client(
         {
-            "classifier_version": 1,
             "activity_buckets": [
-                {"second": int(now - 60), "classifier_version": 1, "allowed": 1, "blocked": 1, "provisional": 0},
-                {"second": int(now - 61), "classifier_version": 1, "allowed": 0, "blocked": 4, "provisional": 0},
-                {"second": int(now), "classifier_version": 2, "allowed": 0, "blocked": 0, "provisional": 1},
+                {"second": int(now - 60), "allowed": 1, "blocked": 1, "provisional": 0},
+                {"second": int(now - 61), "allowed": 0, "blocked": 4, "provisional": 0},
+                {"second": int(now), "allowed": 0, "blocked": 0, "provisional": 1},
             ],
             "query_time_buckets": [
                 {"second": int(now - 60), "count": 2},
@@ -49,7 +48,7 @@ def test_minute_windows_use_bounded_numeric_buckets() -> None:
 
     assert summary["queries_observed_last_minute"] == 3
     assert summary["queries_last_minute"] == 3
-    assert summary["classifier_rates"]["1"] == {"allowed": 1, "blocked": 1, "provisional": 0}
+    assert summary["class_rates"] == {"allowed": 1, "blocked": 1, "provisional": 1}
     assert all(isinstance(bucket["second"], int) for bucket in summary["activity_buckets"])
 
 
@@ -74,7 +73,7 @@ def test_new_query_updates_numeric_buckets_without_retaining_query_details(
     summary = coordinator.client_data["192.0.2.10"]
 
     assert summary["query_count"] == 1
-    assert summary["classifier_counts"]["1"]["allowed"] == 1
+    assert summary["class_counts"]["allowed"] == 1
     assert "last_query" not in summary
     assert "recent_queries" not in summary
     assert "private.example.test" not in repr(summary)
@@ -112,23 +111,21 @@ def test_numeric_query_buckets_survive_midnight_and_dst(
     summary = coordinator.client_data["192.0.2.10"]
 
     assert summary["queries_observed_last_minute"] == 2
-    assert summary["classifier_counts"]["1"]["allowed"] == 2
+    assert summary["class_counts"]["allowed"] == 2
     assert len(summary["activity_buckets"]) == 1
     assert len(summary["query_time_buckets"]) == 2
 
 
 @pytest.mark.asyncio
-async def test_store_reload_preserves_legacy_offset_and_classified_epoch(frozen_time) -> None:
+async def test_store_reload_preserves_offset_and_class_counts(frozen_time) -> None:
     saved = {
         "cursor": 200,
-        "classifier_version": 1,
         "clients": {
             "192.0.2.10": {
                 "query_count": 220,
                 "allowed_count": 200,
                 "blocked_count": 20,
-                "classifier_version": 1,
-                "classifier_counts": {"1": {"allowed": 8, "blocked": 3, "provisional": 2}},
+                "class_counts": {"allowed": 8, "blocked": 3, "provisional": 2},
             }
         },
     }
@@ -149,14 +146,14 @@ async def test_store_reload_preserves_legacy_offset_and_classified_epoch(frozen_
     assert summary["query_count"] == 220
     assert summary["allowed_count"] == 200
     assert summary["blocked_count"] == 20
-    assert summary["classifier_counts"]["1"] == {
+    assert summary["class_counts"] == {
         "allowed": 8,
         "blocked": 3,
         "provisional": 2,
     }
 
 
-def test_ha_sensor_exposes_ingestion_window_and_epoch_statistics() -> None:
+def test_ha_sensor_exposes_ingestion_window_and_class_statistics() -> None:
     class _Coordinator:
         client_data = {
             "192.0.2.10": {
@@ -164,23 +161,23 @@ def test_ha_sensor_exposes_ingestion_window_and_epoch_statistics() -> None:
                 "client_ip": "192.0.2.10",
                 "query_count": 8,
                 "queries_observed_last_minute": 4,
-                "classifier_counts": {"1": {"allowed": 2, "blocked": 1, "provisional": 1}},
-                "classifier_rates": {"1": {"allowed": 1, "blocked": 1, "provisional": 2}},
+                "class_counts": {"allowed": 2, "blocked": 1, "provisional": 1},
+                "class_rates": {"allowed": 1, "blocked": 1, "provisional": 2},
             }
         }
 
         def async_add_listener(self, _listener):
             return lambda: None
 
-    entry = SimpleNamespace(unique_id="entry", entry_id="entry")
+    entry = SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"})
     descriptions = {description.key: description for description in SENSOR_DESCRIPTIONS}
     total = PiHoleClientSensor(_Coordinator(), entry, "192.0.2.10", descriptions["queries"])
     provisional = PiHoleClientSensor(
-        _Coordinator(), entry, "192.0.2.10", descriptions["provisional_v1"]
+        _Coordinator(), entry, "192.0.2.10", descriptions["provisional"]
     )
     attrs = total.extra_state_attributes
     assert attrs["queries_observed_last_minute"] == 4
-    assert attrs["classifier_rates_last_minute"] == {"allowed": 1, "blocked": 1, "provisional": 2}
+    assert attrs["class_rates_last_minute"] == {"allowed": 1, "blocked": 1, "provisional": 2}
     assert provisional.native_value == 1
     assert attrs["blocked_percentage"] == pytest.approx(100 / 3)
     assert attrs["classified_count"] == 3
@@ -194,7 +191,7 @@ def test_last_minute_sensor_preserves_zero_and_missing_values() -> None:
             return lambda: None
 
     coordinator = _Coordinator()
-    entry = SimpleNamespace(unique_id="entry", entry_id="entry")
+    entry = SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"})
     description = next(
         description
         for description in SENSOR_DESCRIPTIONS
@@ -229,7 +226,7 @@ def test_last_minute_sensor_stays_unavailable_until_fresh_complete_window() -> N
             return lambda: None
 
     coordinator = _Coordinator()
-    entry = SimpleNamespace(unique_id="entry", entry_id="entry")
+    entry = SimpleNamespace(unique_id="entry", entry_id="entry", data={"source_id": "source", "source_generation": "first"})
     description = next(
         description
         for description in SENSOR_DESCRIPTIONS
@@ -294,9 +291,8 @@ def test_source_time_window_is_inclusive_and_separate_from_ha_observation_window
     now = 1_735_689_600.75
     coordinator = _coordinator_with_client(
         {
-            "classifier_version": 1,
             "activity_buckets": [
-                {"second": int(now), "classifier_version": 1, "allowed": 2, "blocked": 1, "provisional": 1},
+                {"second": int(now), "allowed": 2, "blocked": 1, "provisional": 1},
             ],
             "query_time_buckets": [
                 {"second": int(now - 60), "count": 1},
@@ -323,7 +319,6 @@ def test_aggregate_source_time_bucket_boundary_is_at_most_one_second_coarse() ->
     now = 1_735_689_600.75
     coordinator = _coordinator_with_client(
         {
-            "classifier_version": 1,
             "activity_buckets": [],
             "query_time_buckets": [
                 {"second": int(now - 60), "count": 2},

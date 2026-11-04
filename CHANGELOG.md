@@ -5,12 +5,14 @@ All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](h
 ## [Unreleased]
 
 ### Changed
-- **Breaking:** entity IDs are now in English whatever language Home Assistant uses, for example `sensor.phe_<client>_dns_queries` and `binary_sensor.phe_<client>_unusual_activity`. Diagnostic entities follow the same rule (`sensor.<entry>_diagnostics_communication_status`). Existing entities keep their IDs; remove and re-add the integration to get the new ones, then update your dashboards and automations.
+- **Breaking:** entity IDs are now in English whatever language Home Assistant uses, for example `sensor.phe_<client>_dns_queries`, `sensor.phe_<client>_allowed` and `binary_sensor.phe_<client>_unusual_activity`. Diagnostic entities follow the same rule (`sensor.<entry>_diagnostics_communication_status`). Update your dashboards and automations after re-adding the integration.
 - **Breaking:** the rolling-minute sensor reports `queries/min` instead of `consultas/min`.
+- `classifier_rates_last_minute` is now `class_rates_last_minute`, with one count per class.
 - Logbook entries, logs and error messages are in English, and so are the fallback names and translations for languages without their own catalog.
 
 ### Removed
-- **Breaking:** upgrades from config entries older than version 8 (integration releases before the current identity scheme), including the step that archived the retired allowed and blocked sensors. An older entry no longer loads; remove and re-add it.
+- **Breaking:** every upgrade path from earlier releases: config entry migrations, the older Store reader and the archiving of retired sensors. The config entry and Store versions restart at 1, so entries from 0.14.0 or earlier no longer load; remove and re-add the integration.
+- The `legacy_allowed_count`, `legacy_blocked_count`, `active_classifier_version` and `classifier_counts` attributes, and the separate translation files of the cards. Every translation now lives in `translations/<language>.json`, so one file adds a language.
 
 ## [0.14.0] - 2026-11-03
 

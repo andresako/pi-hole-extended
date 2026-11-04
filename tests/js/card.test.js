@@ -7,7 +7,7 @@ test("validate mirrors backend rules", () => {
   assert.strictEqual(c.pheValidate("30m", "1d"), null);
   assert.strictEqual(c.pheValidate("1h", "30d"), null);
   assert.strictEqual(c.pheValidate("5m", "30d"), "unavailable");
-  assert.strictEqual(c.pheValidate("1d", "6h"), "biggerThanRange");
+  assert.strictEqual(c.pheValidate("1d", "6h"), "bigger_than_range");
 });
 
 test("invalid bucket moves to the nearest valid larger one", () => {
@@ -46,7 +46,7 @@ test("editor schema offers only integration devices and all supported options", 
 });
 
 test("editor offers lines and bars", () => {
-  const schema = c.pheEditorSchema([], { editLine: "Líneas", editBar: "Barras" });
+  const schema = c.pheEditorSchema([], { edit_line: "Líneas", edit_bar: "Barras" });
   const type = schema.find((f) => f.name === "chart_type").selector.select.options;
   assert.deepStrictEqual(type, [{ value: "line", label: "Líneas" }, { value: "bar", label: "Barras" }]);
 });
@@ -79,8 +79,8 @@ test("resolve finds a device's own entities and the diagnostics of its Pi-hole e
   const registry = [
     { ei: "sensor.phe_a_dns", di: "dev-a", tk: "queries" },
     { ei: "sensor.phe_a_min", di: "dev-a", tk: "queries_last_minute" },
-    { ei: "sensor.phe_a_allowed", di: "dev-a", tk: "allowed_v2" },
-    { ei: "sensor.phe_a_blocked", di: "dev-a", tk: "blocked_v2" },
+    { ei: "sensor.phe_a_allowed", di: "dev-a", tk: "allowed" },
+    { ei: "sensor.phe_a_blocked", di: "dev-a", tk: "blocked" },
     { ei: "binary_sensor.phe_a_unusual", di: "dev-a", tk: "unusual_activity" },
     { ei: "sensor.phe_b_dns", di: "dev-b", tk: "queries" },
     { ei: "sensor.pi_hole_coverage", di: "diag-1", tk: "coverage" },
@@ -145,4 +145,22 @@ test("live card config keeps only the options that differ from the defaults", ()
     c.pheLiveCompact({ ...all, title: "Kitchen", show_strip: false, animate: true }),
     { type: "custom:phe-live-card", entity: "sensor.x", title: "Kitchen", show_strip: false, animate: true },
   );
+});
+
+test("card strings come from the integration catalogs, with English filling the gaps", async () => {
+  const catalog = (language) => JSON.parse(require("node:fs").readFileSync(
+    require("node:path").join(__dirname, `../../custom_components/pihole_queries/translations/${language}.json`), "utf8"));
+  const requested = [];
+  globalThis.fetch = async (url) => {
+    requested.push(url);
+    const language = url.match(/translations\/(.+)\.json$/)[1];
+    if (!["en", "es"].includes(language)) return { ok: false };
+    return { ok: true, json: async () => catalog(language) };
+  };
+  const spanish = await c.pheLoadStrings("es-ES");
+  assert.strictEqual(spanish.unusual_now, catalog("es").selector.card.options.unusual_now);
+  assert.ok(requested.every((url) => url.startsWith("/pihole_queries_translations/")));
+  const unknown = await c.pheLoadStrings("fr");
+  assert.strictEqual(unknown.unusual_now, catalog("en").selector.card.options.unusual_now);
+  assert.strictEqual(unknown.not_a_key, "");
 });

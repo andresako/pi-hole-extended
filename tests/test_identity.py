@@ -17,9 +17,7 @@ from custom_components.pihole_queries.const import (
     CONF_SOURCE_GENERATION,
     CONF_SOURCE_ID,
     DOMAIN,
-    LEGACY_SOURCE_GENERATION,
-    LEGACY_STORAGE_VERSION,
-    STORAGE_KEY_PREFIX,
+    FIRST_SOURCE_GENERATION,
     STORAGE_VERSION,
 )
 from custom_components.pihole_queries.coordinator import PiHoleQueryCoordinator, _client_key
@@ -84,108 +82,16 @@ def _coordinator_for_store(store):
 
 
 @pytest.mark.asyncio
-async def test_first_generation_store_import_is_idempotent_and_keeps_v1_untouched() -> None:
-    source_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-    legacy_data = {
-        "cursor": 500,
-        "clients": {
-            "192.0.2.10": {
-                "query_count": 42,
-                "allowed_count": 31,
-                "blocked_count": 11,
-            }
-        },
-    }
-    old = _Store(legacy_data)
-    current = _Store()
-    store = _IdentityStore(current, old, source_id, LEGACY_SOURCE_GENERATION)
-
-    assert await store.async_load() == legacy_data
-    expected = {
-        "schema_version": STORAGE_VERSION,
-        "source_id": source_id,
-        "source_generation": LEGACY_SOURCE_GENERATION,
-        "data": legacy_data,
-    }
-    assert current.value == expected
-    assert old.value == legacy_data
-    assert len(current.saves) == 1
-
-    assert await store.async_load() == legacy_data
-    assert len(current.saves) == 1
-    assert old.value == legacy_data
-
-    updated = {**legacy_data, "cursor": 501}
-    await store.async_save(updated)
-    assert current.value["data"] == updated
-    assert current.value["source_id"] == source_id
-    assert current.value["source_generation"] == LEGACY_SOURCE_GENERATION
-    assert old.value == legacy_data
-
-
-@pytest.mark.asyncio
-async def test_replacement_generation_does_not_import_entry_scoped_v1_cursor() -> None:
-    legacy_data = {
-        "cursor": 900,
-        "clients": {"192.0.2.10": {"query_count": 42}},
-    }
-    old = _Store(legacy_data)
-    current = _Store()
-    store = _IdentityStore(
-        current,
-        old,
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-    )
-
-    assert await store.async_load() is None
-    assert current.value is None
-    assert current.saves == []
-    assert old.value == legacy_data
-    assert old.saves == []
-
-
-@pytest.mark.asyncio
-async def test_replacement_aggregate_scrubs_legacy_backup_without_importing_it() -> None:
-    old = _Store(
-        {
-            "cursor": 900,
-            "clients": {
-                "192.0.2.10": {
-                    "query_count": 42,
-                    "last_query": {"domain": "private.example.test"},
-                    "recent_queries": [{"id": 901}],
-                }
-            },
-        }
-    )
-    current = _Store()
-    store = _IdentityStore(
-        current,
-        old,
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-    )
-
-    assert await store.async_load() is None
-    assert current.value is None
-    assert old.value == {
-        "cursor": 900,
-        "clients": {"192.0.2.10": {"query_count": 42}},
-    }
-
-
-@pytest.mark.asyncio
-async def test_v2_store_with_different_identity_is_rejected() -> None:
+async def test_store_with_different_identity_is_rejected() -> None:
     current = _Store(
         {
             "schema_version": STORAGE_VERSION,
             "source_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-            "source_generation": LEGACY_SOURCE_GENERATION,
+            "source_generation": FIRST_SOURCE_GENERATION,
             "data": {"cursor": 500},
         }
     )
-    store = _IdentityStore(current, _Store({"cursor": 1}), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", LEGACY_SOURCE_GENERATION)
+    store = _IdentityStore(current, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", FIRST_SOURCE_GENERATION)
 
     with pytest.raises(HomeAssistantError, match="does not match"):
         await store.async_load()
@@ -193,20 +99,19 @@ async def test_v2_store_with_different_identity_is_rejected() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("payload", [None, True, 7, "bad", []])
-async def test_v2_store_with_non_mapping_payload_is_rejected(payload) -> None:
+async def test_store_with_non_mapping_payload_is_rejected(payload) -> None:
     current = _Store(
         {
             "schema_version": STORAGE_VERSION,
             "source_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            "source_generation": LEGACY_SOURCE_GENERATION,
+            "source_generation": FIRST_SOURCE_GENERATION,
             "data": payload,
         }
     )
     store = _IdentityStore(
         current,
-        _Store({"cursor": 1}),
         "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        LEGACY_SOURCE_GENERATION,
+        FIRST_SOURCE_GENERATION,
     )
 
     with pytest.raises(HomeAssistantError, match="schema"):
@@ -215,20 +120,19 @@ async def test_v2_store_with_non_mapping_payload_is_rejected(payload) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("schema_version", [True, 2.0, "2"])
-async def test_v2_store_requires_integer_schema_version(schema_version) -> None:
+async def test_store_requires_integer_schema_version(schema_version) -> None:
     current = _Store(
         {
             "schema_version": schema_version,
             "source_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            "source_generation": LEGACY_SOURCE_GENERATION,
+            "source_generation": FIRST_SOURCE_GENERATION,
             "data": {},
         }
     )
     store = _IdentityStore(
         current,
-        _Store(),
         "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        LEGACY_SOURCE_GENERATION,
+        FIRST_SOURCE_GENERATION,
     )
 
     with pytest.raises(HomeAssistantError, match="schema"):
@@ -236,7 +140,7 @@ async def test_v2_store_requires_integer_schema_version(schema_version) -> None:
 
 
 @pytest.mark.asyncio
-async def test_v2_malformed_client_fields_are_excluded_and_coverage_is_unknown() -> None:
+async def test_malformed_client_fields_are_excluded_and_coverage_is_unknown() -> None:
     data = {
         "cursor": 500,
         "clients": {
@@ -244,7 +148,7 @@ async def test_v2_malformed_client_fields_are_excluded_and_coverage_is_unknown()
                 "query_count": 42,
                 "allowed_count": True,
                 "blocked_count": 1.7,
-                "classifier_rates": "not-a-map",
+                "class_rates": "not-a-map",
             }
         },
     }
@@ -252,15 +156,14 @@ async def test_v2_malformed_client_fields_are_excluded_and_coverage_is_unknown()
         {
             "schema_version": STORAGE_VERSION,
             "source_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            "source_generation": LEGACY_SOURCE_GENERATION,
+            "source_generation": FIRST_SOURCE_GENERATION,
             "data": data,
         }
     )
     store = _IdentityStore(
         current,
-        _Store(),
         "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        LEGACY_SOURCE_GENERATION,
+        FIRST_SOURCE_GENERATION,
     )
 
     prepared = await store.async_load()
@@ -271,9 +174,7 @@ async def test_v2_malformed_client_fields_are_excluded_and_coverage_is_unknown()
     assert summary["query_count"] == 42
     assert "allowed_count" not in summary
     assert "blocked_count" not in summary
-    assert "classifier_rates" not in summary or summary["classifier_rates"] == {
-        "1": {"allowed": 0, "blocked": 0, "provisional": 0}
-    }
+    assert summary["class_rates"] == {"allowed": 0, "blocked": 0, "provisional": 0}
     assert prepared["coverage"] == "unknown"
     assert prepared["coverage_reason"] == "invalid_store_state"
     assert coordinator.coverage == "unknown"
@@ -282,144 +183,20 @@ async def test_v2_malformed_client_fields_are_excluded_and_coverage_is_unknown()
     assert "allowed_count" not in current.value["data"]["clients"]["192.0.2.10"]
 
 
-@pytest.mark.asyncio
-async def test_legacy_store_import_tolerates_malformed_fields_and_keeps_valid_totals() -> None:
-    legacy_data = {
-        "cursor": 500,
-        "clients": {
-            "192.0.2.10": {
-                "client_name": "Router",
-                "client_ip": "192.0.2.10",
-                "query_count": 42,
-                "allowed_count": 31,
-                "blocked_count": 11,
-                "classifier_counts": ["malformed"],
-                "recent_activity": [{"observed_at": [], "classification": []}],
-                "recent_queries": {"not": "a list"},
-                "last_query_id": [],
-                "last_query": "malformed",
-            }
-        },
-    }
-    old = _Store(legacy_data)
-    current = _Store()
-    store = _IdentityStore(
-        current,
-        old,
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        LEGACY_SOURCE_GENERATION,
-    )
-
-    imported = await store.async_load()
-
-    summary = imported["clients"]["192.0.2.10"]
-    assert summary["query_count"] == 42
-    assert summary["allowed_count"] == 31
-    assert summary["blocked_count"] == 11
-    assert "classifier_counts" not in summary
-    assert "recent_activity" not in summary
-    assert "recent_queries" not in summary
-    assert "last_query_id" not in summary
-    assert "last_query" not in summary
-    assert imported["coverage"] == "unknown"
-    assert imported["coverage_reason"] == "invalid_legacy_store"
-    old_summary = old.value["clients"]["192.0.2.10"]
-    assert "classifier_counts" not in old_summary
-    assert not {"last_query", "last_query_id", "recent_queries", "recent_activity"} & old_summary.keys()
-    assert current.value["data"] == imported
-    coordinator = _coordinator_for_store(store)
-    await coordinator.async_load_cursor()
-    assert coordinator.cursor == 500
-    assert coordinator.client_data["192.0.2.10"]["query_count"] == 42
-    assert coordinator.coverage == "unknown"
-    assert coordinator.coverage_reason == "invalid_legacy_store"
-
-
-@pytest.mark.asyncio
-async def test_legacy_store_without_clients_preserves_cursor_and_is_unknown() -> None:
-    old = _Store({"cursor": 500})
-    current = _Store()
-    store = _IdentityStore(
-        current,
-        old,
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        LEGACY_SOURCE_GENERATION,
-    )
-
-    imported = await store.async_load()
-
-    assert imported == {"cursor": 500}
-    assert current.value["data"] == {"cursor": 500}
-    assert old.value == {"cursor": 500}
-    coordinator = _coordinator_for_store(store)
-    await coordinator.async_load_cursor()
-    assert coordinator.cursor == 500
-    assert coordinator.client_data == {}
-    assert coordinator.coverage == "unknown"
-    assert coordinator.coverage_reason == "missing_client_summaries"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("root_value", [True, 17, "malformed", []])
-async def test_non_mapping_legacy_store_roots_fail_closed_as_invalid_store(root_value) -> None:
-    old = _Store(root_value)
-    current = _Store()
-    store = _IdentityStore(
-        current,
-        old,
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        LEGACY_SOURCE_GENERATION,
-    )
-
-    imported = await store.async_load()
-    coordinator = _coordinator_for_store(store)
-    await coordinator.async_load_cursor()
-
-    assert imported == root_value
-    assert coordinator.coverage == "unknown"
-    assert coordinator.coverage_reason == "invalid_legacy_store"
-    assert old.value == {
-        "coverage": "unknown",
-        "coverage_reason": "invalid_legacy_store",
-    }
-    assert current.value["data"] == {
-        "coverage": "unknown",
-        "coverage_reason": "invalid_legacy_store",
-    }
-
-
-@pytest.mark.asyncio
-async def test_null_legacy_store_is_indistinguishable_from_absent_store() -> None:
-    # HA Store returns None for both an absent file and stored JSON null.
-    old = _Store(None)
-    current = _Store()
-    store = _IdentityStore(
-        current,
-        old,
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        LEGACY_SOURCE_GENERATION,
-    )
-    assert await store.async_load() is None
-    assert current.value is None
-
-
-def test_legacy_entity_and_device_ids_stay_stable_for_first_generation() -> None:
+def test_first_generation_ids_use_the_source_and_keep_entity_ids_short() -> None:
     entry = SimpleNamespace(
         entry_id="entry-a",
         unique_id="https://pihole.example.test:443",
-        data={CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION},
+        data={CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION},
     )
+    prefix = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa_first_192.0.2.10"
 
-    assert _client_entity_unique_id(entry, "192.0.2.10", "queries") == (
-        "https://pihole.example.test:443_192.0.2.10"
-    )
-    assert _client_entity_unique_id(entry, "192.0.2.10", "allowed") == (
-        "https://pihole.example.test:443_192.0.2.10_allowed"
-    )
-    assert _client_device_identifier(entry, "192.0.2.10") == (
-        DOMAIN,
-        "entry-a_192.0.2.10",
-    )
+    assert _client_entity_unique_id(entry, "192.0.2.10", "queries") == prefix
+    assert _client_entity_unique_id(entry, "192.0.2.10", "allowed") == f"{prefix}_allowed"
+    assert _client_device_identifier(entry, "192.0.2.10") == (DOMAIN, prefix)
+    assert _canonical_entity_id(
+        entry, SimpleNamespace(domain="sensor", unique_id=prefix)
+    ) == "sensor.phe_192_0_2_10_dns_queries"
 
 
 def test_replacement_generation_scopes_entity_ids_and_devices() -> None:
@@ -436,10 +213,10 @@ def test_replacement_generation_scopes_entity_ids_and_devices() -> None:
     assert _client_device_identifier(entry, "192.0.2.10") == (DOMAIN, expected)
     entity = SimpleNamespace(
         domain="sensor",
-        unique_id=f"{expected}_allowed_v1",
+        unique_id=f"{expected}_allowed",
     )
     assert _canonical_entity_id(entry, entity) == (
-        f"sensor.phe_{generation.replace('-', '_')}_192_0_2_10_allowed_v1"
+        f"sensor.phe_{generation.replace('-', '_')}_192_0_2_10_allowed"
     )
 
 
@@ -451,7 +228,7 @@ def test_replacement_generation_scopes_entity_ids_and_devices() -> None:
         ("provisional", "provisional"),
     ],
 )
-def test_versioned_class_entities_get_metric_and_epoch_in_canonical_id(
+def test_class_entities_get_their_metric_in_canonical_id(
     classification: str, localized: str
 ) -> None:
     generation = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
@@ -467,12 +244,12 @@ def test_versioned_class_entities_get_metric_and_epoch_in_canonical_id(
     entity = SimpleNamespace(
         domain="sensor",
         unique_id=(
-            f"{source_id}_{generation}_192.0.2.10_{classification}_v2"
+            f"{source_id}_{generation}_192.0.2.10_{classification}"
         ),
     )
 
     assert _canonical_entity_id(entry, entity) == (
-        f"sensor.phe_{generation.replace('-', '_')}_192_0_2_10_{localized}_v2"
+        f"sensor.phe_{generation.replace('-', '_')}_192_0_2_10_{localized}"
     )
 
 
@@ -481,12 +258,12 @@ def test_two_sources_with_same_client_ip_have_distinct_entity_and_device_ids() -
         SimpleNamespace(
             entry_id="entry-a",
             unique_id="http://one.example.test:80",
-            data={CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION},
+            data={CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION},
         ),
         SimpleNamespace(
             entry_id="entry-b",
             unique_id="http://two.example.test:80",
-            data={CONF_SOURCE_ID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION},
+            data={CONF_SOURCE_ID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION},
         ),
     ]
     entity_ids = {_client_entity_unique_id(entry, "192.0.2.10", "queries") for entry in entries}
@@ -512,7 +289,7 @@ def test_same_ip_registry_ids_survive_reverse_reload_order() -> None:
             unique_id="http://one.example.test:80",
             data={
                 CONF_SOURCE_ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-                CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION,
+                CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION,
             },
         ),
         SimpleNamespace(
@@ -520,7 +297,7 @@ def test_same_ip_registry_ids_survive_reverse_reload_order() -> None:
             unique_id="http://two.example.test:80",
             data={
                 CONF_SOURCE_ID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-                CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION,
+                CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION,
             },
         ),
     ]
@@ -557,8 +334,8 @@ def test_same_ip_registry_ids_survive_reverse_reload_order() -> None:
 @pytest.mark.asyncio
 async def test_same_ip_sources_keep_independent_store_payloads() -> None:
     identities = [
-        ("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", LEGACY_SOURCE_GENERATION),
-        ("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", LEGACY_SOURCE_GENERATION),
+        ("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", FIRST_SOURCE_GENERATION),
+        ("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", FIRST_SOURCE_GENERATION),
     ]
     stores = [
         _IdentityStore(
@@ -573,7 +350,6 @@ async def test_same_ip_sources_keep_independent_store_payloads() -> None:
                     },
                 }
             ),
-            _Store(),
             source_id,
             generation,
         )
@@ -585,11 +361,5 @@ async def test_same_ip_sources_keep_independent_store_payloads() -> None:
     assert [data["cursor"] for data in loaded] == [100, 900]
     assert [data["clients"]["192.0.2.10"]["query_count"] for data in loaded] == [5, 9]
     assert len({_identity_storage_key(*identity) for identity in identities}) == 2
-
-
-def test_store_version_constants_keep_v1_reader_for_migration() -> None:
-    assert LEGACY_STORAGE_VERSION == 1
-    assert STORAGE_VERSION == 2
-    assert STORAGE_KEY_PREFIX == f"{DOMAIN}_cursor"
 
 

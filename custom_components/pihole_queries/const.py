@@ -50,16 +50,16 @@ QUERY_BATCH_SIZE = 1000
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 UPDATE_INTERVAL = timedelta(seconds=DEFAULT_SCAN_INTERVAL)
 
-LEGACY_STORAGE_VERSION = 1
-STORAGE_VERSION = 2
+STORAGE_VERSION = 1
 STORAGE_KEY_PREFIX = f"{DOMAIN}_cursor"
-LEGACY_SOURCE_GENERATION = "legacy"
+FIRST_SOURCE_GENERATION = "first"
 RECONFIGURE_SAME_SOURCE = "same_source"
 RECONFIGURE_NEW_SOURCE = "new_source"
 
 
 CARD_URL_BASE = f"/{DOMAIN}_static"
 CARD_FILENAME = "phe-activity-card.js"
+TRANSLATIONS_URL_BASE = f"/{DOMAIN}_translations"
 
 
 class Coverage(StrEnum):
@@ -78,11 +78,9 @@ class CoverageReason(StrEnum):
     CURSOR_NOT_REACHED = "cursor_not_reached"
     EMPTY_HISTORY = "empty_history"
     INVALID_CLIENT_SUMMARIES = "invalid_client_summaries"
-    INVALID_LEGACY_CURSOR = "invalid_legacy_cursor"
-    INVALID_LEGACY_STORE = "invalid_legacy_store"
+    INVALID_CURSOR = "invalid_cursor"
     INVALID_QUERY_IDS = "invalid_query_ids"
     INVALID_STORE_STATE = "invalid_store_state"
-    LEGACY_CURSOR = "legacy_cursor"
     MISSING_CLIENT_SUMMARIES = "missing_client_summaries"
     NO_BASELINE = "no_baseline"
     PAGINATION_STALLED = "pagination_stalled"

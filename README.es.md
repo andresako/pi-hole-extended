@@ -73,9 +73,9 @@ Para cada cliente, agrupadas bajo su propio dispositivo:
 |---|---|
 | `sensor.phe_<cliente>_dns_queries` | **Consultas DNS**: consultas observadas, acumuladas. |
 | `sensor.phe_<cliente>_queries_last_minute` | **Consultas (último minuto)**: recuento móvil según la hora de la consulta en Pi-hole. |
-| `sensor.phe_<cliente>_allowed_v1` | **Consultas permitidas**, acumuladas. |
-| `sensor.phe_<cliente>_blocked_v1` | **Consultas bloqueadas**, acumuladas. |
-| `sensor.phe_<cliente>_provisional_v1` | **Consultas provisionales**: resultado aún no reconocido. |
+| `sensor.phe_<cliente>_allowed` | **Consultas permitidas**, acumuladas. |
+| `sensor.phe_<cliente>_blocked` | **Consultas bloqueadas**, acumuladas. |
+| `sensor.phe_<cliente>_provisional` | **Consultas provisionales**: resultado aún no reconocido. |
 | `binary_sensor.phe_<cliente>_unusual_activity` | **Actividad inusual**, ver más abajo. |
 
 Por cada entrada de Pi-hole, cuatro sensores de diagnóstico: **Estado de comunicación**, **Última lectura correcta**, **Última consulta observada** y **Cobertura de ingesta**. `<cliente>` es la dirección del cliente con guiones bajos, por ejemplo `192_0_2_21`; el registro de entidades muestra los ID exactos.

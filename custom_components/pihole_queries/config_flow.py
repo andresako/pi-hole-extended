@@ -47,7 +47,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_UNUSUAL_ACTIVITY,
     DOMAIN,
-    LEGACY_SOURCE_GENERATION,
+    FIRST_SOURCE_GENERATION,
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
     RECONFIGURE_NEW_SOURCE,
@@ -59,6 +59,7 @@ from .const import (
     UNUSUAL_MEDIUM,
     UNUSUAL_OFF,
 )
+from .entity_ids import entity_unique_prefix
 
 
 def _schema(
@@ -180,12 +181,7 @@ def _endpoint_is_configured(
 
 def _archive_client_entities(hass: HomeAssistant, entry: config_entries.ConfigEntry) -> None:
     """Disable previous-generation client sensors while retaining their Recorder history."""
-    generation = entry.data.get(CONF_SOURCE_GENERATION, LEGACY_SOURCE_GENERATION)
-    prefix = (
-        entry.unique_id or entry.entry_id
-        if generation == LEGACY_SOURCE_GENERATION
-        else f"{entry.data[CONF_SOURCE_ID]}_{generation}"
-    ) + "_"
+    prefix = f"{entity_unique_prefix(entry)}_"
     registry = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
         if (
@@ -213,7 +209,7 @@ async def _validate_connection(hass: HomeAssistant, data: dict[str, Any]) -> Non
 class PiHoleQueriesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Configure a Pi-hole v6 instance from Home Assistant's UI."""
 
-    VERSION = 8
+    VERSION = 1
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> dict[str, Any]:
         """Configure host, API credentials, and polling interval."""
@@ -243,19 +239,9 @@ class PiHoleQueriesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         if _endpoint_is_configured(self.hass, unique):
                             errors["base"] = "already_configured"
                         else:
-                            source_id = str(uuid4())
-                            data[CONF_SOURCE_ID] = source_id
-                            data[CONF_SOURCE_GENERATION] = LEGACY_SOURCE_GENERATION
-                            existing = await self.async_set_unique_id(unique)
-                            if (
-                                existing is not None
-                                and _entry_endpoint_unique_id(existing.data) != unique
-                            ):
-                                # Reconfigure preserves the old unique_id for legacy
-                                # entity IDs. If this endpoint was released, key the
-                                # new entry by its source so that stale ownership does
-                                # not block adding it again.
-                                await self.async_set_unique_id(f"source:{source_id}")
+                            data[CONF_SOURCE_ID] = str(uuid4())
+                            data[CONF_SOURCE_GENERATION] = FIRST_SOURCE_GENERATION
+                            await self.async_set_unique_id(unique)
                             self._abort_if_unique_id_configured()
                             return self.async_create_entry(title=f"Pi-hole · {host}", data=data)
         return self.async_show_form(step_id="user", data_schema=_schema(user_input), errors=errors)
@@ -318,11 +304,9 @@ class PiHoleQueriesConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             if action == RECONFIGURE_NEW_SOURCE:
                                 data[CONF_SOURCE_GENERATION] = str(uuid4())
                                 _archive_client_entities(self.hass, current_entry)
-                            # Preserve the entry unique_id. In the first generation it
-                            # is part of the registered entity IDs; endpoint equality
-                            # is checked against the actual data of every other entry.
                             return self.async_update_reload_and_abort(
                                 current_entry,
+                                unique_id=endpoint,
                                 data=data,
                                 title=f"Pi-hole · {host}",
                                 reason="reconfigure_successful",

@@ -88,12 +88,8 @@ def _stored(cursor: int = 100) -> dict[str, Any]:
                 "query_count": 5,
                 "allowed_count": 4,
                 "blocked_count": 1,
-                "last_query_id": cursor,
-                "recent_queries": [],
-                "recent_activity": [],
-                "classifier_version": 1,
-                "classifier_counts": {"1": {"allowed": 4, "blocked": 1, "provisional": 0}},
-                "classifier_rates": {"1": {"allowed": 0, "blocked": 0, "provisional": 0}},
+                "class_counts": {"allowed": 4, "blocked": 1, "provisional": 0},
+                "class_rates": {"allowed": 0, "blocked": 0, "provisional": 0},
             }
         },
     }
@@ -163,35 +159,8 @@ async def test_overlapping_recovery_pages_deduplicate_and_keep_first_observation
     data = await coordinator._async_update_data()
 
     assert data["192.0.2.10"]["query_count"] == 8
-    assert data["192.0.2.10"]["classifier_counts"]["1"]["blocked"] == 2
-    assert "recent_queries" not in data["192.0.2.10"]
+    assert data["192.0.2.10"]["class_counts"]["blocked"] == 2
     assert len(coordinator.hass.services.calls) == 3
-
-
-@pytest.mark.asyncio
-async def test_name_fallback_reuses_legacy_key_when_case_or_spacing_changes() -> None:
-    stored = _stored(cursor=100)
-    stored["clients"] = {
-        "Living Room": {
-            "client_name": "Living Room",
-            "client_ip": "Unknown",
-            "query_count": 5,
-            "allowed_count": 4,
-            "blocked_count": 1,
-            "recent_queries": [],
-            "recent_activity": [],
-        }
-    }
-    incoming = _row(101)
-    incoming["client"] = {"name": "  living   room  "}
-    api = _Api({None: {"queries": [incoming, _row(100)]}})
-    coordinator = _coordinator(api, stored=stored)
-
-    data = await coordinator._async_update_data()
-
-    assert list(data) == ["Living Room"]
-    assert data["Living Room"]["query_count"] == 6
-    assert data["Living Room"]["client_name"] == "living   room"
 
 
 @pytest.mark.asyncio
@@ -315,7 +284,7 @@ async def test_empty_fresh_baseline_does_not_create_cursor_zero_and_stall_future
 
 
 @pytest.mark.asyncio
-async def test_invalid_legacy_cursor_starts_unknown_until_new_baseline_is_reached() -> None:
+async def test_invalid_cursor_starts_unknown_until_new_baseline_is_reached() -> None:
     api = _Api({None: {"queries": []}})
     coordinator = _coordinator(api)
     coordinator.store.value = {"clients": deepcopy(coordinator.client_data)}
@@ -329,7 +298,7 @@ async def test_invalid_legacy_cursor_starts_unknown_until_new_baseline_is_reache
     api.pages[None] = {"queries": [_row(101)]}
     await coordinator._async_update_data()
     assert coordinator.coverage == "unknown"
-    assert coordinator.coverage_reason == "invalid_legacy_cursor"
+    assert coordinator.coverage_reason == "invalid_cursor"
     assert coordinator.cursor == 101
 
     coordinator.client.pages[None] = {"queries": [_row(102), _row(101)]}
@@ -339,7 +308,7 @@ async def test_invalid_legacy_cursor_starts_unknown_until_new_baseline_is_reache
 
 
 @pytest.mark.asyncio
-async def test_non_mapping_legacy_store_is_ignored_as_unknown() -> None:
+async def test_non_mapping_store_is_ignored_as_unknown() -> None:
     api = _Api({None: {"queries": []}})
     coordinator = _coordinator(api)
     coordinator.store.value = ["not", "a", "mapping"]
@@ -350,35 +319,17 @@ async def test_non_mapping_legacy_store_is_ignored_as_unknown() -> None:
 
     assert coordinator.cursor is None
     assert coordinator.coverage == "unknown"
-    assert coordinator.coverage_reason == "invalid_legacy_store"
+    assert coordinator.coverage_reason == "invalid_store_state"
 
     api.pages[None] = {"queries": [_row(101)]}
     await coordinator._async_update_data()
     assert coordinator.coverage == "unknown"
-    assert coordinator.coverage_reason == "invalid_legacy_store"
+    assert coordinator.coverage_reason == "invalid_store_state"
     assert coordinator.cursor == 101
 
     api.pages[None] = {"queries": [_row(102), _row(101)]}
     await coordinator._async_update_data()
     assert coordinator.coverage == "complete"
-
-
-@pytest.mark.asyncio
-async def test_legacy_query_details_are_discarded_without_invalidating_totals() -> None:
-    api = _Api({None: {"queries": [_row(101), _row(100)]}})
-    coordinator = _coordinator(api)
-    coordinator.store.value["clients"]["192.0.2.10"].update(
-        {"last_query": {"domain": "private.example.test"}, "recent_queries": [{"id": "bad"}]}
-    )
-
-    await coordinator.async_load_cursor()
-    data = await coordinator._async_update_data()
-
-    assert coordinator.cursor == 101
-    assert coordinator.coverage == "complete"
-    assert "recent_queries" not in data["192.0.2.10"]
-    assert "private.example.test" not in repr(coordinator.store.value)
-    assert len(coordinator.hass.services.calls) == 1
 
 
 @pytest.mark.asyncio
@@ -419,7 +370,7 @@ async def test_non_mapping_client_summaries_keep_coverage_unknown_and_counters_u
 
 
 @pytest.mark.asyncio
-async def test_missing_client_map_is_legacy_compatible_but_remains_unknown() -> None:
+async def test_missing_client_map_remains_unknown() -> None:
     api = _Api({None: {"queries": [_row(101), _row(100)]}})
     coordinator = _coordinator(api)
     coordinator.store.value.pop("clients")
@@ -435,7 +386,7 @@ async def test_missing_client_map_is_legacy_compatible_but_remains_unknown() -> 
 
 
 @pytest.mark.asyncio
-async def test_missing_client_map_does_not_override_invalid_legacy_cursor() -> None:
+async def test_missing_client_map_does_not_override_invalid_cursor() -> None:
     api = _Api({None: {"queries": [_row(101)]}})
     coordinator = _coordinator(api)
     coordinator.store.value = {"cursor": "bad"}
@@ -448,28 +399,26 @@ async def test_missing_client_map_does_not_override_invalid_legacy_cursor() -> N
 
     assert coordinator.cursor == 101
     assert coordinator.coverage == "unknown"
-    assert coordinator.coverage_reason == "invalid_legacy_cursor"
+    assert coordinator.coverage_reason == "invalid_cursor"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "classifier_counts",
+    "class_counts",
     [
         "corrupt",
         None,
         {},
-        {"1": {"allowed": "corrupt", "blocked": 1, "provisional": 0}},
-        {"1": {"allowed": 4}},
+        {"allowed": "corrupt", "blocked": 1, "provisional": 0},
+        {"allowed": 4},
     ],
 )
-async def test_invalid_classifier_counts_fail_closed_without_resetting_series(
-    classifier_counts: Any,
+async def test_invalid_class_counts_fail_closed_without_resetting_series(
+    class_counts: Any,
 ) -> None:
     api = _Api({None: {"queries": [_row(101), _row(100)]}})
     coordinator = _coordinator(api)
-    coordinator.store.value["clients"]["192.0.2.10"]["classifier_counts"] = deepcopy(
-        classifier_counts
-    )
+    coordinator.store.value["clients"]["192.0.2.10"]["class_counts"] = deepcopy(class_counts)
 
     await coordinator.async_load_cursor()
     with pytest.raises(UpdateFailed, match="local data"):
@@ -479,7 +428,7 @@ async def test_invalid_classifier_counts_fail_closed_without_resetting_series(
     assert coordinator.coverage == "unknown"
     assert coordinator.coverage_reason == "invalid_client_summaries"
     assert coordinator.hass.services.calls == []
-    assert coordinator.store.value["clients"]["192.0.2.10"]["classifier_counts"] == classifier_counts
+    assert coordinator.store.value["clients"]["192.0.2.10"]["class_counts"] == class_counts
 
 
 @pytest.mark.asyncio
@@ -574,7 +523,7 @@ async def test_malformed_store_root_fields_fail_closed(field: str, value: Any) -
 
 
 @pytest.mark.asyncio
-async def test_null_last_query_time_remains_valid_for_legacy_baseline() -> None:
+async def test_null_last_query_time_remains_valid_for_baseline() -> None:
     api = _Api({None: {"queries": [_row(101), _row(100)]}})
     coordinator = _coordinator(api)
     coordinator.store.value["last_query_time"] = None

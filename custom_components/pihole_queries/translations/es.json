@@ -106,13 +106,13 @@
       "queries_last_minute": {
         "name": "Consultas (último minuto)"
       },
-      "allowed_v1": {
+      "allowed": {
         "name": "Consultas permitidas"
       },
-      "blocked_v1": {
+      "blocked": {
         "name": "Consultas bloqueadas"
       },
-      "provisional_v1": {
+      "provisional": {
         "name": "Consultas provisionales"
       }
     },
@@ -155,6 +155,70 @@
         "all": "Todos los clientes",
         "local_dns": "Solo registros DNS locales"
       }
+    },
+    "card": {
+      "options": {
+        "unusual": "inusual",
+        "no_devices": "No se han encontrado dispositivos de Pi-hole Extended.",
+        "no_selection": "Elige uno o más dispositivos.",
+        "loading": "Cargando…",
+        "error": "No se pudieron cargar los datos",
+        "unusual_now": "Actividad inusual",
+        "rate": "consultas/min",
+        "base": "habitual",
+        "no_base": "sin historial suficiente para una referencia",
+        "unavailable": "No disponible: los bloques de 5/15/30 min requieren un rango de 10 días o menos.",
+        "too_many": "Demasiados bloques para este rango.",
+        "bigger_than_range": "El bloque es mayor que el rango.",
+        "times": "x lo habitual",
+        "hide": "Ocultar de la gráfica",
+        "show": "Mostrar en la gráfica",
+        "history": "Abrir historial",
+        "edit_title": "Título",
+        "edit_devices": "Dispositivos",
+        "edit_bucket": "Tamaño de bloque",
+        "edit_span": "Rango",
+        "edit_log": "Escala logarítmica",
+        "edit_chart_type": "Tipo de gráfica",
+        "edit_line": "Líneas",
+        "edit_bar": "Barras",
+        "edit_overview": "Avisar de actividad inusual",
+        "edit_overview_help": "Lista cualquier dispositivo (aunque no esté en la gráfica) con actividad inusual en las últimas dos horas y muestra un contador rojo. No se muestra nada mientras todos estén normales.",
+        "edit_devices_help": "Hasta 12. Vacío muestra los tres más activos.",
+        "edit_invalid": "Ese bloque no está disponible para este rango; la tarjeta usará uno mayor.",
+        "card_name": "Actividad de Pi-hole Extended",
+        "card_description": "Actividad DNS por dispositivo con detección de actividad inusual",
+        "allowed": "Permitidas",
+        "blocked": "Bloqueadas",
+        "provisional": "Provisionales",
+        "live_normal": "Normal",
+        "live_ago": "última consulta hace {n} s",
+        "live_partial": "Datos incompletos",
+        "card_live_name": "Pi-hole Extended dispositivo en vivo",
+        "card_live_description": "Pulso en vivo de un dispositivo: ritmo, rango habitual y consultas permitidas y bloqueadas",
+        "edit_device": "Dispositivo",
+        "edit_show_title": "Título",
+        "edit_show_badge": "Etiqueta de estado",
+        "edit_show_gauge": "Indicador de ritmo",
+        "edit_show_ring": "Anillo de permitidas y bloqueadas",
+        "edit_show_legend": "Leyenda",
+        "edit_show_strip": "Barras de 60 segundos",
+        "edit_show_status": "Estado de la conexión",
+        "edit_animate": "Animaciones suaves",
+        "edit_animate_help": "Mueve el indicador y el anillo con suavidad. Desactivado por defecto.",
+        "edit_device_help": "Elige el dispositivo. Es su contador de consultas DNS; la tarjeta encuentra el resto sola.",
+        "edit_title_help": "Opcional. Déjalo vacío para usar el nombre del dispositivo.",
+        "edit_display": "Qué mostrar",
+        "edit_behavior": "Comportamiento",
+        "edit_show_title_help": "El nombre del dispositivo, o tu título, en la parte superior de la tarjeta.",
+        "edit_show_badge_help": "Muestra Normal, o Actividad inusual con cuántas veces el ritmo habitual.",
+        "edit_show_gauge_help": "Consultas por minuto ahora mismo, con el umbral de aviso y, si se conoce, el ritmo habitual.",
+        "edit_show_ring_help": "El anillo alrededor del indicador con la proporción de consultas permitidas, bloqueadas y provisionales.",
+        "edit_show_legend_help": "Los totales de consultas permitidas, bloqueadas y provisionales.",
+        "edit_show_strip_help": "Una barra por segundo del último minuto, según llegan las consultas.",
+        "edit_show_status_help": "Un punto de color y el tiempo desde la última consulta. Ámbar o rojo si los datos pueden estar atrasados o incompletos.",
+        "live_threshold": "aviso en {n}"
+      }
     }
   },
   "device": {
@@ -163,6 +227,12 @@
     },
     "pihole_instance": {
       "name": "{entry_title} · Diagnóstico"
+    },
+    "unknown_client": {
+      "name": "Cliente desconocido"
+    },
+    "other_devices": {
+      "name": "Otros dispositivos"
     }
   }
 }

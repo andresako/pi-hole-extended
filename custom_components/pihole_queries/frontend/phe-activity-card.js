@@ -20,18 +20,27 @@ const PHE_MAX_DEVICES = 12;
 const PHE_COLORS = ["#4e79a7", "#f28e2b", "#59a14f", "#b07aa1", "#76b7b2", "#edc948", "#9c755f", "#7f7f7f", "#af7aa1", "#86bcb6", "#d4a6c8", "#8cd17d"];
 const PHE_ALERT = "#e15759";
 
-const PHE_LANGUAGES = ["en", "es"];
-const PHE_TRANSLATIONS_URL = "/pihole_queries_static/translations/";
+const PHE_TRANSLATIONS_URL = "/pihole_queries_translations/";
 const PHE_NO_STRINGS = new Proxy({}, { get: () => "" });
 const pheStringCache = {};
 
-/** Load frontend/translations/<language>.json (English fills any gap). */
+/** Read the card strings from the integration's translations/<language>.json. */
+function pheReadCatalog(language) {
+  return fetch(`${PHE_TRANSLATIONS_URL}${language}.json`, { cache: "no-cache" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((catalog) => (catalog && catalog.selector && catalog.selector.card && catalog.selector.card.options) || null)
+    .catch(() => null);
+}
+
+/** Load the card strings for a language; English fills any gap. */
 function pheLoadStrings(language) {
-  const short = String(language || "en").slice(0, 2);
-  const lang = PHE_LANGUAGES.includes(short) ? short : "en";
+  const lang = String(language || "en");
   if (!pheStringCache[lang]) {
-    const read = (code) => fetch(`${PHE_TRANSLATIONS_URL}${code}.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
-    pheStringCache[lang] = Promise.all([read("en"), lang === "en" ? {} : read(lang)]).then(([en, own]) => {
+    const short = lang.split("-")[0];
+    pheStringCache[lang] = Promise.all([
+      pheReadCatalog("en"),
+      lang === "en" ? null : pheReadCatalog(lang).then((own) => own || (short === lang ? null : pheReadCatalog(short))),
+    ]).then(([en, own]) => {
       const strings = { ...en, ...own };
       return new Proxy(strings, { get: (target, key) => (key in target ? target[key] : "") });
     });
@@ -44,9 +53,9 @@ function pheValidate(bucket, span) {
   const b = PHE_BUCKET_SECONDS[bucket];
   const s = PHE_SPAN_SECONDS[span];
   if (!b || !s) return "unavailable";
-  if (b > s) return "biggerThanRange";
+  if (b > s) return "bigger_than_range";
   if (b < 3600 && s > PHE_FINE_LIMIT) return "unavailable";
-  if (s / b > PHE_MAX_BUCKETS) return "tooMany";
+  if (s / b > PHE_MAX_BUCKETS) return "too_many";
   return null;
 }
 
@@ -230,7 +239,7 @@ class PheActivityCard extends HTMLElement {
   _chart() {
     const t = this._t;
     if (this._status === "error") return `<div class="note">${t.error}</div>`;
-    if (this._status === "empty") return `<div class="note">${t.noSelection}</div>`;
+    if (this._status === "empty") return `<div class="note">${t.no_selection}</div>`;
     if (this._status === "invalid") return `<div class="note">${t[pheValidate(this._state.bucket, this._state.span)] || t.unavailable}</div>`;
     if (!this._data) return `<div class="note">${t.loading}</div>`;
     const d = this._data;
@@ -299,7 +308,7 @@ class PheActivityCard extends HTMLElement {
       const color = PHE_COLORS[i % PHE_COLORS.length];
       const unusual = s && s.runs.length > 0;
       const latest = s && s.latest;
-      const detail = !s ? "" : !s.has_baseline ? t.noBase : latest ? `${pheFmt(latest.rate)} ${t.rate} · ${t.base} ${pheFmt(latest.base)}` : "";
+      const detail = !s ? "" : !s.has_baseline ? t.no_base : latest ? `${pheFmt(latest.rate)} ${t.rate} · ${t.base} ${pheFmt(latest.base)}` : "";
       return { id, color, unusual, score: s ? s.score : 0, label: this._label(id), detail };
     }).sort((a, b) => b.score - a.score);
     return rows.map((r) => {
@@ -354,8 +363,8 @@ class PheActivityCard extends HTMLElement {
       </style>
       <ha-card>
         ${this._cfg.title || unusual.length ? `<div class="head"><h2>${this._esc(this._cfg.title || "")}</h2>${unusual.length ? `<span class="badge">${unusual.length} ${t.unusual}</span>` : ""}</div>` : ""}
-        ${this._devices.length ? "" : `<div class="note">${t.noDevices}</div>`}
-        ${this._state.overview && unusual.length ? `<div class="overview"><b>${t.unusualNow}:</b> ${overview}</div>` : ""}
+        ${this._devices.length ? "" : `<div class="note">${t.no_devices}</div>`}
+        ${this._state.overview && unusual.length ? `<div class="overview"><b>${t.unusual_now}:</b> ${overview}</div>` : ""}
         ${this._chart()}
         <div class="legend">${this._legend()}</div>
       </ha-card>`;
@@ -437,7 +446,7 @@ function pheEditorSchema(devices, t) {
         { name: "span", selector: { select: { mode: "dropdown", options: PHE_SPANS.map((v) => ({ value: v, label: v })) } } },
       ],
     },
-    { name: "chart_type", selector: { select: { mode: "box", options: [{ value: "line", label: t.editLine }, { value: "bar", label: t.editBar }] } } },
+    { name: "chart_type", selector: { select: { mode: "box", options: [{ value: "line", label: t.edit_line }, { value: "bar", label: t.edit_bar }] } } },
     { name: "log_scale", selector: { boolean: {} } },
     { name: "show_overview", selector: { boolean: {} } },
   ];
@@ -482,14 +491,14 @@ class PheActivityCardEditor extends HTMLElement {
       });
       this.append(this._form, this._note);
     }
-    const labels = { title: t.editTitle, entities: t.editDevices, bucket: t.editBucket, span: t.editSpan, chart_type: t.editChartType, log_scale: t.editLog, show_overview: t.editOverview };
-    const helpers = { entities: t.editDevicesHelp, show_overview: t.editOverviewHelp };
+    const labels = { title: t.edit_title, entities: t.edit_devices, bucket: t.edit_bucket, span: t.edit_span, chart_type: t.edit_chart_type, log_scale: t.edit_log, show_overview: t.edit_overview };
+    const helpers = { entities: t.edit_devices_help, show_overview: t.edit_overview_help };
     this._form.hass = this._hass;
     this._form.data = this._config;
     this._form.schema = pheEditorSchema(pheDiscover(this._hass.states, this._config.names), t);
     this._form.computeLabel = (item) => labels[item.name] || item.name;
     this._form.computeHelper = (item) => helpers[item.name] || "";
-    this._note.textContent = pheValidate(this._config.bucket, this._config.span) ? t.editInvalid : "";
+    this._note.textContent = pheValidate(this._config.bucket, this._config.span) ? t.edit_invalid : "";
   }
 }
 
@@ -528,7 +537,7 @@ function pheResolveDevice(registry, devices, counterId) {
   const mine = registry.filter((e) => e.di === me.di);
   const own = configEntries(me.di);
   const shared = registry.filter((e) => e.di !== me.di && configEntries(e.di).some((entry) => own.includes(entry)));
-  const pick = (list, key) => (list.find((e) => e.tk === key || e.tk.startsWith(`${key}_`)) || {}).ei;
+  const pick = (list, key) => (list.find((e) => e.tk === key) || {}).ei;
   return {
     device: me.di,
     counter: counterId,
@@ -791,10 +800,10 @@ class PheLiveCard extends HTMLElement {
     this._el.card.classList.toggle("dim", rate == null);
     this._el.badge.classList.toggle("alert", isUnusual);
     pheSetHidden(this._el.badge, !this._badgeShown || !unusual);
-    this._el.badge.textContent = unusual ? (isUnusual ? `${t.unusualNow}${attrs.times_usual ? ` · ${attrs.times_usual} ×` : ""}` : t.liveNormal) : "";
+    this._el.badge.textContent = unusual ? (isUnusual ? `${t.unusual_now}${attrs.times_usual ? ` · ${attrs.times_usual} ×` : ""}` : t.live_normal) : "";
     this._el.unit.textContent = t.rate || "";
-    this._el.sub.textContent = usual ? `${t.base} ${pheFmt(usual)}` : unusual && usual == null ? t.noBase : "";
-    this._el.sub2.textContent = limit != null ? t.liveThreshold.replace("{n}", pheFmt(limit)) : "";
+    this._el.sub.textContent = usual ? `${t.base} ${pheFmt(usual)}` : unusual && usual == null ? t.no_base : "";
+    this._el.sub2.textContent = limit != null ? t.live_threshold.replace("{n}", pheFmt(limit)) : "";
     this._el.band.setAttribute("d", usual ? pheLiveArc(84, PHE_LIVE_SWEEP[0], pheLiveAngle(usual, this._max)) : "");
     if (limit != null) {
       const angle = pheLiveAngle(limit, this._max);
@@ -825,7 +834,7 @@ class PheLiveCard extends HTMLElement {
     const bad = status && status.state === "error";
     const warn = (status && status.state !== "connected") || (coverage && coverage.state !== "complete");
     this._el.dot.className = `dot ${bad ? "bad" : warn ? "warn" : status ? "ok" : ""}`;
-    this._el.cov.textContent = coverage && coverage.state !== "complete" ? t.livePartial : "";
+    this._el.cov.textContent = coverage && coverage.state !== "complete" ? t.live_partial : "";
     this._lastQuery = e.last_query && this._hass.states[e.last_query] ? Date.parse(this._hass.states[e.last_query].state) : NaN;
     this._paintAgo();
     this._paintStrip();
@@ -887,9 +896,9 @@ class PheLiveCard extends HTMLElement {
 
   _paintAgo() {
     const t = this._strings;
-    if (!t.liveAgo || !Number.isFinite(this._lastQuery)) { this._el.ago.textContent = ""; return; }
+    if (!t.live_ago || !Number.isFinite(this._lastQuery)) { this._el.ago.textContent = ""; return; }
     const seconds = Math.max(0, Math.round((Date.now() - this._lastQuery) / 1000));
-    this._el.ago.textContent = t.liveAgo.replace("{n}", String(seconds));
+    this._el.ago.textContent = t.live_ago.replace("{n}", String(seconds));
   }
 }
 
@@ -904,8 +913,8 @@ function pheLiveEditorSchema(devices, t) {
   return [
     { name: "entity", required: true, selector: { entity: { include_entities: devices.map((d) => d.id) } } },
     { name: "title", selector: { text: {} } },
-    { type: "expandable", name: "", title: t.editDisplay, flatten: true, expanded: true, schema: ["show_title", "show_badge", "show_gauge", "show_ring", "show_legend", "show_strip", "show_status"].map(toggle) },
-    { type: "expandable", name: "", title: t.editBehavior, flatten: true, schema: [toggle("animate")] },
+    { type: "expandable", name: "", title: t.edit_display, flatten: true, expanded: true, schema: ["show_title", "show_badge", "show_gauge", "show_ring", "show_legend", "show_strip", "show_status"].map(toggle) },
+    { type: "expandable", name: "", title: t.edit_behavior, flatten: true, schema: [toggle("animate")] },
   ];
 }
 
@@ -943,12 +952,12 @@ class PheLiveCardEditor extends HTMLElement {
       this.append(this._form);
     }
     const labels = {
-      entity: t.editDevice, title: t.editTitle, show_title: t.editShowTitle, show_badge: t.editShowBadge, show_gauge: t.editShowGauge,
-      show_ring: t.editShowRing, show_legend: t.editShowLegend, show_strip: t.editShowStrip, show_status: t.editShowStatus, animate: t.editAnimate,
+      entity: t.edit_device, title: t.edit_title, show_title: t.edit_show_title, show_badge: t.edit_show_badge, show_gauge: t.edit_show_gauge,
+      show_ring: t.edit_show_ring, show_legend: t.edit_show_legend, show_strip: t.edit_show_strip, show_status: t.edit_show_status, animate: t.edit_animate,
     };
     const helpers = {
-      entity: t.editDeviceHelp, title: t.editTitleHelp, show_title: t.editShowTitleHelp, show_badge: t.editShowBadgeHelp, show_gauge: t.editShowGaugeHelp,
-      show_ring: t.editShowRingHelp, show_legend: t.editShowLegendHelp, show_strip: t.editShowStripHelp, show_status: t.editShowStatusHelp, animate: t.editAnimateHelp,
+      entity: t.edit_device_help, title: t.edit_title_help, show_title: t.edit_show_title_help, show_badge: t.edit_show_badge_help, show_gauge: t.edit_show_gauge_help,
+      show_ring: t.edit_show_ring_help, show_legend: t.edit_show_legend_help, show_strip: t.edit_show_strip_help, show_status: t.edit_show_status_help, animate: t.edit_animate_help,
     };
     this._form.hass = this._hass;
     this._form.data = this._config;
@@ -969,14 +978,14 @@ function pheRegister() {
     customElements.define("phe-live-card", PheLiveCard);
     window.customCards = window.customCards || [];
     pheLoadStrings(document.documentElement.lang || navigator.language).then((t) => {
-      window.customCards.push({ type: "phe-live-card", name: t.cardLiveName, description: t.cardLiveDescription, preview: true });
+      window.customCards.push({ type: "phe-live-card", name: t.card_live_name, description: t.card_live_description, preview: true });
     });
   }
   if (!customElements.get("phe-activity-card")) {
     customElements.define("phe-activity-card", PheActivityCard);
     window.customCards = window.customCards || [];
     pheLoadStrings(document.documentElement.lang || navigator.language).then((t) => {
-      window.customCards.push({ type: "phe-activity-card", name: t.cardName, description: t.cardDescription, preview: true });
+      window.customCards.push({ type: "phe-activity-card", name: t.card_name, description: t.card_description, preview: true });
     });
   }
 }
@@ -997,5 +1006,5 @@ if (typeof customElements !== "undefined") {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheResolveDevice, pheLiveCompact, pheLiveFeed, pheLiveRecord, pheLiveSlots, pheLiveBeats, pheLiveAngle, pheLiveArc };
+  module.exports = { pheLoadStrings, pheValidate, pheNearestValidBucket, pheDiscover, pheNiceMax, pheFmt, pheEditorSchema, pheResolveDevice, pheLiveCompact, pheLiveFeed, pheLiveRecord, pheLiveSlots, pheLiveBeats, pheLiveAngle, pheLiveArc };
 }

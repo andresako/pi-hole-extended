@@ -18,7 +18,7 @@ from custom_components.pihole_queries.const import (
 )
 
 
-def test_options_schema_defaults_to_legacy_detail_and_all_activity() -> None:
+def test_options_schema_defaults_to_detail_and_all_activity() -> None:
     schema = _schema(include_connection=False, include_retention=True)
     result = schema({CONF_SCAN_INTERVAL: 15})
 

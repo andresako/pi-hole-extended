@@ -27,26 +27,16 @@ def _keys(value):
     return None
 
 
-def test_base_and_shipped_translations_have_the_same_shape() -> None:
+def test_shipped_translations_have_the_same_shape() -> None:
     catalogs = [
         json.loads(path.read_text(encoding="utf-8"))
         for path in (
-            COMPONENT / "strings.json",
             COMPONENT / "translations" / "en.json",
             COMPONENT / "translations" / "es.json",
         )
     ]
 
-    assert _keys(catalogs[0]) == _keys(catalogs[1]) == _keys(catalogs[2])
-
-
-def test_base_catalog_is_english() -> None:
-    base = json.loads((COMPONENT / "strings.json").read_text(encoding="utf-8"))
-    english = json.loads(
-        (COMPONENT / "translations" / "en.json").read_text(encoding="utf-8")
-    )
-
-    assert base == english
+    assert _keys(catalogs[0]) == _keys(catalogs[1])
 
 
 def test_all_client_and_diagnostic_sensor_names_have_both_translations() -> None:
@@ -63,23 +53,19 @@ def test_all_client_and_diagnostic_sensor_names_have_both_translations() -> None
         for catalog in translations.values():
             assert catalog["entity"]["sensor"][description.translation_key]["name"]
 
-    assert translations["en"]["entity"]["sensor"]["allowed_v1"]["name"] == "Allowed queries"
-    assert translations["en"]["entity"]["sensor"]["blocked_v1"]["name"] == "Blocked queries"
-    assert translations["en"]["entity"]["sensor"]["provisional_v1"]["name"] == "Provisional queries"
-    assert "v1" not in " ".join(
-        translations["en"]["entity"]["sensor"][key]["name"]
-        for key in ("allowed_v1", "blocked_v1", "provisional_v1")
-    )
+    assert translations["en"]["entity"]["sensor"]["allowed"]["name"] == "Allowed queries"
+    assert translations["en"]["entity"]["sensor"]["blocked"]["name"] == "Blocked queries"
+    assert translations["en"]["entity"]["sensor"]["provisional"]["name"] == "Provisional queries"
 
 
 def test_translation_changes_do_not_change_client_unique_ids() -> None:
-    entry = SimpleNamespace(unique_id="stable-entry", entry_id="entry-id")
+    entry = SimpleNamespace(unique_id="stable-entry", entry_id="entry-id", data={"source_id": "source", "source_generation": "first"})
     expected = {
-        "queries": "stable-entry_192.0.2.10",
-        "queries_last_minute": "stable-entry_192.0.2.10_queries_last_minute",
-        "allowed_v1": "stable-entry_192.0.2.10_allowed_v1",
-        "blocked_v1": "stable-entry_192.0.2.10_blocked_v1",
-        "provisional_v1": "stable-entry_192.0.2.10_provisional_v1",
+        "queries": "source_first_192.0.2.10",
+        "queries_last_minute": "source_first_192.0.2.10_queries_last_minute",
+        "allowed": "source_first_192.0.2.10_allowed",
+        "blocked": "source_first_192.0.2.10_blocked",
+        "provisional": "source_first_192.0.2.10_provisional",
     }
 
     for description in SENSOR_DESCRIPTIONS:
@@ -89,49 +75,44 @@ def test_translation_changes_do_not_change_client_unique_ids() -> None:
 
 
 def test_unknown_client_device_fallback_uses_home_assistant_language() -> None:
-    entry = SimpleNamespace(unique_id="stable-entry", entry_id="entry-id")
+    entry = SimpleNamespace(unique_id="stable-entry", entry_id="entry-id", data={"source_id": "source", "source_generation": "first"})
     description = SENSOR_DESCRIPTIONS[0]
     actual_ids = set()
 
-    for language, expected_name in (
-        ("en-US", "Unknown client"),
-        ("es-ES", "Cliente desconocido"),
-        ("fr", "Unknown client"),
-    ):
+    for language in ("en-US", "es-ES", "fr"):
         coordinator = SimpleNamespace(
             client_data={"unknown": {"client_name": "Unknown client"}},
             hass=SimpleNamespace(config=SimpleNamespace(language=language)),
         )
         sensor = PiHoleClientSensor(coordinator, entry, "unknown", description)
 
-        assert sensor.device_info["translation_key"] == "client_device"
-        assert sensor.device_info["translation_placeholders"] == {"client_name": expected_name}
+        assert sensor.device_info["translation_key"] == "unknown_client"
         actual_ids.add(sensor.unique_id)
 
-    assert actual_ids == {"stable-entry_unknown"}
+    assert actual_ids == {"source_first_unknown"}
 
 
 def test_entity_ids_are_english_and_ignore_the_language() -> None:
     entry = SimpleNamespace(
-        unique_id="stable-entry", entry_id="entry-id", title="Pi-hole 192.0.2.2", data={}
+        unique_id="stable-entry", entry_id="entry-id", title="Pi-hole 192.0.2.2", data={"source_id": "source", "source_generation": "first"}
     )
 
     assert {
-        canonical_entity_id(entry, domain, f"stable-entry_192.0.2.10{suffix}")
+        canonical_entity_id(entry, domain, f"source_first_192.0.2.10{suffix}")
         for domain, suffix in (
             ("sensor", ""),
             ("sensor", "_queries_last_minute"),
-            ("sensor", "_allowed_v1"),
-            ("sensor", "_blocked_v1"),
-            ("sensor", "_provisional_v1"),
+            ("sensor", "_allowed"),
+            ("sensor", "_blocked"),
+            ("sensor", "_provisional"),
             ("binary_sensor", "_unusual_activity"),
         )
     } == {
         "sensor.phe_192_0_2_10_dns_queries",
         "sensor.phe_192_0_2_10_queries_last_minute",
-        "sensor.phe_192_0_2_10_allowed_v1",
-        "sensor.phe_192_0_2_10_blocked_v1",
-        "sensor.phe_192_0_2_10_provisional_v1",
+        "sensor.phe_192_0_2_10_allowed",
+        "sensor.phe_192_0_2_10_blocked",
+        "sensor.phe_192_0_2_10_provisional",
         "binary_sensor.phe_192_0_2_10_unusual_activity",
     }
     assert {description.key: diagnostic_entity_id(entry, description.key)

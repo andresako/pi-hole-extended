@@ -27,14 +27,13 @@ def valid_query_time_buckets(value: Any) -> bool:
     return True
 
 
-def valid_classifier_epoch(epoch: Any) -> bool:
-    """Accept only canonical, bounded numeric classifier versions."""
-    if (
-        not isinstance(epoch, str)
-        or not 1 <= len(epoch) <= 10
-        or not epoch.isascii()
-        or not epoch.isdecimal()
-    ):
-        return False
-    version = int(epoch)
-    return 1 <= version <= 2**31 - 1 and str(version) == epoch
+def valid_class_counts(value: Any) -> bool:
+    """Accept exactly one non-negative integer per query class."""
+    return (
+        isinstance(value, dict)
+        and set(value) == {"allowed", "blocked", "provisional"}
+        and all(
+            isinstance(count, int) and not isinstance(count, bool) and count >= 0
+            for count in value.values()
+        )
+    )

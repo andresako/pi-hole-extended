@@ -20,8 +20,9 @@ from custom_components.pihole_queries.binary_sensor import PiHoleUnusualActivity
 from custom_components.pihole_queries.config_flow import _schema
 from custom_components.pihole_queries.const import (
     CONF_SOURCE_GENERATION,
+    CONF_SOURCE_ID,
     CONF_UNUSUAL_ACTIVITY,
-    LEGACY_SOURCE_GENERATION,
+    FIRST_SOURCE_GENERATION,
 )
 
 
@@ -49,7 +50,7 @@ def test_summary_reports_rate_multiple_and_start_of_run() -> None:
 ENTRY = SimpleNamespace(
     entry_id="entry-1",
     unique_id="pi-hole.test",
-    data={CONF_SOURCE_GENERATION: LEGACY_SOURCE_GENERATION},
+    data={CONF_SOURCE_ID: "source", CONF_SOURCE_GENERATION: FIRST_SOURCE_GENERATION},
     options={},
     async_on_unload=lambda unsub: None,
 )
@@ -68,8 +69,8 @@ async def test_monitor_stores_a_result_per_client_and_notifies() -> None:
     monitor, registry = _monitor(
         ["192.0.2.10", "192.0.2.11"],
         {
-            "pi-hole.test_192.0.2.10": "sensor.phe_192_0_2_10_dns_queries",
-            "pi-hole.test_192.0.2.11": "sensor.phe_192_0_2_11_dns_queries",
+            "source_first_192.0.2.10": "sensor.phe_192_0_2_10_dns_queries",
+            "source_first_192.0.2.11": "sensor.phe_192_0_2_11_dns_queries",
         },
     )
     calls = []
@@ -99,7 +100,7 @@ async def test_monitor_stores_a_result_per_client_and_notifies() -> None:
 
 
 async def test_monitor_keeps_previous_results_when_the_recorder_fails() -> None:
-    monitor, registry = _monitor(["192.0.2.10"], {"pi-hole.test_192.0.2.10": "sensor.x"})
+    monitor, registry = _monitor(["192.0.2.10"], {"source_first_192.0.2.10": "sensor.x"})
     monitor.results = {"192.0.2.10": {"ready": True, "unusual": True}}
     with (
         patch.object(monitor_module.er, "async_get", return_value=registry),
@@ -141,7 +142,7 @@ def test_sensor_exposes_rates_and_start() -> None:
     assert attrs["usual_rate"] == 4.0
     assert attrs["times_usual"] == 30.0
     assert attrs["since"] == datetime(2025, 1, 1, tzinfo=UTC)
-    assert sensor.unique_id == "pi-hole.test_192.0.2.10_unusual_activity"
+    assert sensor.unique_id == "source_first_192.0.2.10_unusual_activity"
     assert sensor.entity_description.translation_key == "unusual_activity"
 
 
@@ -150,7 +151,7 @@ def test_sensor_requests_its_phe_entity_id_up_front() -> None:
 
 
 def test_sensor_id_is_normalised_under_phe() -> None:
-    entity = SimpleNamespace(domain="binary_sensor", unique_id="pi-hole.test_192.0.2.10_unusual_activity")
+    entity = SimpleNamespace(domain="binary_sensor", unique_id="source_first_192.0.2.10_unusual_activity")
     assert (
         _canonical_entity_id(ENTRY, entity)
         == "binary_sensor.phe_192_0_2_10_unusual_activity"
@@ -200,7 +201,7 @@ async def test_platform_creates_one_sensor_per_client_unless_off() -> None:
     with patch.object(platform, "UnusualActivityMonitor") as monitor:
         await platform.async_setup_entry(hass, entry, lambda entities: added.extend(entities))
     assert [e.unique_id for e in added] == [
-        "pi-hole.test_192.0.2.10_unusual_activity",
-        "pi-hole.test_192.0.2.11_unusual_activity",
+        "source_first_192.0.2.10_unusual_activity",
+        "source_first_192.0.2.11_unusual_activity",
     ]
     monitor.return_value.async_start.assert_called_once_with()
