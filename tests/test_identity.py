@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -12,6 +13,7 @@ from custom_components.pihole_queries import (
     _canonical_entity_id,
     _identity_storage_key,
     _IdentityStore,
+    _make_store,
 )
 from custom_components.pihole_queries.const import (
     CONF_SOURCE_GENERATION,
@@ -38,6 +40,15 @@ class _Store:
     async def async_save(self, value):
         self.value = deepcopy(value)
         self.saves.append(deepcopy(value))
+
+
+def test_real_home_assistant_store_path_is_in_config_storage(tmp_path) -> None:
+    config = SimpleNamespace(
+        config_dir=str(tmp_path), path=lambda *parts: str(Path(tmp_path).joinpath(*parts))
+    )
+    store = _make_store(SimpleNamespace(config=config, data={}), "source", "first")
+    assert Path(store.current.path) == tmp_path / ".storage" / "pihole_queries_cursor_source_first"
+    assert Path(store.misplaced.path) == Path("/pihole_queries_translations")
 
 
 class _EntityRegistry:
@@ -79,6 +90,52 @@ def _coordinator_for_store(store):
     coordinator._client_store_invalid = False
     coordinator._store_state_invalid = False
     return coordinator
+
+
+@pytest.mark.asyncio
+async def test_misplaced_store_is_recovered_once_for_matching_source() -> None:
+    source = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    payload = {
+        "schema_version": STORAGE_VERSION,
+        "source_id": source,
+        "source_generation": FIRST_SOURCE_GENERATION,
+        "data": {"cursor": 500, "clients": {"client": {"query_count": 42}}},
+    }
+    current, misplaced = _Store(), _Store(payload)
+    store = _IdentityStore(current, source, FIRST_SOURCE_GENERATION, misplaced=misplaced)
+
+    recovered = await store.async_load()
+    assert recovered["clients"]["client"]["query_count"] == 42
+    assert current.value["data"] == recovered
+    assert misplaced.value == payload
+
+    # Once copied, later updates in the correct location win over the old file.
+    current.value["data"]["clients"]["client"]["query_count"] = 100
+    assert (await store.async_load())["clients"]["client"]["query_count"] == 100
+
+
+@pytest.mark.asyncio
+async def test_misplaced_store_from_other_source_is_never_imported() -> None:
+    current = _Store()
+    misplaced = _Store({"source_id": "other", "source_generation": FIRST_SOURCE_GENERATION})
+    store = _IdentityStore(current, "source", FIRST_SOURCE_GENERATION, misplaced=misplaced)
+    assert await store.async_load() is None
+    assert not current.saves
+
+
+@pytest.mark.asyncio
+async def test_misplaced_store_is_not_used_if_current_store_exists() -> None:
+    source = "source"
+    payload = {
+        "schema_version": STORAGE_VERSION,
+        "source_id": source,
+        "source_generation": FIRST_SOURCE_GENERATION,
+        "data": {"cursor": 1},
+    }
+    current, misplaced = _Store(payload), _Store({"source_id": source})
+    store = _IdentityStore(current, source, FIRST_SOURCE_GENERATION, misplaced=misplaced)
+    assert (await store.async_load())["cursor"] == 1
+    assert not current.saves
 
 
 @pytest.mark.asyncio
