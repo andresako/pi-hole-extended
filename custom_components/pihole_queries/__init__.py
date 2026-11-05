@@ -60,6 +60,16 @@ def _identity_storage_key(source_id: str, generation: str) -> str:
     return f"{STORAGE_KEY_PREFIX}_{source_id}_{generation}"
 
 
+def _make_store(hass: HomeAssistant, source_id: str, generation: str) -> _IdentityStore:
+    """Create the source-specific store and a reader for the misplaced 1.0.0 file."""
+    return _IdentityStore(
+        Store(hass, STORAGE_VERSION, _identity_storage_key(source_id, generation)),
+        source_id,
+        generation,
+        misplaced=Store(hass, STORAGE_VERSION, TRANSLATIONS_URL_BASE, read_only=True),
+    )
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration domain."""
     hass.data.setdefault(DOMAIN, {})
@@ -104,16 +114,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if source_id is None or generation is None:
         await client.async_close()
         raise HomeAssistantError("The entry has no valid source_id/source_generation identity")
-    store = _IdentityStore(
-        Store(
-            hass,
-            STORAGE_VERSION,
-            TRANSLATIONS_URL_BASE,
-            _identity_storage_key(source_id, generation),
-        ),
-        source_id,
-        generation,
-    )
+    store = _make_store(hass, source_id, generation)
     coordinator = PiHoleQueryCoordinator(hass, entry, client, store)
     try:
         await coordinator.async_load_cursor()

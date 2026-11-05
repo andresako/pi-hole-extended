@@ -48,10 +48,12 @@ class _IdentityStore:
         current: Store,
         source_id: str,
         generation: str,
+        misplaced: Store | None = None,
     ) -> None:
         self.current = current
         self.source_id = source_id
         self.generation = generation
+        self.misplaced = misplaced
 
     @staticmethod
     def _sanitize_store_data(data: Any) -> bool:
@@ -364,8 +366,19 @@ class _IdentityStore:
     async def async_load(self) -> dict[str, Any] | None:
         """Load the Store, rejecting data from another source or schema."""
         current = await self.current.async_load()
+        migrating = False
         if current is None:
-            return None
+            if self.misplaced is None:
+                return None
+            current = await self.misplaced.async_load()
+            # The old path was shared by every source. Only its owner may
+            # recover it; leave it untouched for any other source to read.
+            if not isinstance(current, dict) or (
+                current.get("source_id") != self.source_id
+                or current.get("source_generation") != self.generation
+            ):
+                return None
+            migrating = True
         if (
             not isinstance(current, dict)
             or isinstance(current.get("schema_version"), bool)
@@ -381,7 +394,7 @@ class _IdentityStore:
         prepared = self._prepare_data(current["data"])
         changed = prepared != current["data"]
         changed = self._sanitize_store_data(prepared) or changed
-        if changed:
+        if changed or migrating:
             await self.async_save(prepared)
         return prepared
 

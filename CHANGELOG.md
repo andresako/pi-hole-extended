@@ -2,6 +2,11 @@
 
 All notable changes to Pi-hole Extended. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- Persist client counters in Home Assistant's configuration storage so they survive container recreation. Recover the matching counters from the misplaced file when it is still available.
+
 ## [1.0.0] - 2026-11-04
 
 First release in the HACS default catalog. It removes everything kept for earlier versions, so **existing installations must remove and re-add the integration**, which starts its counters and statistics from zero.
